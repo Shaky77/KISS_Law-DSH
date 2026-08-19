@@ -1,0 +1,8 @@
+{
+  "name": "dsh-weiwen-law",
+  "version": "0.1.0",
+  "description": "唯稳律（Weiwen's Law）白箱风控插件 —— DeepSeek Harness (Cordis) 实现",
+  "type": "module",
+  "main": "./src/index.js",
+  "license": "MIT"
+}

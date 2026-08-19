@@ -1,0 +1,4 @@
+# 唯稳律插件叠加补丁（DSH --patch overlay）
+# 叠加到 headless profile：dsh --profile headless --patch ./weiwen-law.patch.yml "任务"
+- id: weiwen-law
+  name: 'dsh-weiwen-law'
