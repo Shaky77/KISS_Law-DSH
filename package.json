@@ -1,0 +1,8 @@
+{
+  "name": "dsh-kiss-law",
+  "version": "0.1.0",
+  "description": "KISS's Law (Weiwen's Law) — a universal causal engine (white-box presentation). DeepSeek Harness (Cordis) implementation.",
+  "type": "module",
+  "main": "./src/index.js",
+  "license": "AGPL-3.0"
+}

@@ -1,0 +1,6 @@
+# KISS's Law plugin overlay patch (DSH --patch overlay)
+# Apply with headless profile:
+#   dsh --profile headless --patch ./kiss-law.patch.yml "task"
+- insert:
+    - id: kiss-law
+      name: 'dsh-kiss-law'
