@@ -1,8 +1,53 @@
 {
   "name": "dsh-kiss-law",
   "version": "0.1.0",
-  "description": "KISS's Law (Weiwen's Law) — a universal causal engine (white-box presentation). DeepSeek Harness (Cordis) implementation.",
+  "description": "KISS's Law (Weiwen's Law) universal causal engine (white-box presentation). DeepSeek Harness (Cordis) plugin implementation.",
   "type": "module",
   "main": "./src/index.js",
-  "license": "AGPL-3.0"
+  "files": [
+    "src",
+    "kiss-law.patch.yml",
+    "README.md",
+    "DESIGN.md",
+    "LICENSE",
+    "examples",
+    "test"
+  ],
+  "scripts": {
+    "test": "node --test \"test/*.test.mjs\""
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "license": "AGPL-3.0",
+  "author": {
+    "name": "Shaky77",
+    "email": "563003@qq.com"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Shaky77/KISS_Law-DSH.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Shaky77/KISS_Law-DSH/issues"
+  },
+  "homepage": "https://github.com/Shaky77/KISS_Law-DSH#readme",
+  "keywords": [
+    "ai",
+    "causal",
+    "guardrail",
+    "white-box",
+    "deepseek",
+    "harness",
+    "agent",
+    "safety"
+  ],
+  "peerDependencies": {
+    "@deepseek-ai/dsh-tools": "*"
+  },
+  "peerDependenciesMeta": {
+    "@deepseek-ai/dsh-tools": {
+      "optional": false
+    }
+  }
 }
