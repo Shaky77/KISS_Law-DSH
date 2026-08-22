@@ -129,6 +129,57 @@ examples/             # runnable demos (demo-tool-loop / demo-backtrack-run)
 DESIGN.md             # architecture design (mapping / risks / usage flow / mount)
 ```
 
+## Deploy / Integrate with DeepSeek Harness
+
+This repository is an **external plugin** for DeepSeek Harness (dsh, command `dsh`, built on the Cordis plugin framework, MIT). KISS's Law mounts as a causal constraint layer that sits *outside the model, inside execution* — it does not modify the dsh kernel and is not tied to any specific model.
+
+### Requirements
+
+- Node.js `^22.19 || >=24` (hard requirement of dsh; odd versions unsupported)
+- A DeepSeek API Key (or any OpenAI-compatible endpoint key)
+- dsh is currently in developer preview (v0.1.x); the official notice states breaking API changes may occur — pin a specific version for production
+
+### Option 1: npx quick start (recommended for first try)
+
+```bash
+npx @deepseek-ai/dsh web        # launches Web UI at http://127.0.0.1:3080 by default
+```
+
+Open the browser, fill in your API Key under `Settings → Models`, and start chatting.
+
+### Option 2: Mount the KISS's Law plugin
+
+Clone this repo locally and wire the plugin entry into dsh's plugin config via the `kiss-law.patch.yml` overlay:
+
+```bash
+# 1. Get the plugin
+git clone https://github.com/Shaky77/KISS_Law-DSH.git
+cd KISS_Law-DSH
+
+# 2. Introduce the plugin entry (src/index.js) into dsh's cordis config
+#    Option A (recommended): overlay onto a profile via --patch
+dsh --profile headless --patch ./kiss-law.patch.yml "your task prompt"
+#    Option B: add the plugin path to the plugins list in dsh's launch config (cordis.yml) for persistence
+
+# 3. Configure credentials (any one)
+#    - Fill in via the Web UI Settings; or
+export DEEPSEEK_API_KEY=sk-xxxx     # Linux/macOS
+#    $env:DEEPSEEK_API_KEY="sk-xxxx" # Windows PowerShell
+```
+
+Once mounted, any Agent running under that profile automatically gains the 5 white-box self-check tools (`query_iron_laws` / `query_steady_state` / `list_rigid_anchors` / `query_conduction_chain` / `query_boundary`), and every tool call passes through the `tools/pre-execute` hard-guard gate.
+
+### Daily use vs stress testing
+
+- **Web / Standard mode**: daily conversation and engineering tasks; the plugin constrains silently in the background.
+- **Headless mode**: `dsh --profile headless` runs without UI for batch jobs — suitable for regression tests and multi-agent stress testing (the `versions/live/evidence/` directory in the Chinese repo archives such runs).
+
+### Notes
+
+- The plugin entry is pure ESM (`src/index.js`), depending on `@deepseek-ai/dsh-tools` (peerDependency, optional); verify the API against the current dsh docs before integration.
+- For remote dsh deployment, declare `trustedHosts` in config, otherwise the API layer rejects non-loopback requests.
+- When building dsh from source with `pnpm`, you **must** run `pnpm run build` first (internal package linking + frontend artifacts), or module-not-found errors occur.
+
 ## License
 
 [AGPL-3.0](./LICENSE)
