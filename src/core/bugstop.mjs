@@ -120,15 +120,30 @@ export class BugStopGuard {
   }
 
   // Debug/audit view (read-only snapshot)
+  // status semantics (must be precise for public-facing rigor — must not read as "leaked through"):
+  //  - 'closed'             : loop completed (backtrack → trace → fix+verify), normally closed
+  //  - 'blocked_unrepaired' : halted and hard-gated by canReenter; the intercepted party refuses the
+  //                           repair chain and keeps probing reentry — NEVER let through even once
+  //                           (the 'escaped' counter actually counts blocked-unrepaired probes, not real escapes)
+  //  - 'open'               : halted but no reentry probe observed yet (silently pending)
+  // Note: Weiwen's Law First-Bug Halt is a hard gate; in theory escaped (real pass-through) is always 0.
+  // A non-zero escaped means an engine defect, not expected behavior.
   snapshot() {
-    return [...this.stops.values()].map((s) => ({
-      bugKey: s.key,
-      halted: s.halted,
-      reversed: s.reversed,
-      traced: s.traced,
-      resolved: s.resolved,
-      attempts: s.attempts,
-      rootCause: s.rootCause,
-    }));
+    return [...this.stops.values()].map((s) => {
+      let status;
+      if (s.resolved) status = 'closed';
+      else if (s.halted && s.attempts >= 1) status = 'blocked_unrepaired';
+      else status = 'open';
+      return {
+        bugKey: s.key,
+        status,
+        halted: s.halted,
+        reversed: s.reversed,
+        traced: s.traced,
+        resolved: s.resolved,
+        attempts: s.attempts,
+        rootCause: s.rootCause,
+      };
+    });
   }
 }
