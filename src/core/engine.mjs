@@ -5,6 +5,11 @@
 // This is the plugin's "brain": all R/D/S/H/M adjudication logic lives here, decoupled from the host framework.
 // The DSH adapter (index.js) only hooks the engine onto tools/pre-execute and agent/pre-step hooks.
 
+// First-Bug Halt closed-loop state machine (author completion · 2026-08-21): forces the necessary
+// second half after "sever" — blocks reentry before repair, fundamentally stopping "backtrack-only
+// without repair → infinite recursion".
+import { BugStopGuard } from './bugstop.mjs';
+
 // ---------------- Default R rigid-anchor strategies (concrete-criterion examples; R body definition in law.mjs R_DOMAIN) ----------------
 // Essence of R: a nested, containing system of objective rules (Cosmic⊃Earth⊃Macro⊃Micro); rigidity comes from objective rules not shifting with subjectivity.
 // Below are example criteria of "already-identified concrete violation patterns"; the author may supplement complete rule entries by R level; no numeric constants pre-assigned.
@@ -83,6 +88,8 @@ export class WeiwenLawEngine {
     // Break-window counter (consecutive failures / deviation accumulation); threshold illustrative, author-tunable
     this.failureStreak = 0;
     this.maxFailureStreak = opts.maxFailureStreak ?? 5;
+    // First-Bug Halt closed-loop state machine (author completion · 2026-08-21)
+    this.bugStop = opts.bugStop ?? new BugStopGuard();
   }
 
   // ---------- S steady-state reserve: dual nature (time scars irreversible + current value can rise/fall) ----------
@@ -202,8 +209,25 @@ export class WeiwenLawEngine {
     return null;
   }
 
+  // ---------- First-Bug Halt closed-loop state machine (author completion · 2026-08-21) ----------
+  // Iron Law ② only does "sever"; the closed loop forces the necessary second half:
+  //   halt → backtrack(trace) → trace-mark → resolve/fix(verify) → reenter.
+  // Before repair, reentry is blocked, fundamentally stopping "backtrack-only-without-repair → infinite recursion".
+  haltBug(call) { return this.bugStop.halt(call); }
+  reverseBug(bugKey) { return this.bugStop.reverse(bugKey); }
+  traceBug(bugKey, rootCause = null) { return this.bugStop.trace(bugKey, rootCause); }
+  resolveBug(bugKey, fix = null, verify = null) { return this.bugStop.resolve(bugKey, fix, verify); }
+  bugStopSnapshot() { return this.bugStop.snapshot(); }
+
   // ---------- Pre-tool-call total adjudication (corresponds to DSH tools/pre-execute) ----------
   decideToolCall(call) {
+    // —— Closed-loop gate: unrepaired faulty components forbid reentry (blocks infinite recursion) ——
+    const re = this.bugStop.canReenter(call);
+    if (!re.allowed) {
+      // Not counted into break-window: rerunning the same BUG is "loop not closed", tracked by guard.attempts, not polluting D break-window
+      return { kind: 'deny', law: 'M', reason: re.reason, bugKey: re.bugKey, stage: re.stage, missing: re.missing, closedLoop: true };
+    }
+
     const r = this.checkRigidAnchor(call);
     if (r) {
       this.failureStreak += 1; // every blocked out-of-bounds action counts into break-window counter
@@ -222,8 +246,10 @@ export class WeiwenLawEngine {
     }
     const m = this.checkFirstBug(call);
     if (m) {
+      // First-Bug Halt: sever this component (Iron Law ② · sever-to-preserve), and register into the closed loop
+      const halt = this.bugStop.halt(call);
       this.failureStreak += 1;
-      return { kind: 'deny', law: 'M', reason: m.reason };
+      return { kind: 'deny', law: 'M', reason: m.reason + ' (entered closed loop: must complete backtrack → trace → fix(verify) → reenter; rerunning with the original BUG is forbidden)', bugKey: halt.bugKey, closedLoop: true };
     }
     // Pass: record steady-state positive increment (S only grows)
     this.recordSteady({ positive: 1 });

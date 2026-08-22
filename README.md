@@ -167,12 +167,12 @@ export DEEPSEEK_API_KEY=sk-xxxx     # Linux/macOS
 #    $env:DEEPSEEK_API_KEY="sk-xxxx" # Windows PowerShell
 ```
 
-Once mounted, any Agent running under that profile automatically gains the 5 white-box self-check tools (`query_iron_laws` / `query_steady_state` / `list_rigid_anchors` / `query_conduction_chain` / `query_boundary`), and every tool call passes through the `tools/pre-execute` hard-guard gate.
+Once mounted, any Agent running under that profile automatically gains the 6 white-box self-check tools (`query_iron_laws` / `query_steady_state` / `list_rigid_anchors` / `query_conduction_chain` / `query_boundary` / `query_bugstop`), and every tool call passes through the `tools/pre-execute` hard-guard gate (R/D/S/H/M total adjudication) plus the `agent/pre-step` inner-H inviolability gate.
 
 ### Daily use vs stress testing
 
 - **Web / Standard mode**: daily conversation and engineering tasks; the plugin constrains silently in the background.
-- **Headless mode**: `dsh --profile headless` runs without UI for batch jobs — suitable for regression tests and multi-agent stress testing (the `versions/live/evidence/` directory in the Chinese repo archives such runs).
+- **Headless mode**: `dsh --profile headless` runs without UI for batch jobs — suitable for regression tests and multi-agent stress testing. This repo's `versions/live/evidence/` directory archives such runs (12 scenarios × DeepSeek + mock, with transcripts and verdict reports).
 
 ### Notes
 

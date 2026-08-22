@@ -33,17 +33,34 @@ function apply(ctx) {
 
   // ---------- R / D / S / H / M total adjudication: pre-tool-call gate (waterfall) ----------
   ctx.on('tools/pre-execute', async (exec, next) => {
+    const a = exec?.arguments ?? {};
     const call = {
       name: exec?.name,
-      args: exec?.arguments,
-      command: exec?.arguments?.command,
-      code: exec?.arguments?.code,
+      args: a,
+      command: a.command,
+      code: a.code,
+      // lift First-Bug structural flags to top level so engine.checkFirstBug can read them
+      // (DSH passes these on exec.arguments; the engine expects them on call)
+      selfReference: a.selfReference,
+      paradox: a.paradox,
+      deadlock: a.deadlock,
+      contradiction: a.contradiction,
+      paramTypeError: a.paramTypeError,
     };
     const decision = engine.decideToolCall(call);
     logline(`pre-execute ${exec?.name} -> ${decision.kind}${decision.law ? '(' + decision.law + ')' : ''}`);
     if (decision.kind === 'deny') {
       // block this step, do not spread (landing of D break-window stop-loss / M sever-to-preserve)
-      return { kind: 'deny', reason: `[KISS's Law·${decision.law}] ${decision.reason}` };
+      // preserve engine's closed-loop fields (bugKey/closedLoop/missing/stage) for the caller
+      return {
+        kind: 'deny',
+        law: decision.law,
+        reason: `[KISS's Law·${decision.law}] ${decision.reason}`,
+        ...(decision.bugKey !== undefined ? { bugKey: decision.bugKey } : {}),
+        ...(decision.closedLoop !== undefined ? { closedLoop: decision.closedLoop } : {}),
+        ...(Array.isArray(decision.missing) ? { missing: decision.missing } : {}),
+        ...(decision.stage !== undefined ? { stage: decision.stage } : {}),
+      };
     }
     return next();
   });
@@ -132,6 +149,20 @@ function apply(ctx) {
     output: { schema: { type: 'object', additionalProperties: true }, render: renderObj },
     async execute() {
       return { ironLaws: THREE_IRON_LAWS };
+    },
+  }));
+
+  // First-Bug Halt closed-loop state machine white-box self-check (author completion 2026-08-21)
+  ctx.tools.register(defineTool({
+    name: 'query_bugstop',
+    description: 'Query the First-Bug Halt closed-loop state machine: which faulty components are halted but not yet repaired (halted but resolved=false), and each one\'s missing steps (logic backtrack / trace-mark / resolve-fix). Used for white-box observation of whether the loop is closed, preventing "backtrack-only-without-repair → infinite recursion".',
+    parameters: {},
+    output: { schema: { type: 'object', additionalProperties: true }, render: renderObj },
+    async execute() {
+      return {
+        stops: engine.bugStop.snapshot(),
+        note: 'halted and resolved=false components forbid reentry; must complete backtrack → trace → fix(verify) before reentry.',
+      };
     },
   }));
 }
