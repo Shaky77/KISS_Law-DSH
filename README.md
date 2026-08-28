@@ -40,6 +40,12 @@ KISS's Law is not "yet another causal engine" — it is a **general-purpose (dom
 
 Full bilingual comparison (prior-art references & honest bounds): [`weiwen-vs-market-causal.md`](https://github.com/Shaky77/weiwen-law-dsh/blob/main/versions/live/evidence/weiwen-vs-market-causal.md)
 
+## Concept annotation: H and the "Unity of Knowing & Acting"
+
+> **Author's insight (2026-08-28)**: **inner-H ≈ knowing (知), outer-H ≈ acting (行); the unity of knowing and acting is the maximum leverage** — this simultaneously explains why H is "the only variable / the only sovereignty / the leverage point", and why in the common world there is "a vast gap between knowing and acting".
+
+Full annotation (mapping table + step-by-step derivation): [`docs/H-knowledge-action-annotation.md`](./docs/H-knowledge-action-annotation.md)
+
 ## Quick start (runs without DSH)
 
 This path calls the DeepSeek API directly and does **not** depend on DSH installation. **We have run it through in off-peak hours; it is verifiable:**
