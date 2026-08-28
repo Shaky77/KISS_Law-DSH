@@ -17,7 +17,7 @@
 
 KISS's Law is a general framework describing **how causal law runs**. This repo implements it as a DSH plugin: it mounts a **white-box causal engine** onto an AI Agent running on DSH —
 
-- Before any action, the engine **simulates along the full causal chain (R→D→S→H→M)** — how much steady-state reserve S would be eroded, the break-window risk level, whether the message stays self-consistent — then adjudicates allow / deny / review;
+- Before any action, the engine **simulates along the full causal chain (R→S→D→H→M)** — how much steady-state reserve S would be eroded, the break-window risk level, whether the message stays self-consistent — then adjudicates allow / deny / review;
 - Red lines are **blocked**, faults are **severed to preserve continuity** (First-Bug Halt);
 - Meanwhile "state / boundary" is exposed as **queryable tools**, so the model can self-check and you can audit.
 
@@ -32,7 +32,7 @@ In one line: the framework-native is "universal causal engine (white-box present
 
 ## How it differs from existing "causal" approaches (general-purpose causal engine)
 
-KISS's Law is not "yet another causal engine" — it is a **general-purpose (domain-agnostic) causal-adjudication middleware**: it validates only causal structure (R→D→S→H→M) and encodes zero domain content, so law, medicine, finance, and robotics are governed by the same mechanism.
+KISS's Law is not "yet another causal engine" — it is a **general-purpose (domain-agnostic) causal-adjudication middleware**: it validates only causal structure (R→S→D→H→M) and encodes zero domain content, so law, medicine, finance, and robotics are governed by the same mechanism.
 
 - **Causal-effect estimation libs** (DoWhy / CausalML / Pearl…) → we do **not** discover causality; we **adjudicate** whether a proposed action's causal chain is acceptable.
 - **Domain-specific causal guardrails** (Causal Safety Engine / LLMGuardrail…) → they are bound to one domain (safety / LLM / hallucination); we are **domain-agnostic**.
@@ -75,7 +75,7 @@ Add `kiss-law.patch.yml` as an overlay into your DSH profile (the exact path dep
 | `query_iron_laws` | get the three iron laws verbatim (inner-H inviolability / First-Bug Halt / never abandon any node) |
 | `query_steady_state` | query steady-state reserve S (active ledger / standby / trauma count / break-window count) |
 | `list_rigid_anchors` | list current R rigid-anchor definitions, calibrate direction, self-check overreach |
-| `query_conduction_chain` | get conduction chain R→D→S→H→M and framework essence |
+| `query_conduction_chain` | get conduction chain R→S→D→H→M and framework essence |
 | `query_boundary` | query inner-H boundary (this plugin never reads/writes the subjective black box) |
 
 ### 3 hard gates (hooks)
