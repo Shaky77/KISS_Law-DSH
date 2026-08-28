@@ -67,6 +67,18 @@ But the opposite is true:
 
 This is isomorphic with the rest of the framework: First-Bug Halt is "sever to preserve continuity" (severing is the means, surviving is the end); inner-H inviolability guards the sovereign boundary — the framework's point of force is **constraint and alignment, not expansion**. Treating H as "bigger is better" and cranking it up turns the direction exactly backwards.
 
+### 6.1 Why this is a *root-cause* misread — the misattribution trap
+
+Treating H as "bigger is better" and cranking it is not a mere misunderstanding; it is a **root-cause misusage that directly produces wrong results**:
+
+1. **Wrong direction**: assuming bigger H = more leverage, one maxes out inner-H (knowing) and outer-H (acting) without closing the knowing–acting gap.
+2. **Wrong results**: the larger the volume, the larger the gap — force dissipates, adjudication noise rises; worse, the S reserve gets misled by the false "big H" and misjudges the system as safe.
+3. **Attribution flip (the most dangerous step)**: facing wrong results, outsiders do not first suspect "I used H wrong"; they intuitively blame "this Weiwen's Law framework itself is flawed / doesn't work".
+
+**The framework is not the problem — the usage is turned backwards.** The white-box H is designed to make the gap *visible, measurable, and closeable* — it gives you an *alignment tool*, not a *magnitude dial*. Whenever things get messier the more you use it, the first move is to check H's knowing–acting unity, not to doubt the framework.
+
+> **One-line guardrail**: H's leverage lies in *unity*, not *volume*; if it gets messier the more you use it, you cranked H *bigger* instead of *unified* — that is not Weiwen's Law's fault.
+
 ---
 
 > **(AI collaborator note)** This section is the author's correction of how outsiders misread H ("bigger is better" is exactly backwards); it does not enter the `law.mjs` definition layer. It is isomorphic with "Integrity & Steady State": Integrity ≈ knowing and acting are one true thing (not split); Steady State ≈ after closing the gap, the agent's causal force persists stably.

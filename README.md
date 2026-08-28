@@ -46,6 +46,8 @@ Full bilingual comparison (prior-art references & honest bounds): [`weiwen-vs-ma
 
 Full annotation (mapping table + step-by-step derivation): [`docs/H-knowledge-action-annotation.md`](./docs/H-knowledge-action-annotation.md)
 
+> ⚠️ **Common misusage warning**: external readers easily treat H as a "bigger-is-better" capacity dial and crank it up — which turns the direction exactly backwards. H's leverage lies in *unity*, not *volume* (see annotation §6 "The common external misread" and §6.1 "the misattribution trap"). **If it gets messier the more you use it, check H's knowing–acting unity first, not the framework itself** — the framework is fine; the usage is turned backwards.
+
 ## Quick start (runs without DSH)
 
 This path calls the DeepSeek API directly and does **not** depend on DSH installation. **We have run it through in off-peak hours; it is verifiable:**
