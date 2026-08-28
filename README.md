@@ -15,18 +15,30 @@
 
 ## Understand in 30 seconds
 
-KISS's Law is a general framework describing **how causal law runs**. This repo implements it as a DSH plugin: it mounts a **white-box guardrail** onto an AI Agent running on DSH —
+KISS's Law is a general framework describing **how causal law runs**. This repo implements it as a DSH plugin: it mounts a **white-box causal engine** onto an AI Agent running on DSH —
 
-- Every AI action is **checked** before execution, blocked on red lines, and **severed to preserve continuity** on failure;
+- Before any action, the engine **simulates along the full causal chain (R→D→S→H→M)** — how much steady-state reserve S would be eroded, the break-window risk level, whether the message stays self-consistent — then adjudicates allow / deny / review;
+- Red lines are **blocked**, faults are **severed to preserve continuity** (First-Bug Halt);
 - Meanwhile "state / boundary" is exposed as **queryable tools**, so the model can self-check and you can audit.
 
-In one line: the framework-native is "universal causal engine (white-box presentation)"; "white-box audit / endogenous risk control" is its presentation stance and the endogenous property evolved after adapting to the agent-runtime scenario.
+In one line: the framework-native is "universal causal engine (white-box presentation)" — **causal-chain reasoning is the engine's capability, white-box audit is its presentation stance**, and risk-control blocking is an endogenous property.
 
 ## What it does
 
+- **Causal-chain simulation (the engine itself)**: before each action, it simulates consequences along the full R→S→D→H→M causal chain — S erosion, D risk level, M self-consistency — and issues an allow / deny / review verdict. **Not just audit**: it is causal reasoning about an action's consequences.
 - **White-box self-check** (presentation stance): S steady-state reserve (only grows, never decreases) ledger, H inner-H boundary (inviolable) declaration, all exposed as queryable tools for the model to calibrate direction and for the user to audit.
 - **Rigid guard** (derived application · endogenous property): before each action, do R rigid-anchor checks; on touch, D break-window stop-loss blocks; a faulty component triggers M First-Bug Halt (sever to preserve continuity), keeping the overall causal chain unbroken.
 - **Fractal**: the same plugin can be recursively mounted at sub-agent / sub-task levels.
+
+## How it differs from existing "causal" approaches (general-purpose causal engine)
+
+KISS's Law is not "yet another causal engine" — it is a **general-purpose (domain-agnostic) causal-adjudication middleware**: it validates only causal structure (R→D→S→H→M) and encodes zero domain content, so law, medicine, finance, and robotics are governed by the same mechanism.
+
+- **Causal-effect estimation libs** (DoWhy / CausalML / Pearl…) → we do **not** discover causality; we **adjudicate** whether a proposed action's causal chain is acceptable.
+- **Domain-specific causal guardrails** (Causal Safety Engine / LLMGuardrail…) → they are bound to one domain (safety / LLM / hallucination); we are **domain-agnostic**.
+- **Cross-jurisdictional legal causal AI** (judgeai…) → they are jurisdiction-**aware** (encode law, swap norm packages); we are **jurisdiction-neutral** (encode no jurisdiction at all — law is just one sampled domain).
+
+Full bilingual comparison (prior-art references & honest bounds): [`weiwen-vs-market-causal.md`](https://github.com/Shaky77/weiwen-law-dsh/blob/main/versions/live/evidence/weiwen-vs-market-causal.md)
 
 ## Quick start (runs without DSH)
 
