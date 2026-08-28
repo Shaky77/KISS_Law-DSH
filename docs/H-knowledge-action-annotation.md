@@ -81,4 +81,33 @@ Treating H as "bigger is better" and cranking it is not a mere misunderstanding;
 
 ---
 
-> **(AI collaborator note)** This section is the author's correction of how outsiders misread H ("bigger is better" is exactly backwards); it does not enter the `law.mjs` definition layer. It is isomorphic with "Integrity & Steady State": Integrity ≈ knowing and acting are one true thing (not split); Steady State ≈ after closing the gap, the agent's causal force persists stably.
+### 7. H's sole realization in the engine — the BUG-circuit human-handoff fallback (⚠️ PROVISIONAL)
+
+> **⚠️ PROVISIONAL note**: The "H = human adjudication" described here is a **provisional convention of the current version**. The author (Shaky77) explicitly stated "H is, for now, set to human adjudication" and it may be upgraded in future iterations. This note only describes the engine's *current* realization of H; it is **not a terminal definition**. If any evolution rewrites how H is realized, this section must be updated in step.
+
+The previous sections' "H three-uniqueness" and "bigger is better is exactly backwards" are conceptual. A natural question: **what does H actually look like in code?** The answer — it currently has **no magnitude dial**; its sole realization is the circuit "BUG threshold reached → return adjudication to the human".
+
+**Circuit body (implemented in `src/core/engine.mjs`, mark-based escalation)**
+- `mHumanCap` defaults to 9 (the author's cap value).
+- The same BUG refused-and-repeated → `mBugForce` accumulates; or the same system re-appearing in disguise → `mSystemMarks` accumulates.
+- **When either accumulator hits the cap `mHumanCap` → `human = true`**.
+- On hit, `_toHuman` runs → returns `kind:'review', humanDecision:true`, with reason "the AI stops deliberating and hands the adjudication right back to the human".
+
+**This is exactly the code-level bridge for "H is, for now, set to human adjudication"**
+- H's "variability" in the engine is **not a numerical magnitude** but the **sovereign question of "who adjudicates"**: the AI runs the full R→S→D→H→M derivation within its own authority; when it hits the cap (`mHumanCap`) and cannot close the loop itself, it hands the adjudication right back to the human.
+- That handed-back "human adjudication" *is* H's present form — **H = the sovereign domain guarded by inner-H inviolability, realized in the engine as the single outlet "adjudication right resides with the human"**.
+- It also closes the gap found when auditing the code earlier ("H is not yet a quantified variable in the engine"): H's current realization is the sovereign act of "who decides", not a quantified volume.
+
+**Isomorphic with the three-uniqueness and with "bigger is better is backwards"**
+- Unique sovereignty: the adjudication right is handed to the human only at the cap; normally the engine does not decide for H (guards the boundary).
+- Unique variable: what varies is not H's "size" but "whether it is H's turn to adjudicate" (AI before the cap / H after the cap).
+- Unique leverage point: severing infinite recursion / dissipation at the cap and handing it to the sovereign party is exactly the maximal leverage (sever to preserve continuity).
+- And because H has **no "magnitude" field to crank** in code, the "bigger is better" misread is blocked at the root.
+
+**Future iteration direction (provisional, pending upgrade)**
+- Currently H's realization = human-adjudication fallback only; if H is later allowed to truly participate in adjudication (e.g. letting "knowing–acting unity" weight the decision), the interface **must be modeled on "unity", not "volume"** — otherwise it would itself create the "bigger is better" inducement opening.
+- When that happens, this section's provisional "H = human adjudication" wording will be rewritten with the evolution.
+
+---
+
+> **(AI collaborator note)** This section bridges "H is, for now, set to human adjudication" to its code realization (BUG-circuit human-handoff fallback), and follows the previous section's correction of the "bigger is better" misread; it does not enter the `law.mjs` definition layer; marked "⚠️ PROVISIONAL", may be upgraded in future iterations and is not terminal. Isomorphic with "Integrity & Steady State": Integrity ≈ knowing and acting are one true thing (not split); Steady State ≈ after closing the gap, the agent's causal force persists stably.
