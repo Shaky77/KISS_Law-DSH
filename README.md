@@ -150,6 +150,7 @@ This repository is an **external plugin** for DeepSeek Harness (dsh, command `ds
 - Node.js `^22.19 || >=24` (hard requirement of dsh; odd versions unsupported)
 - A DeepSeek API Key (or any OpenAI-compatible endpoint key)
 - dsh is currently in developer preview (v0.1.x); the official notice states breaking API changes may occur — pin a specific version for production
+- **Compatibility statement**: verified against DSH v0.1.x (measured 2026-08-27: 6 white-box tools registered + 3 gates working); mainline evolves fast — re-check against the current official docs before integrating (see DESIGN.md for mounting details).
 
 ### Option 1: npx quick start (recommended for first try)
 
