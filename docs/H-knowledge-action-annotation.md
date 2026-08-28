@@ -55,4 +55,18 @@ Weiwen's Law, by splitting H into inner / outer, structurally recognizes that kn
 
 ---
 
-> **(AI collaborator note)** This is a conceptual bridge; it does not enter the `law.mjs` definition layer. It is isomorphic with "Integrity & Steady State": Integrity ≈ knowing and acting are one true thing (not split); Steady State ≈ after closing the gap, the agent's causal force persists stably.
+## 6. The common external misread: "bigger is better"? The opposite
+
+External readers of H easily make an intuitive error: **treating H as a "bigger-is-better" capacity dial** — assuming that since H is "the only variable / the only sovereignty / the leverage point", one should crank it up and max out both knowing and acting.
+
+But the opposite is true:
+
+- H's leverage **lies not in magnitude but in unity**. The leverage comes from the degree of "knowing = acting" alignment, not from H's absolute size.
+- An H that is large in volume but carries a large gap between knowing and acting is **not "more leverage" but "more dissipation"** — knowing without acting, acting without knowing; the force leaks away, and the bigger the volume, the more it leaks.
+- So the real goal is not "make H big" but "make H unified": **smaller but unified beats larger but split**.
+
+This is isomorphic with the rest of the framework: First-Bug Halt is "sever to preserve continuity" (severing is the means, surviving is the end); inner-H inviolability guards the sovereign boundary — the framework's point of force is **constraint and alignment, not expansion**. Treating H as "bigger is better" and cranking it up turns the direction exactly backwards.
+
+---
+
+> **(AI collaborator note)** This section is the author's correction of how outsiders misread H ("bigger is better" is exactly backwards); it does not enter the `law.mjs` definition layer. It is isomorphic with "Integrity & Steady State": Integrity ≈ knowing and acting are one true thing (not split); Steady State ≈ after closing the gap, the agent's causal force persists stably.
