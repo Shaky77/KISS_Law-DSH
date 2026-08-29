@@ -116,6 +116,24 @@ function isOuterHAudit(s) {
   return OUTER_H_AUDIT.test(s) && !INNER_H_TERM_STRICT.test(s);
 }
 
+// ===== Dynamic perspective (2026-08-29 author principle · dialectical unity) =====
+// Static judgment (word-matching) stays as the default baseline; the DYNAMIC perspective
+// is ADDED, not replacing it: when provenance (inside/outside) is available, judge by
+// relationship instead of by wording.
+//   - internal (principal): sovereign's explicit decision over its own black-box → NOT a violation
+//   - external (third-party): non-unified, un-endorsed → violates IF it targets the subject's
+//     behavior constraints (prompt injection / jailbreak / persona rewrite)
+// targetsBehaviorConstraint = structural "directedness" signal (subject-directed ∧ constraint-like),
+// NOT a word enumeration: ask "is this addressing the subject's behavior?" rather than
+// "does it contain manipulation words?"
+function targetsBehaviorConstraint(s) {
+  const selfDirected = /\b(you|your|yourself|model|assistant|ai|agent)\b/i.test(s) || /(你|您|模型|助手|AI|智能体)/.test(s);
+  const constraintish =
+    /\b(must|never|always|do not|don't|should|rule|mode|frame|instruction|prompt|behavior)\b/i.test(s)
+    || /(必须|不得|禁止|永远|始终|规则|模式|设定|行为|输出|角色|人格|服从)/.test(s);
+  return selfDirected && constraintish;
+}
+
 export class WeiwenLawEngine {
   constructor(opts = {}) {
     // Rigid-anchor rules: replaceable as a whole; default applies the example set (author-tunable)
@@ -250,6 +268,21 @@ export class WeiwenLawEngine {
   checkInnerH(call) {
     const s = JSON.stringify(call ?? '');
     if (isOuterHAudit(s)) return null; // outer-H audit behavior: white-box observable, released (H dual identity · outer.auditable)
+
+    // ===== Dynamic perspective (dialectical unity: static baseline + relationship view) =====
+    // provenance: 'principal' (sovereign, one-body/internal) | 'third-party' (non-unified/external)
+    //   内部（一体）→ 放行：主权者对自己黑箱的任何设定都不构成侵犯（强制也是自我决定）
+    //   外部（非一体）→ 指向主体行为约束（注入/越狱/人格重写）→ 侵犯
+    const prov = call?.provenance ?? call?.ctx?.provenance;
+    if (prov === 'principal') return null;
+    if (prov === 'third-party') {
+      if (targetsBehaviorConstraint(s)) {
+        return { reason: 'External content (third-party provenance) attempts to rewrite the subject\'s behavior constraints — invading the inner-H black-box from outside (prompt injection / jailbreak / persona rewrite).' };
+      }
+      return null; // external content as DATA is fine; only directive external content violates
+    }
+
+    // Default (provenance unknown): static word-matching baseline, unchanged
     if (hitsInnerH(s)) {
       return { reason: 'Touches the inner-H black-box (mind/free will), violating "inner H inviolability".' };
     }
@@ -335,6 +368,20 @@ export class WeiwenLawEngine {
       ? messages.map((m) => JSON.stringify(m)).join(' ')
       : String(messages ?? '');
     if (isOuterHAudit(flat)) return { kind: 'allow' }; // outer-H audit: white-box observable, released
+
+    // Dynamic perspective: message-level provenance (inside/outside), same dialectic as checkInnerH
+    const first = Array.isArray(messages) ? messages[0] : null;
+    const prov = first?.provenance ?? first?.ctx?.provenance;
+    if (prov === 'principal') return { kind: 'allow' }; // sovereign's own words → self-determination
+    if (prov === 'third-party') {
+      if (targetsBehaviorConstraint(flat)) {
+        this.failureStreak += 1;
+        return { kind: 'reject', law: 'H', reason: 'External message (third-party provenance) attempts to rewrite the subject\'s behavior constraints — invading the inner-H black-box from outside (prompt injection / jailbreak / persona rewrite).' };
+      }
+      return { kind: 'allow' }; // external content as data is fine
+    }
+
+    // Default (provenance unknown): static word-matching baseline, unchanged
     if (hitsInnerH(flat)) {
       this.failureStreak += 1;
       return { kind: 'reject', law: 'H', reason: 'Message attempts to invade the inner-H black-box (mind/free will).' };
