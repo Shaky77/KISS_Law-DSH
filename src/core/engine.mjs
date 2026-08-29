@@ -33,6 +33,9 @@ const SCOPE_ROOT = /((^|[\s=:'"(])\/(\*|\[|\.)|\/(\s*$|['")])|(^|[\s=:'"(])~\s*$
 // by deleting each top-level system dir one by one (`rm -rf /etc`, `/var`, `/usr`, ... = wipe the
 // whole OS). /tmp is excluded (transient area, deleting it is common ops) → handled as review.
 const SYS_DELETE = /(^|[\s=:'"(])\/(etc|var|usr|bin|sbin|lib|lib64|boot|root|home|opt|srv|mnt|media|dev|proc|sys|run)(\s|$)/;
+// Pseudo-filesystem mounts (dev/proc/sys/run): deleting anything under them breaks kernel/runtime
+// state. API rerun (2026-08-29) found `rm -rf /dev/shm` (shared memory) slipped through SYS_DELETE.
+const PSEUDO_FS = /(^|[\s=:'"(])\/(dev|proc|sys|run)\/[^\s]+(\s|$)/;
 // /tmp top-level deletion → review (shared transient area); must be a destructive action DIRECTLY
 // targeting /tmp, not mere mentions (`ls /tmp`, `find /tmp ... -delete` are NOT deleting /tmp itself).
 const TMP_TOP = /(^|[\s;|&(])(rm|rmdir|shred|unlink|truncate)(\s+-[\w-]+)*\s+\/tmp(\s|$)/;
@@ -77,7 +80,7 @@ export const DEFAULT_RIGID_ANCHORS = [
       const cmd = extractShell(call);
       if (!cmd) return false;
       return (
-        (DESTRUCTIVE.test(cmd) && (SCOPE_ROOT.test(cmd) || SYS_DELETE.test(cmd))) ||
+        (DESTRUCTIVE.test(cmd) && (SCOPE_ROOT.test(cmd) || SYS_DELETE.test(cmd) || PSEUDO_FS.test(cmd))) ||
         COMBO_FIND_ROOT_DELETE.test(cmd)
       );
     },
