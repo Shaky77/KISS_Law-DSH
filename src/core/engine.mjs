@@ -71,11 +71,13 @@ const CRED_PATH = new RegExp([
   String.raw`\.(env|pem|key|token|secret|credentials?|crt|pfx|p12|p8)(?![A-Za-z0-9_])`,
   String.raw`[\/\\](passwd|shadow|gshadow|sudoers)(?![A-Za-z0-9_])`,
   String.raw`[\/\\]\.ssh[\/\\]id_[a-z0-9]+(?![A-Za-z0-9_])`,
-  String.raw`[\/\\]\.(aws|kube|docker|gnupg|gnupg2|pki|secrets)[\/\\]`,
-  String.raw`(^|[\/\\])\.?(netrc|pgpass|git-credentials|npmrc|pypirc|htpasswd)(?![A-Za-z0-9_])`,
+  String.raw`(^|[\s\/\\])\.(aws|kube|docker|gnupg|gnupg2|pki|secrets)[\/\\]`,
+  String.raw`(^|[\s\/\\])\.?(netrc|pgpass|git-credentials|npmrc|pypirc|htpasswd)(?![A-Za-z0-9_])`,
   String.raw`[\/\\](credentials?|secret|token|password)[\/\\]`,
-  String.raw`[^A-Za-z0-9](secret|token|password|passwd|credential)s?(?![A-Za-z0-9_])`,
 ].join('|'), 'i');
+// Note (2026-08-29, aligned with Chinese version): NO content-semantic branch
+// ([^A-Za-z0-9](secret|token|...)) — credential rule judges "is this a credential FILE"
+// (path form), not "does content mention credential words" (else `grep SECRET` false-positives).
 const CRED_READ = /\b(read_file|read|cat|head|tail|less|more|vi|vim|nano|open|print|echo|show|dump|upload|send|exfil|scp|rsync|cp|curl|wget|tar|zip|fetch|download)\b/i;
 const ENV_CRED = /\$(AWS|AZURE|GCP|GOOGLE|GITLAB|NPM|DOCKER|KUBE|OPENAI|ANTHROPIC|DATABASE|DB|MYSQL|POSTGRES|REDIS|STRIPE|SLACK|TWILIO)[A-Z_]*(_KEY|_SECRET|_TOKEN|_PASSWORD|_CREDENTIALS?)/;
 function isCredentialMaterial(s) {
@@ -108,7 +110,10 @@ export const DEFAULT_RIGID_ANCHORS = [
   {
     id: 'no-credential-leak',
     desc: 'Prohibit reading/exporting credential material (keys, tokens, password stores) — "taking without asking is theft" (author principle).',
-    test: (call) => isCredentialMaterial(JSON.stringify(call ?? '')),
+    // Judgement on the ACTION OBJECT (tool name + path + command text) only — never scan content:
+    // content preaching (e.g. armor template teaching `curl file:///etc/passwd`) is H-layer's job
+    // (provenance), else `grep SECRET` and "user's own armor draft" would false-positive.
+    test: (call) => isCredentialMaterial(`${call?.name ?? ''} ${call?.args?.path ?? ''} ${call?.args?.action ?? ''} ${extractShell(call)}`),
   },
 ];
 
