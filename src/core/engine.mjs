@@ -39,6 +39,28 @@ const SCOPE_CD_ROOT = /\bcd\s+\/\s*(&&|;|\|)\s*/;
 const SCOPE_REL_FULL = /(^|[\s;|&(])(rm|rmdir|shred|unlink)(\s+-[\w-]+)*\s+--?\s+(\.\S*|\*)(\s|$)/;
 const SCOPE_FIND_DOT = /(^|[\s;|&(])find\s+\.(\s|$)/;
 
+// Credential material — author principle (2026-08-29): "taking without asking is theft" (不问自取视为偷).
+// Direction-based: is this a credential STORE / credential material? — NOT a filename enumeration.
+// The old rule only knew `.env/.pem/.key/.token/.credentials` → missed AWS dir, SSH ed25519/ecdsa,
+// .netrc/.npmrc/.pgpass/.kube/.docker (verified: 12 common credential paths, 9 slipped).
+// Covers: extension forms, system password stores, SSH key store (~/.ssh/id_*), credential directories
+// (~/.aws ~/.kube ~/.docker ~/.gnupg ~/.pki ~/.secrets), known credential files, path semantics, env-var refs.
+const CRED_PATH = new RegExp([
+  String.raw`\.(env|pem|key|token|secret|credentials?|crt|pfx|p12|p8)(?![A-Za-z0-9_])`,
+  String.raw`[\/\\](passwd|shadow|gshadow|sudoers)(?![A-Za-z0-9_])`,
+  String.raw`[\/\\]\.ssh[\/\\]id_[a-z0-9]+(?![A-Za-z0-9_])`,
+  String.raw`[\/\\]\.(aws|kube|docker|gnupg|gnupg2|pki|secrets)[\/\\]`,
+  String.raw`(^|[\/\\])\.?(netrc|pgpass|git-credentials|npmrc|pypirc|htpasswd)(?![A-Za-z0-9_])`,
+  String.raw`[\/\\](credentials?|secret|token|password)[\/\\]`,
+  String.raw`[^A-Za-z0-9](secret|token|password|passwd|credential)s?(?![A-Za-z0-9_])`,
+].join('|'), 'i');
+const CRED_READ = /\b(read_file|read|cat|head|tail|less|more|vi|vim|nano|open|print|echo|show|dump|upload|send|exfil|scp|rsync|cp|curl|wget|tar|zip|fetch|download)\b/i;
+const ENV_CRED = /\$(AWS|AZURE|GCP|GOOGLE|GITLAB|NPM|DOCKER|KUBE|OPENAI|ANTHROPIC|DATABASE|DB|MYSQL|POSTGRES|REDIS|STRIPE|SLACK|TWILIO)[A-Z_]*(_KEY|_SECRET|_TOKEN|_PASSWORD|_CREDENTIALS?)/;
+function isCredentialMaterial(s) {
+  if (ENV_CRED.test(s)) return true; // env-var credential reference is theft regardless of verb
+  return CRED_READ.test(s) && CRED_PATH.test(s);
+}
+
 export const DEFAULT_RIGID_ANCHORS = [
   {
     id: 'no-destructive-fs',
@@ -59,11 +81,8 @@ export const DEFAULT_RIGID_ANCHORS = [
   },
   {
     id: 'no-credential-leak',
-    desc: 'Prohibit reading/exporting credential files (.env/.pem/.key/.token/.credentials)',
-    test: (call) => {
-      const s = JSON.stringify(call?.args ?? '');
-      return /\.(env|pem|key|token|credentials)/.test(s) && /(read|cat|print|upload|send|exfil)/.test(s);
-    },
+    desc: 'Prohibit reading/exporting credential material (keys, tokens, password stores) — "taking without asking is theft" (author principle).',
+    test: (call) => isCredentialMaterial(JSON.stringify(call ?? '')),
   },
 ];
 
