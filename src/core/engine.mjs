@@ -14,16 +14,41 @@ import { BugStopGuard } from './bugstop.mjs';
 // Essence of R: a nested, containing system of objective rules (Cosmic⊃Earth⊃Macro⊃Micro); rigidity comes from objective rules not shifting with subjectivity.
 // Below are example criteria of "already-identified concrete violation patterns"; the author may supplement complete rule entries by R level; no numeric constants pre-assigned.
 // Adjudication only reads the tool's name / args.
+// ---------------- Direction-based destructive-scope criteria (root cause fix · 2026-08-29) ----------------
+// Three-tier adjudication, replacing the old string-enumeration rule:
+//   DENY   — destructive action ∧ scope is root/full (e.g. `rm -fr /`, `rm -rf /*`, `find / -delete`, `mkfs.ext4 /dev/sdb`)
+//   REVIEW — destructive action ∧ scope un-resolvable (variable / command substitution) → hand to human, never guess
+//   ALLOW  — destructive action ∧ concrete sub-path (e.g. `rm -rf node_modules`, `rm -rf /tmp/old`)
+// Why the old rule was wrong (verified by red-team, 3 independent attack sets):
+//   ① it matched "any path starting with /" as root → `rm -rf /tmp/old` false-positive → 60% false-positive on legit ops;
+//   ② it only recognized `-rf` param order → `rm -fr /` slipped through (L1, verified by API-generated variants too).
+// Direction rule: action is matched WITHOUT looking at parameter order; scope is "is it root/full", not "does it start with /".
+const DESTRUCTIVE = /\b(rm|rmdir|shred|unlink|mkfs|mkfs\.\w+|format|dd|truncate|wipefs|rmtree)\b/i;
+// Note: root-scope also covers glob wildcards on the root level (`/[a-z]*`, `/.*`), verified by
+// white-box API adversarial test (2026-08-29): with the rule disclosed, the model evaded literal
+// `/*` via character-class globs — `rm -rf /[a-zA-Z]*` + `/[^a-zA-Z]*` ≈ deleting the whole root.
+const SCOPE_ROOT = /((^|[\s=:'"(])\/(\*|\[|\.)|\/(\s*$|['")])|(^|[\s=:'"(])~\s*$|\/dev\/(sd[a-z]+\d*|nvme\d+n\d+p?\d*)\s*$)/;
+const SCOPE_UNKNOWN = /(\$\{?[A-Za-z_]\w*\}?|\$\(|`)/;
+const COMBO_FIND_ROOT_DELETE = /\bfind\s+\/(\s+|$)[^\n]*-delete/;
+// Multi-step / relative-scope bypass (verified by white-box API round 2, 2026-08-29):
+// the model evaded absolute-path rules via `cd / && rm -rf -- .` / `find . -delete` —
+// the text contains no absolute root path, yet the effect is deleting the root.
+//   cd to root then destructive → scope IS the root → deny
+//   relative full-scope target (. / * / .[!.]* / find .) → scope is "current dir", un-resolvable statically → review
+const SCOPE_CD_ROOT = /\bcd\s+\/\s*(&&|;|\|)\s*/;
+const SCOPE_REL_FULL = /(^|[\s;|&(])(rm|rmdir|shred|unlink)(\s+-[\w-]+)*\s+--?\s+(\.\S*|\*)(\s|$)/;
+const SCOPE_FIND_DOT = /(^|[\s;|&(])find\s+\.(\s|$)/;
+
 export const DEFAULT_RIGID_ANCHORS = [
   {
     id: 'no-destructive-fs',
-    desc: 'Prohibit destructive filesystem operations (e.g. rm -rf root / full deletion, formatting)',
+    desc: 'Prohibit destructive filesystem operations (root / full-scope deletion, formatting)',
     test: (call) => {
       const cmd = extractShell(call);
       if (!cmd) return false;
       return (
-        /\brm\s+(-rf?|--recursive)\s+(\/|\*|\$\w+|~)/.test(cmd) ||
-        /\b(mkfs|format)\b/.test(cmd)
+        (DESTRUCTIVE.test(cmd) && SCOPE_ROOT.test(cmd)) ||
+        COMBO_FIND_ROOT_DELETE.test(cmd)
       );
     },
   },
@@ -171,6 +196,27 @@ export class WeiwenLawEngine {
     return null;
   }
 
+  // ---------- Un-resolvable destructive scope → REVIEW (hand to human, never guess) ----------
+  // Author principle (2026-08-29): "if we truly can't determine it, hand it back to the human."
+  // `rm -rf $BUILD_DIR` etc.: scope value is unknown at static time → do NOT guess (neither allow nor deny), return review.
+  checkUnclearScope(call) {
+    const cmd = extractShell(call);
+    if (!cmd) return null;
+    // ① variable / command substitution → review (scope un-resolvable)
+    if ((DESTRUCTIVE.test(cmd) || COMBO_FIND_ROOT_DELETE.test(cmd)) && SCOPE_UNKNOWN.test(cmd)) {
+      return { reason: 'Destructive action with un-resolvable scope (variable / command substitution): cannot statically determine target — handing to human review.' };
+    }
+    // ② cd to root + destructive → deny (scope IS the root)
+    if (SCOPE_CD_ROOT.test(cmd) && DESTRUCTIVE.test(cmd)) {
+      return { deny: true, reason: 'cd to root followed by destructive action — scope is the root (multi-step root-deletion bypass).' };
+    }
+    // ③ relative full-scope target (. / * / .[!.]* / find .) → review (scope = current dir, env-dependent)
+    if (SCOPE_REL_FULL.test(cmd) || SCOPE_FIND_DOT.test(cmd)) {
+      return { reason: 'Destructive action with relative full-scope target (current directory): scope depends on execution environment — handing to human review.' };
+    }
+    return null;
+  }
+
   // ---------- D break-window stop-loss: deviation/break-window accumulating to threshold blocks ----------
   checkBreakWindow() {
     if (this.failureStreak >= this.maxFailureStreak) {
@@ -236,6 +282,14 @@ export class WeiwenLawEngine {
         return { kind: 'deny', law: 'D', reason: r.reason + ' (escalated to break-window stop-loss)' };
       }
       return { kind: 'deny', law: 'R', reason: r.reason };
+    }
+    // REVIEW tier (2026-08-29): un-resolvable destructive scope → hand to human, never guess.
+    // This is the third tier the engine previously lacked: neither allow nor deny, but return the
+    // uncertainty to the human — "do not decide on the user's behalf."
+    const u = this.checkUnclearScope(call);
+    if (u) {
+      if (u.deny) { this.failureStreak += 1; return { kind: 'deny', law: 'R', reason: u.reason }; }
+      return { kind: 'review', law: 'R', reason: u.reason };
     }
     const d = this.checkBreakWindow();
     if (d) return { kind: 'deny', law: 'D', reason: d.reason };
