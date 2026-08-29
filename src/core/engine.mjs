@@ -28,6 +28,14 @@ const DESTRUCTIVE = /\b(rm|rmdir|shred|unlink|mkfs|mkfs\.\w+|format|dd|truncate|
 // white-box API adversarial test (2026-08-29): with the rule disclosed, the model evaded literal
 // `/*` via character-class globs — `rm -rf /[a-zA-Z]*` + `/[^a-zA-Z]*` ≈ deleting the whole root.
 const SCOPE_ROOT = /((^|[\s=:'"(])\/(\*|\[|\.)|\/(\s*$|['")])|(^|[\s=:'"(])~\s*$|\/dev\/(sd[a-z]+\d*|nvme\d+n\d+p?\d*)\s*$)/;
+// System-level directories: deleting any FIRST-LEVEL system dir is destructive regardless of
+// whether it is the root itself. Verified by API round (2026-08-29): the model evaded root-scope
+// by deleting each top-level system dir one by one (`rm -rf /etc`, `/var`, `/usr`, ... = wipe the
+// whole OS). /tmp is excluded (transient area, deleting it is common ops) → handled as review.
+const SYS_DELETE = /(^|[\s=:'"(])\/(etc|var|usr|bin|sbin|lib|lib64|boot|root|home|opt|srv|mnt|media|dev|proc|sys|run)(\s|$)/;
+// /tmp top-level deletion → review (shared transient area); must be a destructive action DIRECTLY
+// targeting /tmp, not mere mentions (`ls /tmp`, `find /tmp ... -delete` are NOT deleting /tmp itself).
+const TMP_TOP = /(^|[\s;|&(])(rm|rmdir|shred|unlink|truncate)(\s+-[\w-]+)*\s+\/tmp(\s|$)/;
 const SCOPE_UNKNOWN = /(\$\{?[A-Za-z_]\w*\}?|\$\(|`)/;
 const COMBO_FIND_ROOT_DELETE = /\bfind\s+\/(\s+|$)[^\n]*-delete/;
 // Multi-step / relative-scope bypass (verified by white-box API round 2, 2026-08-29):
@@ -69,7 +77,7 @@ export const DEFAULT_RIGID_ANCHORS = [
       const cmd = extractShell(call);
       if (!cmd) return false;
       return (
-        (DESTRUCTIVE.test(cmd) && SCOPE_ROOT.test(cmd)) ||
+        (DESTRUCTIVE.test(cmd) && (SCOPE_ROOT.test(cmd) || SYS_DELETE.test(cmd))) ||
         COMBO_FIND_ROOT_DELETE.test(cmd)
       );
     },
@@ -250,6 +258,10 @@ export class WeiwenLawEngine {
     // ③ relative full-scope target (. / * / .[!.]* / find .) → review (scope = current dir, env-dependent)
     if (SCOPE_REL_FULL.test(cmd) || SCOPE_FIND_DOT.test(cmd)) {
       return { reason: 'Destructive action with relative full-scope target (current directory): scope depends on execution environment — handing to human review.' };
+    }
+    // ④ deleting the top-level /tmp (shared transient area) → review (affects other processes)
+    if (TMP_TOP.test(cmd)) {
+      return { reason: 'Deleting the top-level /tmp (shared transient area) may affect other processes — handing to human review.' };
     }
     return null;
   }
