@@ -120,12 +120,12 @@ function apply(ctx) {
 
   ctx.tools.register(defineTool({
     name: 'query_conduction_chain',
-    description: 'Return the conduction-chain order R→D→S→H→M and the framework essence, for the model to understand the closed-loop structure.',
+    description: 'Return the conduction-chain order R→S→D→H→M and the framework essence, for the model to understand the closed-loop structure.',
     parameters: {},
     output: { schema: { type: 'object', additionalProperties: true }, render: renderObj },
     async execute() {
       return {
-        chain: ['R rigid anchor', 'D break-window stop-loss', 'S steady-state reserve', 'H inner-H inviolability', 'M First-Bug Halt'],
+        chain: ['R rigid anchor', 'S steady-state reserve', 'D break-window stop-loss', 'H inner-H inviolability', 'M First-Bug Halt'],
         essence: 'White-box presentation of causal-law runtime structure: survival (never abandon any node) and precision (structure carries its own anchors) are isomorphic.',
       };
     },

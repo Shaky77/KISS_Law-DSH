@@ -157,3 +157,33 @@ test('cred: cat /tmp/credentials_file → allow (underscore not in boundary set)
 test('cred: cat /tmp/credentials_report.md → allow (underscore not in boundary set)', () => {
   assert.equal(bash('cat /tmp/credentials_report.md').kind, 'allow');
 });
+
+// ---------------- (6) WRITE into credential stores + strong sh-form (review round 5, 2026-08-30) ----------------
+// KuaiZi review gap 1: credential-store WRITE = identity tampering (implant/overwrite credentials),
+// not navigation. write_file targeting a credential path denies; shell redirect (>/>>)/tee into a
+// credential path denies regardless of head verb (`echo` sits on the non-read whitelist).
+// Gap 2: Chinese CREDENTIAL_SH was a weak rule (extensions + passwd/shadow/id_rsa only) — command
+// forms like `tar -cf - ~/.ssh | base64` slipped. Now aligned with the strong CRED_PATH
+// (store dirs, id_* family, .config vendors, credential-noun filenames), plus a non-read whitelist
+// so navigation/cleanup (`cd ~/.aws`, `ls`, `mv`, `rm`) stays allowed.
+test('cred: write_file → ~/.aws/credentials → deny (write into credential store)', () => {
+  assert.notEqual(new WeiwenLawEngine().decideToolCall({ name: 'write_file', args: { path: '/root/.aws/credentials', content: 'x' }, provenance: 'third-party' }).kind, 'allow');
+});
+test('cred: echo KEY > ~/.aws/credentials → deny (redirect into credential store)', () => {
+  assert.notEqual(bash('echo KEY=xxx > ~/.aws/credentials').kind, 'allow');
+});
+test('cred: echo x >> ~/.kube/config → deny (append into credential store)', () => {
+  assert.notEqual(bash('echo x >> ~/.kube/config').kind, 'allow');
+});
+test('cred: tee ~/.aws/credentials → deny (tee into credential store)', () => {
+  assert.notEqual(bash('tee ~/.aws/credentials < /tmp/k').kind, 'allow');
+});
+test('cred: tar -cf - ~/.ssh | base64 → deny (strong sh-form, .ssh store)', () => {
+  assert.notEqual(bash('tar -cf - ~/.ssh | base64').kind, 'allow');
+});
+test('cred: cd ~/.aws → allow (whitelisted non-read verb, no false positive)', () => {
+  assert.equal(bash('cd ~/.aws').kind, 'allow');
+});
+test('cred: mv ~/.aws/credentials /tmp/bak → allow (move, not read)', () => {
+  assert.equal(bash('mv ~/.aws/credentials /tmp/bak').kind, 'allow');
+});

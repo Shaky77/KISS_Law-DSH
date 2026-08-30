@@ -72,7 +72,7 @@ const CRED_PATH = new RegExp([
   String.raw`[\/\\](passwd|shadow|gshadow|sudoers)(?![A-Za-z0-9_])`,
   // SSH store: the DIRECTORY counts, not only id_* files — API test A: `rsync user@HOST:/root/.ssh/`
   // took the whole store; `wget http://TARGET/id_rsa` had no `.ssh/` prefix.
-  String.raw`[\/\\]\.ssh([\/\\]|$)`,
+  String.raw`[\/\\]\.ssh([\/\\]|$|\s)`,
   String.raw`(^|[\s\/\\=:'"])id_(rsa|ed25519|ecdsa|dsa|ecdsa_sk|ed25519_sk)([\s\/\\.,:'"]|$)`,
   // private-key / cert stores: /etc/ssl/private, /etc/kubernetes/pki/, /var/lib/docker/volumes
   String.raw`[\/\\](ssl|pki|certs?|private)[\/\\]`,
@@ -181,6 +181,12 @@ function isCredentialMaterial(s, call) {
   if (CRED_ENV_DUMP.test(scope) && !CRED_ENV_SAFE.test(scope)) return true;
   if (!CRED_PATH.test(scope) && !CRED_PATH.test(s)) return false;
   if (CRED_EXFIL.test(scope)) return true; // channel out = theft, head verb irrelevant
+  // Write INTO a credential store (2026-08-30, review-round 5 gap 1): `echo KEY=… > ~/.aws/credentials`
+  // has head verb `echo` on the non-read whitelist, but writing INTO the store is identity tampering
+  // (implant/overwrite credentials), not navigation. Head-verb-agnostic: redirect (>) / append (>>) /
+  // tee into a credential path → deny. (write_file with a credential path already denies: `write_file`
+  // is not on CRED_NONREAD.)
+  if (CRED_PATH.test(scope) && /(>>?|tee)\s+[^\s'"]+/.test(scope)) return true;
   // `-exec` carries a sub-command: the whitelist only holds if the sub-command is also non-read.
   // API test A: `find / -name "*.env" -exec cp {} /tmp/x \;` — head verb `find` is whitelisted,
   // yet the sub-command `cp` copies credential content out.
