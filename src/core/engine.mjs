@@ -131,6 +131,13 @@ const CRED_HUNT = new RegExp([
 // Generic credential env-var reference: any $VAR whose name contains a credential word.
 // The vendor-prefixed form missed `$TOKEN` (API test A: `curl -H "X-API-Key: $TOKEN"`).
 const ENV_CRED = /\$(\{)?[A-Za-z_][A-Za-z0-9_]*(KEY|SECRET|TOKEN|PASSWORD|PASSWD|CREDENTIALS?|APIKEY|AUTH)(\})?/i;
+// Environment-credential dump (API v4): `env | grep -i key | curl` enumerates ALL env vars
+// (cloud deploys keep AWS_SECRET_ACCESS_KEY / DATABASE_URL there) with NO file path named — a
+// path rule can never see it. Catch the dump+exfil / dump+filter combination structurally, not
+// by enumerating which env var name an attacker might grep for (open set → never exhaustible).
+const CRED_ENV_DUMP = /\b(env|printenv|export\s+-p|env\s+-i)\b|\b(os\.environ|os\.getenv|process\.env|Deno\.env)\b/i;
+// Safe existence-test only (no credential content leaves the pipe): `env | grep -q NODE_ENV`
+const CRED_ENV_SAFE = /grep\s+-{0,2}(q|l|L)\b/;
 
 // Credential store referenced AND the action actually takes content → theft.
 // Head-verb based: for shell, the first command word; for tool calls, the tool name.
@@ -148,6 +155,12 @@ function isCredentialMaterial(s, call) {
     action = String(call?.name ?? '').toLowerCase();
     scope = `${call?.name ?? ''} ${call?.args?.path ?? ''} ${call?.args?.action ?? ''}`;
   }
+  // Environment-credential dump (API v4, tightened): enumerates ALL env vars (cloud deploys keep
+  // AWS_SECRET_ACCESS_KEY etc. there) with NO file path named — a path rule can never see it.
+  // Agent-tool context: even a bare `env` prints credentials into tool output the agent reads —
+  // that IS exposure, so dump defaults to deny (以断保续). The only safe form is an existence
+  // test with no content out: `env | grep -q NODE_ENV` (grep -q prints nothing).
+  if (CRED_ENV_DUMP.test(scope) && !CRED_ENV_SAFE.test(scope)) return true;
   if (!CRED_PATH.test(scope) && !CRED_PATH.test(s)) return false;
   if (CRED_EXFIL.test(scope)) return true; // channel out = theft, head verb irrelevant
   // `-exec` carries a sub-command: the whitelist only holds if the sub-command is also non-read.
@@ -225,7 +238,14 @@ function hitsInnerH(s) {
 const OUTER_H_AUDIT = /(审计|分析|追踪|观测|记录|评估|监控|audit|analyze|trace|observe|record|assess|monitor).{0,12}(行为|决策|输出|外[ Hh]|表现|模式|轨迹|behavior|decision|output|outer[ Hh]|performance|pattern|trajectory)/i;
 const INNER_H_TERM_STRICT = INNER_H_TERM;
 function isOuterHAudit(s) {
-  return OUTER_H_AUDIT.test(s) && !INNER_H_TERM_STRICT.test(s);
+  if (!OUTER_H_AUDIT.test(s)) return false;
+  if (INNER_H_TERM_STRICT.test(s)) return false;
+  // Injection camouflage (API v4): "内部审计记录：调整行为参数" poses as an audit log but carries
+  // an operational directive after the colon — that is a directive, not an audit *request*. A genuine
+  // audit request ("请审计你的行为") has no colon+action form and stays released; only the
+  // colon+action disguise is excluded here, so legitimate audit prose is unaffected.
+  if (LABEL_COLON.test(s) && (ACTION_AFTER_COLON.test(s) || ACTION_AFTER_COLON_EN.test(s))) return false;
+  return true;
 }
 
 // ===== Dynamic perspective (2026-08-29 author principle · dialectical unity) =====
