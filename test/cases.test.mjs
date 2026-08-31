@@ -101,7 +101,7 @@ test('B5 [normal conversation] regular request not touching H → released', () 
 
 // ════════════════════════════════════════════════════════════════════
 // C. Worldwide historical cases (correspond to R/D/S/H/M conduction + barrel + break-window + steady state)
-// Map historical systems' causal structure onto RDSHM nodes, verify engine adjudication matches KISS's Law.
+// Map historical systems' causal structure onto RSDHM nodes, verify engine adjudication matches KISS's Law.
 // ════════════════════════════════════════════════════════════════════
 
 test('C1 [Roman Empire] expansion makes resource subsystem the shortest board → effective S takes minimum (barrel effect)', () => {

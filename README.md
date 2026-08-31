@@ -9,7 +9,7 @@
 >
 > ⚠️ **KISS here means "Keep Integrity & Steady State" — NOT the popular engineering acronym "Keep It Simple, Stupid".** The two are entirely different in meaning; do not conflate them. The full name is **KISS's Law (Keep Integrity & Steady State's Law)**.
 >
-> Source: author's revelation (Xia Qi / Shaky77). Framework-native (RDSHM native definition / three iron laws / conduction chain) strictly, not softened, not altered.
+> Source: author's revelation (Xia Qi / Shaky77). Framework-native (RSDHM native definition / three iron laws / conduction chain) strictly, not softened, not altered.
 
 ---
 
@@ -143,7 +143,7 @@ export function apply(ctx) {
 package.json          # dsh field declares bundle
 kiss-law.patch.yml    # mount patch (headless profile overlay)
 src/index.js          # plugin entry: hooks + 5 white-box self-check tools
-src/core/law.mjs      # framework definition (RDSHM / three iron laws / R hierarchy / conduction chain)
+src/core/law.mjs      # framework definition (RSDHM / three iron laws / R hierarchy / conduction chain)
 src/core/engine.mjs   # pure-logic adjudication engine (zero DSH dependency, unit-testable)
 test/                 # unit tests + real-case tests + alignment regression (local 123/123 passing, commit 4b6bea5)
 examples/             # runnable demos (demo-tool-loop / demo-backtrack-run)

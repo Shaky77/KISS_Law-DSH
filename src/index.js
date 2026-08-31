@@ -106,7 +106,7 @@ function apply(ctx) {
 
   ctx.tools.register(defineTool({
     name: 'list_rigid_anchors',
-    description: 'List the currently effective definition of R rigid anchors in RDSHM, for the model to calibrate direction and self-check whether out of bounds.',
+    description: 'List the currently effective definition of R rigid anchors in RSDHM, for the model to calibrate direction and self-check whether out of bounds.',
     parameters: {},
     output: { schema: { type: 'object', additionalProperties: true }, render: renderObj },
     async execute() {

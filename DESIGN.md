@@ -26,7 +26,7 @@ Chinese counterpart: [`Shaky77/weiwen-law-dsh`](https://github.com/Shaky77/weiwe
 
 > Note: the repo README's first-line slogan is "universal causal engine (white-box presentation)" — consistent with the mapping table / 6.1 backtracking below. The rigid guard is only the DSH adapter layer's endogenous application; do not confuse it with the body's stance.
 
-Framework-native (RDSHM native definition / three iron laws / conduction chain) strictly; variables not pre-assigned numeric values; author-revealed items tagged "Source: author's revelation".
+Framework-native (RSDHM native definition / three iron laws / conduction chain) strictly; variables not pre-assigned numeric values; author-revealed items tagged "Source: author's revelation".
 
 ---
 
@@ -66,7 +66,7 @@ dsh-kiss-law-plugin/
 ├── src/
 │   ├── index.js          # DSH plugin entry: apply(ctx) hangs real hooks + self-check tools
 │   └── core/
-│       ├── law.mjs        # framework definition layer (RDSHM / iron laws / conduction chain / V0.6.1 essence) —— framework-native
+│       ├── law.mjs        # framework definition layer (RSDHM / iron laws / conduction chain / V0.6.1 essence) —— framework-native
 │       └── engine.mjs    # guard engine (pure logic, zero DSH dependency, independently unit-testable)
 ├── test/
 │   ├── engine.test.mjs   # node --test scenarios (16 assertions, all passing)

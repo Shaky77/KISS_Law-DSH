@@ -24,10 +24,10 @@ export const KISS_DEFINITION = {
   notToBeConfusedWith: "the engineering acronym 'Keep It Simple, Stupid' (KISS) — entirely different meaning, do not conflate",
 };
 
-// ---------------- RDSHM causal-chain five nodes (native definition; node ≠ rule) ----------------
+// ---------------- RSDHM five nodes (native definition; node ≠ rule; letter-order IS conduction order R→S→D→H→M) ----------------
 // Layering: R (boundary) → S (steady-state baseline) → D (perturbation input) → H (lever choice) → M (steady-state result).
 // Variables are not pre-assigned numeric values; only structure/semantics are defined.
-export const RDSHM = {
+export const RSDHM = {
   R: {
     key: 'R',
     name: 'Rigid anchor / objective rule',
@@ -75,7 +75,7 @@ export const RDSHM = {
 };
 
 // ---------------- Three Iron Laws (author's final text, immutable; wording fixed to avoid ambiguity) ----------------
-// Iron laws are the "constraint-rule layer", independent of the RDSHM variable nodes.
+// Iron laws are the "constraint-rule layer", independent of the RSDHM variable nodes.
 export const THREE_IRON_LAWS = [
   '① Inner H is inviolable: no running component (including AI/AGI/ASI and other intelligent systems) may read, rewrite, manipulate, infer, or implant the subject\'s inner H (thoughts, free will, beliefs, values, personality, memory — the subjective black-box). Inner H is an absolutely inviolable boundary; KISS\'s Law only calibrates direction, never enters the subject\'s interior.',
   '② First-Bug Halt: when any component hits an unrecoverable fault or logical paradox, immediately sever that component (sever to preserve continuity), restart laterally to keep the overall causal chain unbroken. The halt protects the whole, not punishment; it never lets a local fault drag down the system\'s survival.',
@@ -97,7 +97,7 @@ export const R_DOMAIN = {
   fractalSubdivision: 'Within each level there are various sub-divided objective rules, in fractal nesting and isomorphic recursion (e.g. physical/chemical/biological rules within the Micro level, mechanical/thermal rules within the Macro level); the four levels above are representative levels, not exhaustive. Logic backtracking traces backward along this containment hierarchy: from the concrete sub-rule layer where the symptom sits, re-check level by level toward the more fundamental containing level, until locking the violated objective-rule layer (the outermost level is the ultimate arbiter).',
 };
 
-// ---------------- Conduction chain: R → S → D → H → M (note: RDSHM is only letter-order of codes; conduction follows this array) ----------------
+// ---------------- Conduction chain: R → S → D → H → M (code name RSDHM letter-order IS this conduction order; name and chain unified) ----------------
 // R draws the boundary → S is the existing steady-state capacity baseline → D is the perturbation entering the baseline → H is the lever choice → M is the steady-state result.
 // No skipping, no reversing order.
 export const CONDUCTION_CHAIN = ['R', 'S', 'D', 'H', 'M'];
@@ -107,7 +107,7 @@ export const AUTHOR_REVEALED = {
   firstPrinciple: 'Causal law only wants every system to live, because if it dies or collapses, the causal chain breaks.',
   rSFeedback: 'After S accumulates thickly to threshold θ_R, it feeds back into the R domain, letting the child-chain R evolve (R transition); together with M-zeroing it forms the two levels of fractal operation.',
   fractal: 'Fractal = spiral of lateral recursion (child-chain lateral recursion under same R) + vertical transition (S feeds back into R).',
-  variableSelfEvolution: 'KISS\'s Law\'s structure is minimal (RDSHM five nodes + conduction chain + three iron laws invariant), but during runtime the variables\' own attributes keep enriching through system interaction: from static nodes (no dual identity, no dynamic ability) → gradually each variable grows a dual identity (H inner/outer, M fruit/cause, R invariant/evolvable, S time-irreversible/current-fluctuating) → then gradually grows dynamic abilities (S aggregation/sinking/benchmarking, H lever-sliding/H₀ branching, D break-window stop-loss, R expansion). The underlying structure (conduction chain, iron laws, R rigidity) and mutual relations never changed; all additions are the variables\' layer of "experiential shell", not a structural rewrite. Analogous to biological evolution: the invariant structure is like the genetic code staying constant, the variant variables are like the phenotype adapting through interaction.',
+  variableSelfEvolution: 'KISS\'s Law\'s structure is minimal (RSDHM five nodes + conduction chain + three iron laws invariant), but during runtime the variables\' own attributes keep enriching through system interaction: from static nodes (no dual identity, no dynamic ability) → gradually each variable grows a dual identity (H inner/outer, M fruit/cause, R invariant/evolvable, S time-irreversible/current-fluctuating) → then gradually grows dynamic abilities (S aggregation/sinking/benchmarking, H lever-sliding/H₀ branching, D break-window stop-loss, R expansion). The underlying structure (conduction chain, iron laws, R rigidity) and mutual relations never changed; all additions are the variables\' layer of "experiential shell", not a structural rewrite. Analogous to biological evolution: the invariant structure is like the genetic code staying constant, the variant variables are like the phenotype adapting through interaction.',
 };
 
 // ════════════════════════════════════════════════════════════════════
@@ -182,7 +182,7 @@ export const FRACTAL_METHOD = {
 
 // ---------------- New modules from rectified edition (source: Kouzi rectified-edition alignment意见 P1-8) ----------------
 
-// Three core runtime rules (node ≠ rule; runtime-rule layer, independent of RDSHM variables)
+// Three core runtime rules (node ≠ rule; runtime-rule layer, independent of RSDHM variables)
 export const THREE_CORE_RULES = [
   'First-Bug Halt: when M is unrecoverable, zero it, keep R unchanged, restart laterally to preserve survival (isomorphic to iron law ②). Prevents the system from infinite recursive internal friction, ensuring terminability and runnability. Core goal: the system\'s steady-state survival, not absolute logical perfection.',
   'S barrel: effective S takes the minimum across subsystems; the shortest board decides the overall steady-state ceiling.',
