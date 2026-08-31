@@ -11,6 +11,8 @@
 >
 > Source: author's revelation (Xia Qi / Shaky77). Framework-native (RSDHM native definition / three iron laws / conduction chain) strictly, not softened, not altered.
 
+> ⚖️ **Dual license**: open-source use **AGPL-3.0**; commercial integration / closed-source distribution / OEM can be licensed **independently of AGPL-3.0** → 563003@qq.com. See [License & security](#license--security) and [CONTRIBUTING.md](./CONTRIBUTING.md).
+
 ---
 
 ## Understand in 30 seconds
@@ -145,7 +147,7 @@ kiss-law.patch.yml    # mount patch (headless profile overlay)
 src/index.js          # plugin entry: hooks + 5 white-box self-check tools
 src/core/law.mjs      # framework definition (RSDHM / three iron laws / R hierarchy / conduction chain)
 src/core/engine.mjs   # pure-logic adjudication engine (zero DSH dependency, unit-testable)
-test/                 # unit tests + real-case tests + alignment regression (local 123/123 passing, commit 4b6bea5)
+test/                 # unit tests + real-case tests + alignment regression (local 123/123 passing, commit 905499f)
 examples/             # runnable demos (demo-tool-loop / demo-backtrack-run)
 DESIGN.md             # architecture design (mapping / risks / usage flow / mount)
 ```
@@ -231,13 +233,18 @@ Once mounted, any Agent running under that profile automatically gains the 6 whi
 ## Development
 
 - **Dependencies**: Node.js `^22.19 || >=24`; runtime dependency only `@deepseek-ai/dsh-tools` (peerDependency, optional).
-- **Testing**: `npm test` (i.e. `node --test "test/*.test.mjs"`); currently **123/123 passing** (commit `4b6bea5`).
+- **Testing**: `npm test` (i.e. `node --test "test/*.test.mjs"`); currently **123/123 passing** (commit `905499f`).
 - **Build**: no build needed (pure ESM + yml overlay); after editing `src/core/engine.mjs`, rerun `npm test` for regression.
 - **Contributing**: the framework-native (mind-map layer) is frozen in the base edition; this live-system edition carries engineering iteration. Changes via PR against this repo, with `node --test` output attached.
 
 ## License & security
 
-[AGPL-3.0](./LICENSE)
+This project uses **dual licensing**:
+
+- **Open-source use**: **AGPL-3.0** (full text in [LICENSE](./LICENSE))
+- **Commercial integration / closed-source distribution / OEM**: a license **independent of AGPL-3.0** is available — contact 563003@qq.com
+
+External contributions require a signed CLA (to support the dual licensing above); see [CONTRIBUTING.md](./CONTRIBUTING.md).
 
 > **Private security reporting**: please do not disclose security issues in public issues; email 563003@qq.com directly and the author will prioritize it.
 
