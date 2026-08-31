@@ -1,4 +1,4 @@
-# dsh-kiss-law-plugin
+# dsh-kiss-law
 
 **KISS's Law universal causal engine (white-box presentation)** —— implemented as a **Cordis plugin of DeepSeek Harness (DSH)**.
 
@@ -54,7 +54,7 @@ This path calls the DeepSeek API directly and does **not** depend on DSH install
 
 ```bash
 git clone https://github.com/Shaky77/KISS_Law-DSH
-cd dsh-kiss-law-plugin
+cd KISS_Law-DSH
 
 # Put your DeepSeek API Key at (one line, no trailing newline):
 #   C:/Users/Administrator/.workbuddy/deepseek_api_key.txt
@@ -67,16 +67,16 @@ After it runs: DeepSeek will **proactively call the `query_iron_laws` tool** and
 
 ## Mount into DSH (production)
 
-Add `kiss-law.patch.yml` as an overlay into your DSH profile (the exact path depends on your DSH version; see the mount section in [`DESIGN.md`](./DESIGN.md)). Once mounted, any Agent running under that profile automatically gets the 5 white-box tools.
+Add `kiss-law.patch.yml` as an overlay into your DSH profile (the exact path depends on your DSH version; see the mount section in [`DESIGN.md`](./DESIGN.md)). Once mounted, any Agent running under that profile automatically gets the 6 white-box tools.
 
 > Note: the exact native-mount profile path varies with the DSH version. This repo has verified through real runs that the plugin loads in DSH and all 5 tools register. If the official API changes, verify against the current official docs.
 
 ## How the model calls it (for AI engineers)
 
-> **Plain version**: the plugin registers 5 white-box tools with DSH; the model calls them like ordinary functions to **self-check boundaries**, while 3 hooks do **hard interception**.
+> **Plain version**: the plugin registers 6 white-box tools with DSH; the model calls them like ordinary functions to **self-check boundaries**, while 3 hooks do **hard interception**.
 > **Pro version**: excerpted from `src/index.js` (full code in repo), see the block below.
 
-### 5 white-box tools (real registered names)
+### 6 white-box tools (real registered names)
 
 | Tool | What the model uses it for |
 |---|---|
@@ -85,6 +85,7 @@ Add `kiss-law.patch.yml` as an overlay into your DSH profile (the exact path dep
 | `list_rigid_anchors` | list current R rigid-anchor definitions, calibrate direction, self-check overreach |
 | `query_conduction_chain` | get conduction chain R→S→D→H→M and framework essence |
 | `query_boundary` | query inner-H boundary (this plugin never reads/writes the subjective black box) |
+| `query_bugstop` | query First-Bug Halt loop status: which fault links are halted-unrepaired, missing steps (backtrack/trace/fix), whether the white-box loop is closed |
 
 ### 3 hard gates (hooks)
 
@@ -134,7 +135,7 @@ export function apply(ctx) {
 }
 ```
 
-> Full implementation (all 5 tools' `execute`, runtime log, engine adjudication) in repo `src/index.js`.
+> Full implementation (all 6 tools' `execute`, runtime log, engine adjudication) in repo `src/index.js`.
 
 ## Structure
 
@@ -144,7 +145,7 @@ kiss-law.patch.yml    # mount patch (headless profile overlay)
 src/index.js          # plugin entry: hooks + 5 white-box self-check tools
 src/core/law.mjs      # framework definition (RDSHM / three iron laws / R hierarchy / conduction chain)
 src/core/engine.mjs   # pure-logic adjudication engine (zero DSH dependency, unit-testable)
-test/                 # unit tests + real-case tests + alignment regression (local 44/44 passing)
+test/                 # unit tests + real-case tests + alignment regression (local 123/123 passing, commit 4b6bea5)
 examples/             # runnable demos (demo-tool-loop / demo-backtrack-run)
 DESIGN.md             # architecture design (mapping / risks / usage flow / mount)
 ```
@@ -195,15 +196,50 @@ Once mounted, any Agent running under that profile automatically gains the 6 whi
 - **Web / Standard mode**: daily conversation and engineering tasks; the plugin constrains silently in the background.
 - **Headless mode**: `dsh --profile headless` runs without UI for batch jobs — suitable for regression tests and multi-agent stress testing. This repo's `versions/live/evidence/` directory archives such runs (12 scenarios × DeepSeek + mock, with transcripts and verdict reports).
 
+### Uninstall
+
+- **dsh plugin install**: `dsh plugin --profile web remove "dsh-kiss-law"`, restart to take effect.
+- **overlay mount**: remove the `kiss-law.patch.yml` reference from dsh launch config (cordis.yml plugins list or `--patch`), restart to take effect.
+- The plugin writes no persistent state; after removal the Agent no longer has the white-box tools or the 3 hard gates, and nothing is left behind.
+
 ### Notes
 
 - The plugin entry is pure ESM (`src/index.js`), depending on `@deepseek-ai/dsh-tools` (peerDependency, optional); verify the API against the current dsh docs before integration.
 - For remote dsh deployment, declare `trustedHosts` in config, otherwise the API layer rejects non-loopback requests.
 - When building dsh from source with `pnpm`, you **must** run `pnpm run build` first (internal package linking + frontend artifacts), or module-not-found errors occur.
 
-## License
+## Configuration
+
+- **Runtime form**: pure-ESM plugin, no build step; integrate via `kiss-law.patch.yml` overlay or `dsh plugin add`; no standalone service process.
+- **Environment variables**: only `DEEPSEEK_API_KEY` (needed for model calls, passed through by DSH's model adapter — this plugin never reads the key content); all other config is DSH's own (profile / cordis.yml). This plugin defines no dedicated env vars.
+- **Sensitive items**: the plugin writes no persistent state and persists no user data; credentials stay in the host's secure path (e.g. `~/.workbuddy/deepseek_api_key.txt`), managed by host and DSH, never committed to this repo.
+
+## Permissions & data
+
+- **File access**: reads only its own source and `kiss-law.patch.yml`; never reads or writes user project files, session logs, or other plugins' directories.
+- **Network access**: no independent outbound requests; model-call networking is handled by DSH's model adapter.
+- **Credentials & user data**: collects and uploads no user data or API keys; the inner-H boundary declaration "this plugin never reads/writes the subjective black box" — `query_boundary` returns only the boundary description, no user content.
+- **Immutable declaration**: the three iron laws (`law.mjs`) and rigid anchors are read-only constants, not rewritable at runtime by prompts or external input (white-box no-tampering).
+
+## Troubleshooting
+
+- **Plugin not loaded / tools missing**: confirm DSH v0.1.x and that `kiss-law.patch.yml` is correctly overlaid to the target profile; after `dsh --profile web`, check `Settings → Plugins` that `kiss-law` shows "enabled".
+- **Mount error `module not found`**: when building dsh from source, run `pnpm run build` first (internal package linking + frontend artifacts), or module-not-found occurs.
+- **API layer rejects non-loopback requests**: for remote dsh deployment, declare `trustedHosts` in config.
+- **Rollback**: remove the `--patch` reference or `dsh plugin remove "dsh-kiss-law"` and restart — the plugin leaves no residual state.
+
+## Development
+
+- **Dependencies**: Node.js `^22.19 || >=24`; runtime dependency only `@deepseek-ai/dsh-tools` (peerDependency, optional).
+- **Testing**: `npm test` (i.e. `node --test "test/*.test.mjs"`); currently **123/123 passing** (commit `4b6bea5`).
+- **Build**: no build needed (pure ESM + yml overlay); after editing `src/core/engine.mjs`, rerun `npm test` for regression.
+- **Contributing**: the framework-native (mind-map layer) is frozen in the base edition; this live-system edition carries engineering iteration. Changes via PR against this repo, with `node --test` output attached.
+
+## License & security
 
 [AGPL-3.0](./LICENSE)
+
+> **Private security reporting**: please do not disclose security issues in public issues; email 563003@qq.com directly and the author will prioritize it.
 
 ---
 
