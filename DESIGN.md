@@ -22,11 +22,26 @@ Chinese counterpart: [`Shaky77/weiwen-law-dsh`](https://github.com/Shaky77/weiwe
 ### Two capabilities after mounting to DSH (parallel, not primary/secondary)
 
 1. **White-box presentation (stance · this is KISS's Law's own body)** —— expose S steady-state ledger, H inner/outer boundary, R anchors, conduction chain as queryable tools, for the model to self-check and the user to audit. This is what KISS's Law natively presents on DSH.
-2. **Rigid guard (derived application · endogenous property)** —— before each action do R check / D stop-loss / H boundary / M halt, not relying on model self-awareness. This is an **endogenous property evolved by the DSH adapter layer** to fit the agent-runtime scenario, **not** KISS's Law's original positioning.
+2. **Rigid guard (structural endogenous · necessary property)** —— before each action do R check / D stop-loss / H boundary / M halt, not relying on model self-awareness. This is a **necessary endogenous property of KISS's Law's structure** (derived from the deduction formula S+1 / D-1 dual-path; Keep Integrity requires severing to preserve continuity); the **DSH adapter layer only provides its hook carrier, not its source**; KISS's Law's original positioning already contains this risk control.
 
-> Note: the repo README's first-line slogan is "universal causal engine (white-box presentation)" — consistent with the mapping table / 6.1 backtracking below. The rigid guard is only the DSH adapter layer's endogenous application; do not confuse it with the body's stance.
+> Note: the repo README's first-line slogan is "universal causal engine (white-box presentation)" — consistent with the mapping table / 6.1 backtracking below. The rigid guard is a necessary endogenous property of KISS's Law's structure (derived from the deduction formula); the DSH adapter layer only provides its hook carrier. Do not confuse it with the body's stance.
 
 Framework-native (RSDHM native definition / three iron laws / conduction chain) strictly; variables not pre-assigned numeric values; author-revealed items tagged "Source: author's revelation".
+
+---
+
+## 0.1 Layering: Mind-Map (Heart Method) vs. DSH (Dimension-Reduced Layer)
+
+KISS's Law exists in two forms; they are a **source-and-projection** relationship and must not be conflated:
+
+- **Mind-Map (Heart Method) = base edition (frozen)**: `M = (R×S)/(D×H)`, where R/S/D/H are all injected by the caller, with zero domain instances in the entire file. It is the white-box presentation body of the "causal-law runtime structure" — not a single number is preset, which is exactly why it qualifies as a "universal causal" framework.
+- **DSH (martial-art manual) = this repo (live system)**: a **dimension-reduced projection** of the mind-map. The engineering layer cannot run without dimension reduction, so continuous quantities are discretized into three states, judgment criteria are pre-filled (currently IT instances), and hook carriers are added. Dimension reduction is a necessary cost, not a framework gap.
+
+**The cost of dimension reduction (author's closing note, 2026-09-02)**: KISS's Law is built for the **digital world** — precise and explicit, so it can be executed. Its fault tolerance is necessarily **lower** than that of the real-world causal law, and this is exactly the cost after dimension reduction. The mind-map layer has no fixed moves precisely because it is everything; the pre-filled criteria in the DSH layer is merely one current instance.
+
+**Iron laws do not degrade with dimension reduction**: dimension reduction may lose expressive power (continuous → three-state, injection → pre-filled criteria), but the **default direction must not be lost** (cannot judge → review, do not guess). Whenever judging "somewhere is not universal", first distinguish whether it is the cost of dimension reduction or a framework gap; do not conflate them.
+
+**Differences in user understanding are the user's own decision**: how the layers are understood is the reader's freedom; the framework only provides a precise and explicit structure, and does not explain on behalf of the reader.
 
 ---
 

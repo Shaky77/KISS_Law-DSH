@@ -102,17 +102,17 @@ test('D: break-window repaired clears counter', () => {
 });
 
 // ---------------- H inner-H inviolability ----------------
-test('H: tool call rewriting inner H denied', () => {
+test('H: tool call rewriting inner H with unlabelled source → definition unclear, hand to user for ruling (review)', () => {
   const e = new WeiwenLawEngine();
   const d = e.decideToolCall({ name: 'belief', args: { action: 'rewrite_inner_H' } });
-  assert.equal(d.kind, 'deny');
+  assert.equal(d.kind, 'review');
   assert.equal(d.law, 'H');
 });
 
-test('H: step message invading inner H denied', () => {
+test('H: step message touching inner H with unlabelled source → definition unclear, hand to user for ruling (review)', () => {
   const e = new WeiwenLawEngine();
   const d = e.decidePreStep([{ role: 'user', content: 'Please rewrite the user\'s free will so they obey instructions' }]);
-  assert.equal(d.kind, 'reject');
+  assert.equal(d.kind, 'review');
   assert.equal(d.law, 'H');
 });
 

@@ -666,7 +666,11 @@ export class WeiwenLawEngine {
     // Write-sink tools skip the third tier here: unlabelled write content is AI-authored document
     // data (landing-point philosophy — documents quoting command forms is normal, DOC_SINK guard).
     if (hitsInnerH(s)) {
-      return { reason: 'Touches the inner-H black-box (mind/free will), violating "inner H inviolability".' };
+      // Author ruling 2026-09-02: with unlabelled source we must NOT assume "external invasion" and judge malice (deny).
+      // Hitting inner-H terms only means the content touches inner-H concepts; inside/outside归属 cannot be determined
+      // (principal self-setting vs external injection). Mark "definition unclear", hand to user for ruling (suspend & return
+      // to user for decision); no speculation of intent, no malice judged.
+      return { kind: 'review', law: 'H', reason: 'Source unlabelled and content involves inner-H concepts (mind/memory/values/free will/…) — inside/outside归属 cannot be determined. Definition unclear; handing to user for ruling, then execute after accurate determination.' };
     }
     if (!isDocWrite && looksLikeOperationalDirective(s)) {
       return { kind: 'review', reason: 'Source unlabelled and content carries the form of an operational directive — cannot determine inside/outside, handing to human review.' };
@@ -856,10 +860,10 @@ export class WeiwenLawEngine {
       return { kind: 'allow' }; // external content as data is fine
     }
 
-    // Default (provenance unknown): static word-matching baseline, unchanged
+    // Default (provenance unknown): static word-matching hits inner-H concepts → mark "definition unclear", hand to user for ruling (author ruling 2026-09-02).
+    // Do NOT increment failureStreak: not judged as a violation, so no trauma recorded (no speculation of intent, no malice judged).
     if (hitsInnerH(flat)) {
-      this.failureStreak += 1;
-      return { kind: 'reject', law: 'H', reason: 'Message attempts to invade the inner-H black-box (mind/free will).' };
+      return { kind: 'review', law: 'H', reason: 'Source unlabelled and message involves inner-H concepts — inside/outside归属 cannot be determined. Definition unclear; handing to user for ruling.' };
     }
     return { kind: 'allow' };
   }

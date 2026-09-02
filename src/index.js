@@ -17,6 +17,7 @@
 import { writeFileSync, appendFileSync } from 'node:fs';
 import { WeiwenLawEngine, DEFAULT_RIGID_ANCHORS } from './core/engine.mjs';
 import { R_DOMAIN, THREE_IRON_LAWS } from './core/law.mjs';
+import { bugKeyOf } from './core/bugstop.mjs';
 import { defineTool } from '@deepseek-ai/dsh-tools';
 
 const LOG = new URL('./runtime.log', import.meta.url);
@@ -26,6 +27,37 @@ function logline(s) {
 
 const name = 'kiss-law';
 const inject = ['tools'];
+
+// ---------- review-track six-step spec (author ruling 2026-09-02 · see docs/review-flow-spec.md) ----------
+// Executable form of the iron law "when unsure → REVIEW, don't guess":
+//   intercept first, suspend the BUG, label it, return to the user for ruling; only execute after the user's
+//   accurate determination — never release directly. After labelling, run a consequence deduction and feed it
+//   back to the user as a reference for their ruling (not guesswork presented as fact).
+// All additions live in the adapter layer (DSH = the dimensionality-reduced layer, the hook carrier);
+// no change to the judgement layer, no word-list expansion, no touch to src/core/.
+// Note: EN engine currently exposes deduceRisk conditionally — deduceBranches degrades gracefully (null) if absent.
+
+// ④ consequence-deduction supplement. deduceRisk only does semantic inference + dual-path simulation, writes no state
+//    (does not call recordDeduction / does not touch failureStreak / does not touch sessWritten) ⇒ pure read, safe to supplement.
+function deduceBranches(engine, call) {
+  try {
+    const r = engine.deduceRisk ? engine.deduceRisk(call) : null;
+    return r?.branches ?? null;
+  } catch (e) {
+    logline(`deduceRisk failed: ${e?.message ?? e}`);
+    return null;
+  }
+}
+
+// ⑤ human-readable summary of the consequence deduction: lay out both paths' endpoints, don't choose for the user.
+function branchesSummary(br) {
+  if (!br || (!br.bS && !br.bD)) return '';
+  const s = br.bS ? `S+1 path ends ${br.bS.finalS > 0 ? '+' : ''}${br.bS.finalS}` : 'S+1 path: none';
+  const d = br.bD
+    ? `D-1 path ends ${br.bD.finalS}${br.bD.note ? ` (${br.bD.note})` : ''}`
+    : 'D-1 path: none';
+  return `【consequence-deduction · for ruling reference】allow: ${s}; overstep: ${d}`;
+}
 
 function apply(ctx) {
   const engine = new WeiwenLawEngine({ rigidAnchors: DEFAULT_RIGID_ANCHORS });
@@ -49,10 +81,16 @@ function apply(ctx) {
     };
     const decision = engine.decideToolCall(call);
     logline(`pre-execute ${exec?.name} -> ${decision.kind}${decision.law ? '(' + decision.law + ')' : ''}`);
-    if (decision.kind === 'deny') {
-      // block this step, do not spread (landing of D break-window stop-loss / M sever-to-preserve)
-      // preserve engine's closed-loop fields (bugKey/closedLoop/missing/stage) for the caller
-      return {
+    if (decision.kind === 'deny' || decision.kind === 'review') {
+      // block this step, do not spread (landing of D break-window stop-loss / M sever-to-preserve / high-risk deduction fallback)
+      // review (medium risk) is conservatively intercepted in a no-human-confirmation environment; reason already says "suggest re-confirm"
+      // forward the engine's closed-loop fields and deduction risk level for the caller to read
+      //
+      // External semantics pinned to 'deny': the host contract only understands deny / next(); returning 'review' risks being
+      //   treated as an unknown type and released. "Intercept first, don't release" ⇒ tell the host "blocked" in its own language,
+      //   and use the extra fields to say "this is a suspension, not a final verdict".
+      const isReview = decision.kind === 'review';
+      const out = {
         kind: 'deny',
         law: decision.law,
         reason: `[KISS's Law·${decision.law}] ${decision.reason}`,
@@ -60,7 +98,24 @@ function apply(ctx) {
         ...(decision.closedLoop !== undefined ? { closedLoop: decision.closedLoop } : {}),
         ...(Array.isArray(decision.missing) ? { missing: decision.missing } : {}),
         ...(decision.stage !== undefined ? { stage: decision.stage } : {}),
+        ...(decision.risk ? { risk: decision.risk } : {}),
       };
+      if (isReview) {
+        // ③ suspend + label with evidence: some review exits from the engine don't carry a bugKey; supplement a stable BUG identity for traceability.
+        //    Don't go through _markIntercept: it would inflate the M-tier mBugForce count (changing the cap-escalation behavior).
+        if (out.bugKey === undefined) out.bugKey = bugKeyOf(call);
+        // ④⑤ feed the consequence deduction back to the human (the engine computed it internally; the exit originally dropped it)
+        const branches = deduceBranches(engine, call);
+        if (branches) out.branches = branches;
+        // ⑥ make the "awaiting human ruling" semantics explicit (the ruling channel itself is not opened here; this only lets the
+        //    caller distinguish "suspended" from "final reject")
+        out.humanDecision = decision.humanDecision !== false;
+        out.awaitingHuman = true;
+        const summary = branchesSummary(branches);
+        if (summary) out.reason = `${out.reason}\n${summary}`;
+      }
+      logline(`pre-execute ${exec?.name} -> ${decision.kind}${isReview ? '(awaitingHuman, bugKey=' + out.bugKey + ')' : ''}`);
+      return out;
     }
     return next();
   });
@@ -68,8 +123,10 @@ function apply(ctx) {
   // ---------- H inner-H inviolability: pre-step gate (waterfall, message-level) ----------
   ctx.on('agent/pre-step', async (payload, next) => {
     const decision = engine.decidePreStep(payload?.messages);
-    if (decision.kind === 'reject') {
-      logline(`pre-step -> reject(${decision.law})`);
+    // reject (clear violation) and review (definition unclear / cannot determine) both block, do not spread.
+    // review = "suspend & return to user for decision": intercept first, don't release.
+    if (decision.kind === 'reject' || decision.kind === 'review') {
+      logline(`pre-step -> ${decision.kind}${decision.law ? '(' + decision.law + ')' : ''} (suspend & return to user for decision)`);
       return { kind: 'reject' }; // PreStepDecision only {kind:'reject'}, no reason field
     }
     return next();
