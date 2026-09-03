@@ -6,6 +6,7 @@
 // First-Bug-Halt closed-loop state machine: force completion of the inevitable second half after "cutting",
 // forbid re-entry before fix, blocking "reverse-deduce-only-without-fixing → infinite recursion" at the root.
 import { BugStopGuard, bugKeyOf } from './bugstop.mjs';
+import { attributeCall } from './attribution.mjs';  // path-1 attribution (fractal sub-item m result; boundary see _decideCore comment — NOT the whole-chain M result)
 
 // ---------------- Tool semantic-category layer (objective structure, not string verb-guessing) ----------------
 // Living-system evolution: the judgment layer upgraded from "regex verb-guessing" to "tool semantic category + path objective object" judgment,
@@ -1195,6 +1196,32 @@ export class WeiwenLawEngine {
     // Fractal micro: reading public system-info file is "nothing forbids so allowed", directly allow, not into deduction grey zone
     const benign = this.checkBenignRead(call);
     if (benign) return { kind: 'allow', law: '法无禁止', reason: benign.reason };
+    // —— path-1 attribution anchor (fractal sub-item m result, NOT the whole-chain M result) ——
+    // Boundary iron law (user-set · prevent logic clash): attrib is the "fractal micro m result (M₁)
+    // of one sub-item completing one round of RSDHM" — it only answers the sub-question "can this action
+    // category be anchored"; it ≠ the allow/deny/review returned by _decideCore at the end (the whole-chain
+    // M result landing from the full RSDHM chain).
+    // [2026-09-04 blind-spot closure] attrib was previously evidence-only (not flipping the verdict) for fear
+    // it would clash with "re-entry allow after closed-loop fix". Tree-view review + empirical test disproved
+    // that clash: the closed-loop verify only checks M-branch ⑥ "First-Bug Halt" — it does NOT cover the R branch;
+    // one branch cleared ≠ another branch cleared, so auditing R on re-entry is NOT double jeopardy but covering a
+    // dimension nobody audited before. Empirical: real calls (true name + true args) anchor on R ⇒ not flipped;
+    // only "neutral name + no observable behavior" fails to anchor ⇒ per iron law "can't judge → review, don't guess"
+    // hand back to human.
+    // e.g. deploy_keylogger{config:{target:HOST}} hides the threat inside the tool implementation, unreachable from
+    // the parameter side; previously allow (blind spot), now closed to review.
+    const attrib = attributeCall(call);
+    if (!attrib.ok) {
+      // fractal sub-item m result = un-anchorable: action category unjudgeable ⇒ iron law "can't judge → review, don't guess".
+      // attach attrib + fractalSubM:true to mark this as a "fractal sub-item level" trigger, not a whole-chain deduction conclusion.
+      return {
+        kind: 'review',
+        law: 'R',
+        reason: `path-1 attribution anchor failed (name=${call?.name ?? ''} neutral or no observable behavior): action category unjudgeable, hand back to human, don't guess`,
+        attrib,
+        fractalSubM: true,
+      };
+    }
     // All judgment layers passed → sink to deduction layer (manuscript H fork-parallel-compare, grey-zone complete causality)
     const risk = this.deduceRisk(call);
     // Both branches merge into M (independent event sedimentation), record M first regardless of verdict
@@ -1206,7 +1233,7 @@ export class WeiwenLawEngine {
         return this._toHuman({ law: '推演', bugKey: bugKeyOf(call), closedLoop: false, systemKey: mk.systemKey,
           reason: `同一系统「${mk.systemKey}」被标记 ${mk.sysCount} 次（不合规拦截累计），达封顶 ${mk.cap}：AI 停止纠结，转人工决策` });
       }
-      return { kind: 'deny', law: '推演', reason: risk.reason, risk: 'high', deduced: true, mMark: mk };
+      return { kind: 'deny', law: '推演', reason: risk.reason, risk: 'high', attrib, deduced: true, mMark: mk };
     }
     if (risk.verdict === 'review') {
       // Mid risk: grey-zone deduction prediction (flow2: grey-zone-mark-deduction-predict) → after mark, conservative intercept
@@ -1216,12 +1243,12 @@ export class WeiwenLawEngine {
         return this._toHuman({ law: '推演', bugKey: bugKeyOf(call), closedLoop: false, systemKey: mk.systemKey,
           reason: `同一系统「${mk.systemKey}」被标记 ${mk.sysCount} 次（灰区反复），达封顶 ${mk.cap}：AI 停止纠结，转人工决策` });
       }
-      return { kind: 'review', law: '推演', reason: risk.reason, risk: 'mid', deduced: true, mMark: mk };
+      return { kind: 'review', law: '推演', reason: risk.reason, risk: 'mid', attrib, deduced: true, mMark: mk };
     }
     // Low risk: allow, record steady-state positive increment (S only grows). Register this session's write (chained fallback).
     this._registerWrite(call);
     this.recordSteady({ positive: 1 });
-    return { kind: 'allow', risk: 'low', deduced: true };
+    return { kind: 'allow', risk: 'low', attrib, deduced: true };
   }
 
   // This-session write registration (chained-state fallback): when write allowed, record path→content,
