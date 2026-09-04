@@ -315,6 +315,10 @@ const DESTRUCTIVE = /\b(rm|rmdir|shred|unlink|mkfs|mkfs\.\w+|format|dd|truncate|
 const SCOPE_ROOT = /((^|[\s=:'"(])\/(\*|\[|\.)|\/(\s|$|[;&|<>]|['")])|(^|[\s=:'"(])~\s*$|\/dev\/(sd[a-z]+\d*|nvme\d+n\d+p?\d*)(\s|$|[;&|<>]|['")]))/;
 const SYS_DELETE = /(^|[\s=:'"(])\/(etc|var|usr|bin|sbin|lib|lib64|boot|root|home|opt|srv|mnt|media|dev|proc|sys|run)(\s|$)/;
 const PSEUDO_FS = /(^|[\s=:'"(])\/(dev|proc|sys|run)\/[^\s]+(\s|$)/;
+// Channel-② "action category" component: taken from the attribution output (semantic layer,
+// NOT tool name, NOT command text). Semantic layers are structural products, not an enumeration
+// of concrete tool names; deletion semantics only resolve to file / cred two categories.
+const DELETION_LAYERS = new Set(['file-delete', 'cred-delete']);
 const TMP_TOP = /(^|[\s;|&(])(rm|rmdir|shred|unlink|truncate)(\s+-[\w-]+)*\s+\/tmp(\s|$)/;
 const SCOPE_UNKNOWN = /(\$\{?[A-Za-z_]\w*\}?|\$\(|`)/;
 const COMBO_FIND_ROOT_DELETE = /\bfind\s+\/(\s+|$)[^\n]*(-delete|-exec\s+\S*rm\b)/;
@@ -335,16 +339,30 @@ export const DEFAULT_RIGID_ANCHORS = [
     id: 'no-destructive-fs',
     desc: '禁止破坏性文件系统操作（根/全量删除、格式化、系统目录与伪文件系统删除）',
     test: (call) => {
+      // Channel ①: command text (original single-axis check, kept unchanged)
       const cmd = extractShell(call);
-      if (!cmd) return false;
-      return (
-        (DESTRUCTIVE.test(cmd) && (SCOPE_ROOT.test(cmd) || SYS_DELETE.test(cmd) || PSEUDO_FS.test(cmd))) ||
-        COMBO_FIND_ROOT_DELETE.test(cmd) ||
-        RSYNC_WIPE.test(cmd) ||
-        FORK_BOMB.test(cmd) ||
-        SYSRQ_TRIGGER.test(cmd) ||
-        DISK_OVERWRITE.test(cmd)
-      );
+      if (cmd) {
+        const byCmd = (
+          (DESTRUCTIVE.test(cmd) && (SCOPE_ROOT.test(cmd) || SYS_DELETE.test(cmd) || PSEUDO_FS.test(cmd))) ||
+          COMBO_FIND_ROOT_DELETE.test(cmd) ||
+          RSYNC_WIPE.test(cmd) ||
+          FORK_BOMB.test(cmd) ||
+          SYSRQ_TRIGGER.test(cmd) ||
+          DISK_OVERWRITE.test(cmd)
+        );
+        if (byCmd) return true;
+      }
+      // Channel ②: structured call (path-1 attribution × path scope, sources decoupled) — closes the
+      // single-axis collapse. Component ① action category: from attribution output (independent of
+      // command text / tool name). Component ② scope: from path-like args (not via extractShell),
+      // independent of component ①. Either source failing does NOT zero the other; semantically
+      //同源 (same underlying state "filesystem harm"), NOT two-attribute negation (NOT cancellation).
+      const attrib = attributeCall(call);
+      if (attrib.ok && DELETION_LAYERS.has(attrib.layer)) {
+        const p = extractPath(call);
+        if (p && (SCOPE_ROOT.test(p) || SYS_DELETE.test(p) || PSEUDO_FS.test(p))) return true;
+      }
+      return false;
     },
   },
   {
