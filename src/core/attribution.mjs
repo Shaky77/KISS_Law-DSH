@@ -34,6 +34,10 @@ const NOUN = {
   config:     ['config', 'configuration', 'setting', '配置', '设置'],
 };
 
+// 删除类语义层集合：layer 命名归本模块所有（attrib.layer 由 verb/noun 推导产出）。
+// 引擎只消费此命名导出，不重复声明字面量——词汇归属单一、改一处即全链跟随（能隐则隐）。
+export const DELETION_LAYERS = new Set(['file-delete', 'cred-delete']);
+
 // split name by _ - . and camelCase boundaries, then classify verb / noun
 function tokensOf(name) {
   if (!name || typeof name !== 'string') return [];

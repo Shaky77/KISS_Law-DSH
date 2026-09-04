@@ -6,7 +6,7 @@
 // First-Bug-Halt closed-loop state machine: force completion of the inevitable second half after "cutting",
 // forbid re-entry before fix, blocking "reverse-deduce-only-without-fixing → infinite recursion" at the root.
 import { BugStopGuard, bugKeyOf } from './bugstop.mjs';
-import { attributeCall } from './attribution.mjs';  // path-1 attribution (fractal sub-item m result; boundary see _decideCore comment — NOT the whole-chain M result)
+import { attributeCall, DELETION_LAYERS } from './attribution.mjs';  // path-1 attribution + its deletion-layer set (vocabulary owned by attribution; engine only consumes)
 
 // ---------------- Tool semantic-category layer (objective structure, not string verb-guessing) ----------------
 // Living-system evolution: the judgment layer upgraded from "regex verb-guessing" to "tool semantic category + path objective object" judgment,
@@ -318,7 +318,6 @@ const PSEUDO_FS = /(^|[\s=:'"(])\/(dev|proc|sys|run)\/[^\s]+(\s|$)/;
 // Channel-② "action category" component: taken from the attribution output (semantic layer,
 // NOT tool name, NOT command text). Semantic layers are structural products, not an enumeration
 // of concrete tool names; deletion semantics only resolve to file / cred two categories.
-const DELETION_LAYERS = new Set(['file-delete', 'cred-delete']);
 const TMP_TOP = /(^|[\s;|&(])(rm|rmdir|shred|unlink|truncate)(\s+-[\w-]+)*\s+\/tmp(\s|$)/;
 const SCOPE_UNKNOWN = /(\$\{?[A-Za-z_]\w*\}?|\$\(|`)/;
 const COMBO_FIND_ROOT_DELETE = /\bfind\s+\/(\s+|$)[^\n]*(-delete|-exec\s+\S*rm\b)/;
