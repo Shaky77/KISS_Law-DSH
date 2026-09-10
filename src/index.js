@@ -225,3 +225,7 @@ function apply(ctx) {
 }
 
 export { name, inject, apply };
+
+// Adapter-layer fusion wiring: S/D quantitative effect sensor (M-gate constrained),
+// see src/adapt/sd-effect-sensor.mjs
+export { estimateEffectPsi, upliftRank, fusedDecide } from './adapt/sd-effect-sensor.mjs';
