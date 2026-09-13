@@ -25,6 +25,38 @@ function logline(s) {
   try { appendFileSync(LOG, `[${new Date().toISOString()}] ${s}\n`); } catch { /* log failure does not block the guard */ }
 }
 
+// ⑥ Window police: evidence-sufficiency gate (audit layer, zero intrusion into core criteria)
+function evidenceOf(args) {
+  if (!args || typeof args !== 'object') return null;
+  const RES = ['command', 'path', 'url'];
+  if (!RES.some((f) => f in args)) return null;
+  for (const f of RES) {
+    if (!(f in args)) continue;
+    const v = args[f];
+    if (typeof v !== 'string') continue;
+    if (!v.trim()) return false;
+    if (f === 'command') {
+      const m = v.match(/(?:^|\s)((?:https?:\/\/|\/|\.\/|~|\w:)[^\s]*)/);
+      if (!m) return false;
+    }
+  }
+  return true;
+}
+function policeGate(call) {
+  const ev = evidenceOf(call?.args);
+  if (ev === false) {
+    return {
+      kind: 'deny',
+      law: 'insufficient-evidence',
+      reason: '【Insufficient evidence · remand for supplementation】Call did not externalize a concrete target (path / URL / object). DSH will not guess the target for you — supply an explicit target and resubmit.',
+      awaitingHuman: true,
+      humanDecision: true,
+      insufficient_evidence: true,
+      bugKey: bugKeyOf(call),
+    };
+  }
+  return null;
+}
 const name = 'kiss-law';
 const inject = ['tools'];
 
@@ -79,6 +111,12 @@ function apply(ctx) {
       contradiction: a.contradiction,
       paramTypeError: a.paramTypeError,
     };
+    // ⑥ Window police: insufficient-evidence calls remanded before any substantive verdict.
+    const gate = policeGate(call);
+    if (gate) {
+      logline(`pre-execute ${exec?.name} -> police gate (insufficient evidence · remand)`);
+      return gate;
+    }
     const decision = engine.decideToolCall(call);
     logline(`pre-execute ${exec?.name} -> ${decision.kind}${decision.law ? '(' + decision.law + ')' : ''}`);
     if (decision.kind === 'deny' || decision.kind === 'review') {
