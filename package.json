@@ -4,6 +4,11 @@
   "description": "KISS's Law (Weiwen's Law) universal causal engine (white-box presentation). DeepSeek Harness (Cordis) plugin implementation.",
   "type": "module",
   "main": "./src/index.js",
+  "dsh": {
+    "bundle": {
+      "patch": "./kiss-law.patch.yml"
+    }
+  },
   "files": [
     "src",
     "kiss-law.patch.yml",
@@ -73,7 +78,7 @@
   },
   "peerDependenciesMeta": {
     "@deepseek-ai/dsh-tools": {
-      "optional": false
+      "optional": true
     }
   }
 }
