@@ -104,8 +104,10 @@ function apply(ctx) {
         // ③ suspend + label with evidence: some review exits from the engine don't carry a bugKey; supplement a stable BUG identity for traceability.
         //    Don't go through _markIntercept: it would inflate the M-tier mBugForce count (changing the cap-escalation behavior).
         if (out.bugKey === undefined) out.bugKey = bugKeyOf(call);
-        // ④⑤ feed the consequence deduction back to the human (the engine computed it internally; the exit originally dropped it)
-        const branches = deduceBranches(engine, call);
+        // ④⑤ feed the consequence deduction back to the human.
+        // 2026-09-13: branches are now echoed by the engine's verdict export (decision.projection); read it first
+        // instead of re-running deduceRisk (the recompute stays only as fallback for early exits that never ran deduction).
+        const branches = decision.projection ?? deduceBranches(engine, call);
         if (branches) out.branches = branches;
         // ⑥ make the "awaiting human ruling" semantics explicit (the ruling channel itself is not opened here; this only lets the
         //    caller distinguish "suspended" from "final reject")

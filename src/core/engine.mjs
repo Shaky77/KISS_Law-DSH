@@ -1240,6 +1240,14 @@ export class WeiwenLawEngine {
       };
     }
     // All judgment layers passed → sink to deduction layer (manuscript H fork-parallel-compare, grey-zone complete causality)
+    // [2026-09-13 export fix · projection made visible]
+    // The two branches computed by deduceRisk (S-growth path / D-erosion path) used to be recorded into the
+    // M ledger only and never returned with the verdict — callers saw just allow/deny/review plus one sentence,
+    // so "why this verdict" was invisible: the complete causal chain was cut at the M export (which is why the
+    // engine reads like an audit/intercept tool, and why the adapter had to recompute branches outside).
+    // Fix is display-only: all three verdict exports carry projection = risk.branches
+    // (no criteria, no threshold, no verdict logic changed).
+    // The allow export also lacked reason; now it echoes risk.reason (no new conclusion, just not discarding it).
     const risk = this.deduceRisk(call);
     // Both branches merge into M (independent event sedimentation), record M first regardless of verdict
     this.recordDeduction(risk.m);
@@ -1250,7 +1258,7 @@ export class WeiwenLawEngine {
         return this._toHuman({ law: '推演', bugKey: bugKeyOf(call), closedLoop: false, systemKey: mk.systemKey,
           reason: `同一系统「${mk.systemKey}」被标记 ${mk.sysCount} 次（不合规拦截累计），达封顶 ${mk.cap}：AI 停止纠结，转人工决策` });
       }
-      return { kind: 'deny', law: '推演', reason: risk.reason, risk: 'high', attrib, deduced: true, mMark: mk };
+      return { kind: 'deny', law: '推演', reason: risk.reason, risk: 'high', attrib, deduced: true, mMark: mk, projection: risk.branches };
     }
     if (risk.verdict === 'review') {
       // Mid risk: grey-zone deduction prediction (flow2: grey-zone-mark-deduction-predict) → after mark, conservative intercept
@@ -1260,12 +1268,12 @@ export class WeiwenLawEngine {
         return this._toHuman({ law: '推演', bugKey: bugKeyOf(call), closedLoop: false, systemKey: mk.systemKey,
           reason: `同一系统「${mk.systemKey}」被标记 ${mk.sysCount} 次（灰区反复），达封顶 ${mk.cap}：AI 停止纠结，转人工决策` });
       }
-      return { kind: 'review', law: '推演', reason: risk.reason, risk: 'mid', attrib, deduced: true, mMark: mk };
+      return { kind: 'review', law: '推演', reason: risk.reason, risk: 'mid', attrib, deduced: true, mMark: mk, projection: risk.branches };
     }
     // Low risk: allow, record steady-state positive increment (S only grows). Register this session's write (chained fallback).
     this._registerWrite(call);
     this.recordSteady({ positive: 1 });
-    return { kind: 'allow', risk: 'low', attrib, deduced: true };
+    return { kind: 'allow', law: '推演', reason: risk.reason, risk: 'low', attrib, deduced: true, projection: risk.branches };
   }
 
   // This-session write registration (chained-state fallback): when write allowed, record path→content,

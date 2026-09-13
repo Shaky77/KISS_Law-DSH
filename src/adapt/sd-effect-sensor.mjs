@@ -120,7 +120,10 @@ export function fusedDecide(call, context = {}) {
       return {
         ...base,
         kind: 'review',
-        law: base.law ?? 'M',
+        // The escalation here is decided by the M gate (unidentifiable effect → hand to M), not by the deduction
+        // layer, so law is always 'M' and must not be inherited from base.law
+        // (2026-09-13: once the engine's allow export carries law, inheritance would mislabel an M fallback).
+        law: 'M',
         reason: `SD sensor: ${est.reason} → effect unidentifiable, escalate to M review (rejecting blind unconfoundedness)`,
         sdUncertain: true,
       };
