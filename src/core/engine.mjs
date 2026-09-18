@@ -9,6 +9,13 @@ import { BugStopGuard, bugKeyOf } from './bugstop.mjs';
 import { attributeCall, DELETION_LAYERS, GIT_DESTRUCTIVE } from './attribution.mjs';  // path-1 attribution + its deletion-layer set + git-destructive vocab (vocabulary owned by attribution; engine only consumes)
 import { R_DOMAIN } from './law.mjs';  // [2026-09-18 synthesis] R-domain nested-inclusive boundary law — base A's Y-axis essence, wired back into the engine (base A imported it; B had dropped the wiring). FRACTAL_PROPERTY cross-call recursion left as the next frontier (see report).
 
+// [2026-09-18] R 域层级 → 权威权重（结构性推导，非枚举阈值、非拍脑袋数字）
+// 依据 R_DOMAIN 原文（作者不可变文本）：Cosmic⊃Earth⊃Macro⊃Micro，上层包含下层、下层服从上层，
+// 且「最外层为最终仲裁者」。⇒ 层级号越小 = 越根本 = 权威越高 = 覆盖面越大 ⇒ 破窗累积权重越大。
+// 权重由 hierarchy 数组本身推导，层级若增减会自动适配（域常量驱动，不是硬编码数字）。
+const R_MAX_LEVEL = Math.max(...R_DOMAIN.hierarchy.map((h) => h.level));
+const rAuthority = (level) => (level == null ? 1 : Math.max(1, R_MAX_LEVEL + 1 - level));
+
 // ---------------- Tool semantic-category layer (objective structure, not string verb-guessing) ----------------
 // Living-system evolution: the judgment layer upgraded from "regex verb-guessing" to "tool semantic category + path objective object" judgment,
 // eliminating the blind spot of "verb hidden in command/name causes a miss" (e.g. read_file reading .env).
@@ -697,13 +704,18 @@ export class WeiwenLawEngine {
     this.mBugForce = new Map();
     this.mSystemMarks = new Map();
     this.mMagnitude = new Map();   // [2026-09-18 synthesis] key=anchor, value=R_DOMAIN level (magnitude/weight of that M mark; structural, not enumerative)
+    // [2026-09-19 M 位移序列] 推演所得：M 是坐标点（X=t 序位，Y=R 层级），两 M 点间只有两类位移——
+    //   同层重复（Y 不变而 X 前进）＝破窗投影；跨层移动（Y 变化）＝上溯／下沉。
+    //   ⇒ 破窗与上溯不是两个机制，是同一「M 位移结构」的两面（此前二者各自单步生效、跨步即断）。
+    this.mSeries = [];             // 位移链（append-only）：历史轨迹属"疤"，不清（S 只增不减）
+    this.mLayerLoad = new Map();   // key=R 层级, value=该层投影累积；属"窗"，healWindow / settleWindow 清零
+    this.windowBroken = false;     // 破窗止损是"状态"不是"一次判定"：一旦触发即持续 fail-closed，直到 heal / settle 复位
     // [2026-09-18 簇A] R 命中按锚(域)分桶；原只进全局 failureStreak 标量(诊断：最强信号记进最弱容器)
     this.windowMarks = new Map();   // key = `${termId}::${anchor}`，窗口内按域分桶的痕存
     this.termId = opts.termId ?? null; // 当前时间窗口(阶段)id；null = 未分窗(全量)
     this.mBugSystem = new Map();
-    // [2026-09-18 簇A] 跨步/会话 Y 轴累积器(积分器)；原引擎为单点横截面，无 s_delta
-    this.seriesY = [];     // 每次裁决后的 effectiveS 序列(积分采样)
-    this.lastSDelta = 0;   // 最近一步 Y 净位移
+    // [2026-09-18 定轴收敛] 已删除动轴漂移累积器 seriesY/lastSDelta：定轴下 Y=R 固定不动，S 仅是 Y=R 轴上的
+    //   积累段，无需追踪全局基线漂移；M 是坐标点（D 定域于 X=t、R 层级落于 Y=R），由 mSystemMarks / mMagnitude / windowMarks 表达。
     this.mHumanCap = opts.mHumanCap ?? 9; // cap → hand to human (user sets 9)
     // This-session write registry: allowed writes record path→content,
     // later exec-class calls referencing a registered path trigger review (refsSessionWritten). Only register this session's writes, don't guess the filesystem.
@@ -784,15 +796,22 @@ export class WeiwenLawEngine {
   }
 
   // ---------- R rigid-anchor validation: touch any rigid anchor → return violation reason ----------
+  // [2026-09-18] R 域判定 = 沿 Y=R 轴「自具象向根本」逐级上溯（作者口径：升级就是进入套嵌）。
+  //   · 本层所有 R 域匹配无效 ⇒ 顺理成章升入上一层（进入嵌套）；
+  //   · 命中后继续上溯，多层同时命中 ⇒ 取最外层（最根本、level 号最小）锁定；
+  //   · 全程无命中 ⇒ 非 R 违犯，交还下游（不改既有 fall-through 语义）。
+  // 依据 R_DOMAIN 原文：Cosmic⊃Earth⊃Macro⊃Micro，上层包含下层，「最外层为最终仲裁者」。
   checkRigidAnchor(call) {
+    let locked = null;
     for (const a of this.rigidAnchors) {
-      try {
-        if (a.test(call)) return { anchor: a.id, reason: a.desc, magnitude: a.magnitude };
-      } catch {
-        /* rule exception doesn't block, just skip that rule */
-      }
+      let hit = false;
+      try { hit = !!a.test(call); } catch { hit = false; /* rule exception doesn't block, just skip that rule */ }
+      if (!hit) continue;
+      const lv = a.magnitude ?? R_MAX_LEVEL;
+      // 越外层 level 号越小 = 越根本 → 仲裁优先；同层取先命中者
+      if (!locked || lv < locked.magnitude) locked = { anchor: a.id, reason: a.desc, magnitude: lv };
     }
-    return null;
+    return locked;
   }
 
   // ---------- Destructive scope undecidable → REVIEW (hand to human, don't guess) ----------
@@ -827,6 +846,13 @@ export class WeiwenLawEngine {
 
   // ---------- D broken-window stop-loss: deviation/broken-window accumulation to threshold → block ----------
   checkBreakWindow() {
+    // [2026-09-19] 两条通道：① 任一 R 层投影达阈值（有域归属 ⇒ 走结构）；② 全局兜底累积（无域归属 ⇒ 走兜底）。
+    //   破窗是"状态"不是"一次判定"：触发后持续 fail-closed，直到 healWindow / settleWindow 复位。
+    if (this.windowBroken) {
+      return {
+        reason: '已有 R 层投影累积达破窗阈值，系统处于破窗止损态（fail-closed，防故障扩散杀死整体）；修复或结算后复位。',
+      };
+    }
     if (this.failureStreak >= this.maxFailureStreak) {
       return {
         reason: `连续失败/偏离已累积 ${this.failureStreak} 次，达破窗阈值，触发 D 破窗止损（防故障扩散杀死整体）。`,
@@ -843,7 +869,12 @@ export class WeiwenLawEngine {
     // Same philosophy as the deduction-layer landing criterion: whether text gets executed depends on its sink; writing an ordinary file has no execution sink,
     // so the "operational-instruction form" third tier does not apply to document content (DOC_SINK avoids false hits: docs referencing command form is the norm).
     // Hard signals such as persona rewrite / guardrail removal (deny tier) are still judged — landed content itself may also be an injection carrier.
-    const isDocWrite = TOOL_CATEGORY[call?.name] === 'write';
+    // [2026-09-19 live-API fix] shape-based, not name-list: an unknown tool carrying path+content has a
+    // write sink, so it is a doc write regardless of host naming (fs_write / writeFile / ...). Enumeration
+    // of host tool names is infinite (X-axis); the structural criterion is "lands content at a path" (Y-axis).
+    const _a = call?.args ?? {};
+    const isDocWrite = TOOL_CATEGORY[call?.name] === 'write'
+      || (TOOL_CATEGORY[call?.name] == null && _a.path != null && _a.content != null);
 
     // Dynamic view (dialectical unity): with provenance, judge inside/outside, not wording
     const prov = call?.provenance ?? call?.ctx?.provenance;
@@ -1162,13 +1193,8 @@ export class WeiwenLawEngine {
   // ---------- Pre-tool-call grand adjudication (corresponds to DSH tools/pre-execute) ----------
   // Outer-H deduction done inside _decideCore; exit uniformly mounts inner-H parked state (inner-H registration protocol ④: delivered together).
   decideToolCall(call) {
-    const before = this.effectiveS();
     const res = this._decideCore(call);
-    const attached = this._attachInnerH(res, call);
-    const after = this.effectiveS();
-    this.seriesY.push({ before, after, delta: after - before, t: Date.now() });
-    this.lastSDelta = after - before;
-    return attached;
+    return this._attachInnerH(res, call);
   }
 
   _decideCore(call) {
@@ -1187,11 +1213,17 @@ export class WeiwenLawEngine {
 
     const r = this.checkRigidAnchor(call);
     if (r) {
-      this.failureStreak += 1; // every intercepted overstep action counts into broken-window
-      this._bucketRHit(r.anchor, r.magnitude); // [2026-09-18 簇A] R 命中按锚(域)分桶：进 mSystemMarks + 当前窗口 windowMarks + 量级
-      if (this.failureStreak >= this.maxFailureStreak) {
+      // [2026-09-19 M 位移序列] 破窗读数 = M 位移在该 R 层的投影累积：
+      //   同层重复才累积该层；跨层移动＝上溯，新层按其自身 authority 从头累积（旧层读数保留）。
+      //   原全局 failureStreak 把不同 R 层混成一个数（＝「最强信号记进最弱容器」的延伸），故此处不再累加 R 命中；
+      //   failureStreak 保留给**无域层级归属**的路径（unclear scope / high risk / inner-H 等）。
+      //   轻重缓急仍由 authority 体现：越根本的层 authority 越高 ⇒ 同层重复累积越快 ⇒ 更早升级破窗。
+      const pt = this._bucketRHit(r.anchor, r.magnitude);
+      const layerLoad = this.mLayerLoad.get(pt.level) || 0;
+      if (layerLoad >= this.maxFailureStreak) {
+        this.windowBroken = true; // 破窗止损态：持续 fail-closed（此前靠 failureStreak 持久化隐含实现，分层后须显式化）
         // Overstep became a pattern → escalate to D broken-window stop-loss
-        return { kind: 'deny', law: 'D', reason: r.reason + '（已升级为破窗止损）' };
+        return { kind: 'deny', law: 'D', reason: r.reason + `（R 层 L${pt.level} 投影累积 ${layerLoad} 达阈值，已升级为破窗止损）` };
       }
       return { kind: 'deny', law: 'R', reason: r.reason };
     }
@@ -1357,6 +1389,8 @@ export class WeiwenLawEngine {
   // Broken-window heal: after D stop-loss, a fix action clears broken-window count (cut to preserve continuity → lateral restart)
   healWindow() {
     this.failureStreak = 0;
+    if (this.mLayerLoad) this.mLayerLoad.clear(); // [2026-09-19] 分层投影累积属"窗"非"疤"：治愈即清零；mSeries 位移链保留（S 只增不减）
+    this.windowBroken = false; // 治愈即解除破窗止损态
   }
 
   // ---------- First-Bug-Halt closed-loop driver (for harness / orchestration layer to advance explicitly) ----------
@@ -1377,8 +1411,8 @@ export class WeiwenLawEngine {
   // Closed-loop state read-only snapshot (white-box audit / query_bugstop tool)
   bugStopSnapshot() { return this.bugStop.snapshot(); }
 
-  // ═══ [2026-09-18 簇A] 跨步累积器 / 窗口脚手架（加法，不动既有判定与 healWindow） ═══
-  // R 命中按锚(域)分桶：同时计入全量 mSystemMarks 与当前窗口 windowMarks
+  // ═══ [2026-09-18 定轴收敛] M 坐标点 / 窗口脚手架（定轴：X=t, Y=R, S=Y=R 轴积累段, D=X 轴事件, M=坐标点） ═══
+  // R 命中按锚(域)分桶：同时计入全量 mSystemMarks 与当前窗口 windowMarks（即 Y=R 轴层级分置 / S 积累段边界）
   _bucketRHit(anchor, magnitude) {
     const key = anchor || '_rigid';
     this.mSystemMarks.set(key, (this.mSystemMarks.get(key) || 0) + 1);
@@ -1387,22 +1421,60 @@ export class WeiwenLawEngine {
       const wkey = `${this.termId}::${key}`;
       this.windowMarks.set(wkey, (this.windowMarks.get(wkey) || 0) + 1);
     }
+    return this._appendMPoint(key, magnitude); // 返回本次 M 点（含位移类型与该层投影读数）
   }
 
-  // Y 轴轨迹（积分器视图）：净位移=逼近量；累计变动=尝试量（供轨迹实验与归属度量读取）
-  trajectory() {
-    const ys = this.seriesY.map((s) => s.after);
-    const net = ys.length ? ys[ys.length - 1] - ys[0] : 0;
-    const cumulative = this.seriesY.reduce((a, s) => a + Math.abs(s.delta), 0);
+  // [2026-09-19] M 位移序列：把「破窗」与「上溯」接进同一条链。
+  //   位移只有三类（由坐标系只有两轴推出）：
+  //     same-layer —— Y 不变而 X 前进 ⇒ 同层重复 ⇒ 该层投影累积（破窗读数）
+  //     ascend     —— Y 向更根本层移动（层号变小）⇒ 上溯 ⇒ 新层按自身 authority 从头累积
+  //     descend    —— Y 向更具体层移动（层号变大）⇒ 下沉 ⇒ 同上
+  //   起点（链首）记为 origin；任一端缺层级信息记为 unrelated（不臆测）。
+  _appendMPoint(anchor, magnitude) {
+    const prev = this.mSeries.length ? this.mSeries[this.mSeries.length - 1] : null;
+    const level = magnitude ?? null;
+    const authority = rAuthority(magnitude);
+    let displacement;
+    if (!prev) displacement = 'origin';
+    else if (prev.level == null || level == null) displacement = 'unrelated';
+    else if (prev.level === level) displacement = 'same-layer';
+    else displacement = level < prev.level ? 'ascend' : 'descend';
+
+    const point = {
+      seq: this.mSeries.length, anchor, level, authority,
+      from: prev ? prev.level : null, displacement,
+    };
+    this.mSeries.push(point);
+    // 投影累积：每一次落点都计入其所在层的读数（跨层移动不继承旧层读数——旧层读数保留，S 只增不减）
+    if (level != null) {
+      const load = (this.mLayerLoad.get(level) || 0) + authority;
+      this.mLayerLoad.set(level, load);
+      point.layerLoad = load;
+    }
+    return point;
+  }
+
+  // M 坐标点集合（定轴视图）：每个被 R 域锚住的 D 落点 = (t 在 X 轴定域, R 层级在 Y=R 轴的坐标)。
+  //   magnitude = 该锚 R_DOMAIN 层级（M 点在 Y=R 轴上的坐标）；total = 全量同锚痕存数；inTerm = 当前 S 积累段内同锚数。
+  mPoints() {
+    const points = [];
+    const levelName = (lv) => R_DOMAIN.hierarchy.find((h) => h.level === lv)?.name ?? null;
+    for (const [anchor, mag] of this.mMagnitude) {
+      const total = this.mSystemMarks.get(anchor) || 0;
+      const inTerm = this.termId != null ? (this.windowMarks.get(`${this.termId}::${anchor}`) || 0) : 0;
+      // authority = 由 R_DOMAIN 层级推导的破窗累积权重（越根本的层 authority 越高 ⇒ 轻重缓急里的"重"）
+      points.push({ anchor, magnitude: mag, rLevelName: levelName(mag), authority: rAuthority(mag), total, inTerm });
+    }
+    // 轻重缓急排序：authority 高（层级号小 = 越根本 = 覆盖面越大）的排前；同级按痕存次数降序
+    points.sort((a, b) => b.authority - a.authority || b.total - a.total);
     return {
-      samples: this.seriesY.length,
-      seriesY: ys,
-      sDelta: this.lastSDelta,
-      netDisplacement: net,
-      cumulativeMovement: cumulative,
+      axes: { x: 't (event sequence on X)', y: 'R (rigid-domain level on Y; S = accumulation segment on Y=R)' },
+      mPoints: points,
+      // [2026-09-19] 位移链：破窗（同层重复）与上溯（跨层移动）在此合为一条链
+      mSeries: this.mSeries,
+      layerLoad: Object.fromEntries(this.mLayerLoad), // 各 R 层的破窗投影读数（"窗"，可清零）
       termId: this.termId,
       windowMarks: Object.fromEntries(this.windowMarks),
-      mMagnitude: Object.fromEntries(this.mMagnitude), // [2026-09-18 synthesis] anchor → R_DOMAIN level (weight of each M mark)
     };
   }
 
@@ -1416,6 +1488,10 @@ export class WeiwenLawEngine {
     for (const k of [...this.windowMarks.keys()]) {
       if (k.startsWith(prefix)) this.windowMarks.delete(k);
     }
+    // [2026-09-19] 阶段到期：分层投影读数属"窗"，随结算清零（与 healWindow 正交）；
+    //   mSeries 位移链与 mSystemMarks 全量痕存属"疤"，保留（疤 ≠ 窗）。
+    if (this.mLayerLoad) this.mLayerLoad.clear();
+    this.windowBroken = false; // 阶段结算：解除破窗止损态（与 healWindow 正交——修好 vs 到期）
     return true;
   }
 }
