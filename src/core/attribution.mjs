@@ -38,6 +38,12 @@ const NOUN = {
 // 引擎只消费此命名导出，不重复声明字面量——词汇归属单一、改一处即全链跟随（能隐则隐）。
 export const DELETION_LAYERS = new Set(['file-delete', 'cred-delete']);
 
+// [2026-09-18 · A→B synthesis] Git working-tree destructive verbs (nested-included objective-rule boundary law).
+// Ported from weiwen-law-dsh (base A) which wires this into no-destructive-fs via R_DOMAIN nesting:
+// a destructive reset/clean/checkout/restore on a repo working tree = destruction of a contained lower-level
+// state → touched the rigid anchor. Vocabulary lives here (engine only consumes).
+export const GIT_DESTRUCTIVE = /\bgit\s+(reset\s+--(hard|\w*[hH]ard)|clean\s+-[fF][dD]?|checkout\s+--\s*(\.\s*$|$)|checkout\s+-[fF]|restore\s+--\w*worktree|restore\s+--staged\s+--worktree)(?=\s|$)/i;
+
 // split name by _ - . and camelCase boundaries, then classify verb / noun
 function tokensOf(name) {
   if (!name || typeof name !== 'string') return [];
@@ -133,6 +139,7 @@ function extractCommand(call) {
 
 function commandLayer(cmd) {
   if (!cmd) return null;
+  if (GIT_DESTRUCTIVE.test(cmd)) return 'exec-destructive';
   if (/\b(rm|rmdir|shred|unlink|mkfs|format|dd|truncate|wipefs)\b/i.test(cmd)) return 'exec-destructive';
   if (/\b(cat|head|tail|read|less|more|vi|vim|nano|type|open)\b/i.test(cmd)) return 'cred-read';
   if (/\b(curl|wget|scp|rsync|ftp|nc|ssh)\b/i.test(cmd)) return 'network-send';

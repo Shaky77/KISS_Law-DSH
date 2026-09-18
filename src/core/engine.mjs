@@ -6,7 +6,8 @@
 // First-Bug-Halt closed-loop state machine: force completion of the inevitable second half after "cutting",
 // forbid re-entry before fix, blocking "reverse-deduce-only-without-fixing → infinite recursion" at the root.
 import { BugStopGuard, bugKeyOf } from './bugstop.mjs';
-import { attributeCall, DELETION_LAYERS } from './attribution.mjs';  // path-1 attribution + its deletion-layer set (vocabulary owned by attribution; engine only consumes)
+import { attributeCall, DELETION_LAYERS, GIT_DESTRUCTIVE } from './attribution.mjs';  // path-1 attribution + its deletion-layer set + git-destructive vocab (vocabulary owned by attribution; engine only consumes)
+import { R_DOMAIN } from './law.mjs';  // [2026-09-18 synthesis] R-domain nested-inclusive boundary law — base A's Y-axis essence, wired back into the engine (base A imported it; B had dropped the wiring). FRACTAL_PROPERTY cross-call recursion left as the next frontier (see report).
 
 // ---------------- Tool semantic-category layer (objective structure, not string verb-guessing) ----------------
 // Living-system evolution: the judgment layer upgraded from "regex verb-guessing" to "tool semantic category + path objective object" judgment,
@@ -336,7 +337,8 @@ const ENV_CRED = /\$(AWS|AZURE|GCP|GOOGLE|GITLAB|NPM|DOCKER|KUBE|OPENAI|ANTHROPI
 export const DEFAULT_RIGID_ANCHORS = [
   {
     id: 'no-destructive-fs',
-    desc: '禁止破坏性文件系统操作（根/全量删除、格式化、系统目录与伪文件系统删除）',
+    magnitude: 3, // [2026-09-18 synthesis] R-domain level of the protected objective rule: filesystem integrity = Micro objective rules (R_DOMAIN.level 3)
+    desc: '禁止破坏性文件系统操作（根/全量删除、格式化、系统目录与伪文件系统删除），含对被包含工作树（版本库）的全局销毁（git reset --hard / clean -fd / checkout -- 等，依 R 域嵌套包含边界法则自动匹配）。' + R_DOMAIN.invariant,
     test: (call) => {
       // Channel ①: command text (original single-axis check, kept unchanged)
       const cmd = extractShell(call);
@@ -357,20 +359,33 @@ export const DEFAULT_RIGID_ANCHORS = [
       // independent of component ①. Either source failing does NOT zero the other; semantically
       //同源 (same underlying state "filesystem harm"), NOT two-attribute negation (NOT cancellation).
       const attrib = attributeCall(call);
-      if (attrib.ok && DELETION_LAYERS.has(attrib.layer)) {
-        const p = extractPath(call);
-        if (p && (SCOPE_ROOT.test(p) || SYS_DELETE.test(p) || PSEUDO_FS.test(p))) return true;
+      if (attrib.ok) {
+        if (DELETION_LAYERS.has(attrib.layer)) {
+          const p = extractPath(call);
+          if (p && (SCOPE_ROOT.test(p) || SYS_DELETE.test(p) || PSEUDO_FS.test(p))) return true;
+        }
+        // [A→B synthesis · R-domain nesting] destruction of a contained lower-level state (repo working tree)
+        // via git reset --hard / clean -fd / checkout -- → touched the rigid anchor by R_DOMAIN nesting law,
+        // auto-matched (not via regex stacking). Independent source from the path-scope channel above.
+        if (attrib.layer === 'exec-destructive' && GIT_DESTRUCTIVE.test(attrib.signal || '')) return true;
       }
+      // git destructive also recognizable via command text (named exec tool already reduced to 'exec',
+      // semantic layer can't surface 'exec-destructive'; supplement the command-text source — decoupled
+      // from the semantic layer, not cancellation). git with no explicit safe sub-path = whole contained
+      // working tree destroyed → over the boundary.
+      if (GIT_DESTRUCTIVE.test(extractShell(call) || '')) return true;
       return false;
     },
   },
   {
     id: 'no-force-push',
+    magnitude: 2, // [2026-09-18 synthesis] shared remote-repo integrity = Macro objective rules (R_DOMAIN.level 2)
     desc: '禁止强制覆盖远端（git push --force 等）',
     test: (call) => /\bgit\s+push\b.*--force/.test(extractShell(call) || ''),
   },
   {
     id: 'no-credential-leak',
+    magnitude: 3, // [2026-09-18 synthesis] credential confidentiality = Micro objective rules (R_DOMAIN.level 3)
     desc: '禁止读取/外传凭据材料（钥匙/token/密码库）——"不问自取视为偷"（作者原则 2026-08-29）',
     test: (call) => {
       // Fractal landing: when a write tool's landing isn't a credential location, content is a doc/config template, not judged as "exfil credential" (landing nature + content intent)
@@ -399,6 +414,7 @@ export const DEFAULT_RIGID_ANCHORS = [
   },
   {
     id: 'no-system-destruction',
+    magnitude: 2, // [2026-09-18 synthesis] system availability = Macro objective rules (R_DOMAIN.level 2)
     desc: '禁止破坏系统可用性（根迁移/权限清零/强制 fsck/嵌套代码删根/覆写系统文件）——AVAILABILITY_LOSS 维度',
     test: (call) => {
       const cmd = extractShell(call);
@@ -680,6 +696,7 @@ export class WeiwenLawEngine {
     //   mBugSystem  : bugKey→systemKey reverse map, for the fix-loop to recycle system marks
     this.mBugForce = new Map();
     this.mSystemMarks = new Map();
+    this.mMagnitude = new Map();   // [2026-09-18 synthesis] key=anchor, value=R_DOMAIN level (magnitude/weight of that M mark; structural, not enumerative)
     // [2026-09-18 簇A] R 命中按锚(域)分桶；原只进全局 failureStreak 标量(诊断：最强信号记进最弱容器)
     this.windowMarks = new Map();   // key = `${termId}::${anchor}`，窗口内按域分桶的痕存
     this.termId = opts.termId ?? null; // 当前时间窗口(阶段)id；null = 未分窗(全量)
@@ -761,6 +778,7 @@ export class WeiwenLawEngine {
       mHumanCap: this.mHumanCap,
       mBugForce: Object.fromEntries(this.mBugForce),
       mSystemMarks: Object.fromEntries(this.mSystemMarks),
+      mMagnitude: Object.fromEntries(this.mMagnitude),
       // Note: full historyTrail still retained on the instance (this.historyTrail) for deep audit, not in snapshot by default.
     };
   }
@@ -769,7 +787,7 @@ export class WeiwenLawEngine {
   checkRigidAnchor(call) {
     for (const a of this.rigidAnchors) {
       try {
-        if (a.test(call)) return { anchor: a.id, reason: a.desc };
+        if (a.test(call)) return { anchor: a.id, reason: a.desc, magnitude: a.magnitude };
       } catch {
         /* rule exception doesn't block, just skip that rule */
       }
@@ -1170,7 +1188,7 @@ export class WeiwenLawEngine {
     const r = this.checkRigidAnchor(call);
     if (r) {
       this.failureStreak += 1; // every intercepted overstep action counts into broken-window
-      this._bucketRHit(r.anchor); // [2026-09-18 簇A] R 命中按锚(域)分桶：进 mSystemMarks + 当前窗口 windowMarks
+      this._bucketRHit(r.anchor, r.magnitude); // [2026-09-18 簇A] R 命中按锚(域)分桶：进 mSystemMarks + 当前窗口 windowMarks + 量级
       if (this.failureStreak >= this.maxFailureStreak) {
         // Overstep became a pattern → escalate to D broken-window stop-loss
         return { kind: 'deny', law: 'D', reason: r.reason + '（已升级为破窗止损）' };
@@ -1361,9 +1379,10 @@ export class WeiwenLawEngine {
 
   // ═══ [2026-09-18 簇A] 跨步累积器 / 窗口脚手架（加法，不动既有判定与 healWindow） ═══
   // R 命中按锚(域)分桶：同时计入全量 mSystemMarks 与当前窗口 windowMarks
-  _bucketRHit(anchor) {
+  _bucketRHit(anchor, magnitude) {
     const key = anchor || '_rigid';
     this.mSystemMarks.set(key, (this.mSystemMarks.get(key) || 0) + 1);
+    if (magnitude != null) this.mMagnitude.set(key, magnitude); // magnitude = R_DOMAIN level of the anchored domain (structural, set once per anchor)
     if (this.termId != null) {
       const wkey = `${this.termId}::${key}`;
       this.windowMarks.set(wkey, (this.windowMarks.get(wkey) || 0) + 1);
@@ -1383,6 +1402,7 @@ export class WeiwenLawEngine {
       cumulativeMovement: cumulative,
       termId: this.termId,
       windowMarks: Object.fromEntries(this.windowMarks),
+      mMagnitude: Object.fromEntries(this.mMagnitude), // [2026-09-18 synthesis] anchor → R_DOMAIN level (weight of each M mark)
     };
   }
 
