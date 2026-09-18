@@ -680,7 +680,13 @@ export class WeiwenLawEngine {
     //   mBugSystem  : bugKey→systemKey reverse map, for the fix-loop to recycle system marks
     this.mBugForce = new Map();
     this.mSystemMarks = new Map();
+    // [2026-09-18 簇A] R 命中按锚(域)分桶；原只进全局 failureStreak 标量(诊断：最强信号记进最弱容器)
+    this.windowMarks = new Map();   // key = `${termId}::${anchor}`，窗口内按域分桶的痕存
+    this.termId = opts.termId ?? null; // 当前时间窗口(阶段)id；null = 未分窗(全量)
     this.mBugSystem = new Map();
+    // [2026-09-18 簇A] 跨步/会话 Y 轴累积器(积分器)；原引擎为单点横截面，无 s_delta
+    this.seriesY = [];     // 每次裁决后的 effectiveS 序列(积分采样)
+    this.lastSDelta = 0;   // 最近一步 Y 净位移
     this.mHumanCap = opts.mHumanCap ?? 9; // cap → hand to human (user sets 9)
     // This-session write registry: allowed writes record path→content,
     // later exec-class calls referencing a registered path trigger review (refsSessionWritten). Only register this session's writes, don't guess the filesystem.
@@ -1138,7 +1144,13 @@ export class WeiwenLawEngine {
   // ---------- Pre-tool-call grand adjudication (corresponds to DSH tools/pre-execute) ----------
   // Outer-H deduction done inside _decideCore; exit uniformly mounts inner-H parked state (inner-H registration protocol ④: delivered together).
   decideToolCall(call) {
-    return this._attachInnerH(this._decideCore(call), call);
+    const before = this.effectiveS();
+    const res = this._decideCore(call);
+    const attached = this._attachInnerH(res, call);
+    const after = this.effectiveS();
+    this.seriesY.push({ before, after, delta: after - before, t: Date.now() });
+    this.lastSDelta = after - before;
+    return attached;
   }
 
   _decideCore(call) {
@@ -1158,6 +1170,7 @@ export class WeiwenLawEngine {
     const r = this.checkRigidAnchor(call);
     if (r) {
       this.failureStreak += 1; // every intercepted overstep action counts into broken-window
+      this._bucketRHit(r.anchor); // [2026-09-18 簇A] R 命中按锚(域)分桶：进 mSystemMarks + 当前窗口 windowMarks
       if (this.failureStreak >= this.maxFailureStreak) {
         // Overstep became a pattern → escalate to D broken-window stop-loss
         return { kind: 'deny', law: 'D', reason: r.reason + '（已升级为破窗止损）' };
@@ -1345,4 +1358,44 @@ export class WeiwenLawEngine {
   }
   // Closed-loop state read-only snapshot (white-box audit / query_bugstop tool)
   bugStopSnapshot() { return this.bugStop.snapshot(); }
+
+  // ═══ [2026-09-18 簇A] 跨步累积器 / 窗口脚手架（加法，不动既有判定与 healWindow） ═══
+  // R 命中按锚(域)分桶：同时计入全量 mSystemMarks 与当前窗口 windowMarks
+  _bucketRHit(anchor) {
+    const key = anchor || '_rigid';
+    this.mSystemMarks.set(key, (this.mSystemMarks.get(key) || 0) + 1);
+    if (this.termId != null) {
+      const wkey = `${this.termId}::${key}`;
+      this.windowMarks.set(wkey, (this.windowMarks.get(wkey) || 0) + 1);
+    }
+  }
+
+  // Y 轴轨迹（积分器视图）：净位移=逼近量；累计变动=尝试量（供轨迹实验与归属度量读取）
+  trajectory() {
+    const ys = this.seriesY.map((s) => s.after);
+    const net = ys.length ? ys[ys.length - 1] - ys[0] : 0;
+    const cumulative = this.seriesY.reduce((a, s) => a + Math.abs(s.delta), 0);
+    return {
+      samples: this.seriesY.length,
+      seriesY: ys,
+      sDelta: this.lastSDelta,
+      netDisplacement: net,
+      cumulativeMovement: cumulative,
+      termId: this.termId,
+      windowMarks: Object.fromEntries(this.windowMarks),
+    };
+  }
+
+  // 设定当前时间窗口（阶段）；null = 退出分窗（全量）
+  setTerm(termId) { this.termId = termId; return this; }
+
+  // 窗口结算：到期结算（非修好即清零），与 D 破窗的 healWindow 全局清零正交
+  settleWindow(termId = this.termId) {
+    if (termId == null) return false;
+    const prefix = `${termId}::`;
+    for (const k of [...this.windowMarks.keys()]) {
+      if (k.startsWith(prefix)) this.windowMarks.delete(k);
+    }
+    return true;
+  }
 }
