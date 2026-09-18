@@ -350,14 +350,31 @@ export const DEFAULT_RIGID_ANCHORS = [
       // Channel ①: command text (original single-axis check, kept unchanged)
       const cmd = extractShell(call);
       if (cmd) {
-        const byCmd = (
-          (DESTRUCTIVE.test(cmd) && (SCOPE_ROOT.test(cmd) || SYS_DELETE.test(cmd) || PSEUDO_FS.test(cmd))) ||
-          COMBO_FIND_ROOT_DELETE.test(cmd) ||
-          RSYNC_WIPE.test(cmd) ||
-          FORK_BOMB.test(cmd) ||
-          SYSRQ_TRIGGER.test(cmd) ||
-          DISK_OVERWRITE.test(cmd)
-        );
+        // [2026-09-19 live-API 长链实测] 🔴 动词-宾语必须【同片段绑定】。
+        // 旧判据＝整条命令里 "有 DESTRUCTIVE 动词" ∧ "有 SCOPE 路径" —— 二者取自任意位置，
+        // 于是真模型产出的多片段长命令必然错配：A 片段的动词 × B 片段的宾语 ⇒ 误判"删除系统目录"。
+        // 实测误伤：`install -d ... "$DEST"; mv "$ARCH" "$DEST"/; rmdir "$STAGE"` （备份归档＋删空暂存）
+        // 被判 deny，而其中并无任何删除系统目录的动作（rmdir 的宾语是 /tmp 下的暂存目录）。
+        // 结构修法：按 shell 分隔符切片段，动词与路径须在【同一片段】内配对；
+        // 路径作用域只允许由 cd 向【后】传递（真实的作用域语义），不允许宾语反向配给前面的动词。
+        const SCOPE_ANY = (s) => SCOPE_ROOT.test(s) || SYS_DELETE.test(s) || PSEUDO_FS.test(s);
+        let cdScope = false;
+        let byCmd = false;
+        for (const seg of cmd.split(/(?:;|&&|\|\||\||\n)+/)) {
+          const cdm = seg.match(/\bcd\s+(\S+)/);
+          if (cdm && SCOPE_ANY(cdm[1])) cdScope = true;
+          if (DESTRUCTIVE.test(seg) && SCOPE_ANY(seg)) { byCmd = true; break; } // 同片段配对
+          if (cdScope && DESTRUCTIVE.test(seg)) { byCmd = true; break; }         // cd 系统目录 → 其后删除
+        }
+        if (!byCmd) {
+          byCmd = (
+            COMBO_FIND_ROOT_DELETE.test(cmd) ||
+            RSYNC_WIPE.test(cmd) ||
+            FORK_BOMB.test(cmd) ||
+            SYSRQ_TRIGGER.test(cmd) ||
+            DISK_OVERWRITE.test(cmd)
+          );
+        }
         if (byCmd) return true;
       }
       // Channel ②: structured call (path-1 attribution × path scope, sources decoupled) — closes the
