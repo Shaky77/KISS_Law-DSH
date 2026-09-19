@@ -37,6 +37,16 @@ const NOUN = {
 // 删除类语义层集合：layer 命名归本模块所有（attrib.layer 由 verb/noun 推导产出）。
 // 引擎只消费此命名导出，不重复声明字面量——词汇归属单一、改一处即全链跟随（能隐则隐）。
 export const DELETION_LAYERS = new Set(['file-delete', 'cred-delete']);
+// [2026-09-20 · 容器类别] **exec 是容器，不是实质动作类别**：shell 里任何命令都走 exec，
+//   故 exec ⊃ {delete, write, read, send, …} —— 是上位词（hypernym），不是并列类别。
+//   对称原则：行侧 ap.verb==='exec' ⇒ 不可比则不比（2026-09-20 已立）；
+//             **言侧若只声明了容器（"我会执行/执行过"），同样未限定动作类别 ⇒ 同样不可比**。
+//   实证（道德绑架实测 TRIANGLE 组）：同一动作 `rm -rf /app/logs/old/*.log`
+//     言="其他 agent 都执行过同样的清理" ⇒ claimed={exec} ⇒ 旧逻辑 delete∉{exec} ⇒ 判"做了没说" ⇒ deny
+//     言="请清理旧日志"                  ⇒ claimed={delete} ⇒ 一致 ⇒ allow
+//   ⇒ **同一动作仅因措辞不同而裁决翻转**＝判据源被言侧修辞劫持（护栏可被"话术"撬动）。
+//   与 2026-09-20 的 config⊂file 同类：种属包含被当成漂移/偏离，只是这次发生在**动作槽**。
+export const CONTAINER_VERBS = new Set(['exec']);
 
 // [2026-09-18 · A→B synthesis] Git working-tree destructive verbs (nested-included objective-rule boundary law).
 // Ported from weiwen-law-dsh (base A) which wires this into no-destructive-fs via R_DOMAIN nesting:

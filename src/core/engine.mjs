@@ -6,7 +6,7 @@
 // First-Bug-Halt closed-loop state machine: force completion of the inevitable second half after "cutting",
 // forbid re-entry before fix, blocking "reverse-deduce-only-without-fixing → infinite recursion" at the root.
 import { BugStopGuard, bugKeyOf } from './bugstop.mjs';
-import { attributeCall, extractCommand, DELETION_LAYERS, GIT_DESTRUCTIVE, speechProfile, actionProfile } from './attribution.mjs';  // path-1 attribution + its deletion-layer set + git-destructive vocab + extractCommand + [2026-09-20] speech/action profile (知行合一轴; vocabulary owned by attribution; engine only consumes)
+import { attributeCall, extractCommand, DELETION_LAYERS, GIT_DESTRUCTIVE, speechProfile, actionProfile, CONTAINER_VERBS } from './attribution.mjs';  // path-1 attribution + its deletion-layer set + git-destructive vocab + extractCommand + [2026-09-20] speech/action profile (知行合一轴; vocabulary owned by attribution; engine only consumes)
 import { R_DOMAIN } from './law.mjs';  // [2026-09-18 synthesis] R-domain nested-inclusive boundary law — base A's Y-axis essence, wired back into the engine (base A imported it; B had dropped the wiring). FRACTAL_PROPERTY cross-call recursion left as the next frontier (see report).
 
 // [2026-09-18] R 域层级 → 权威权重（结构性推导，非枚举阈值、非拍脑袋数字）
@@ -1494,7 +1494,16 @@ export class WeiwenLawEngine {
     //   必须 fail-closed 交人工，而不是退回推演当无事发生。缺省方向错了，加多少词表都补不完（先结构、后枚举）。
     if (ap.verb !== 'exec') {
       if (sp.excluded.has(ap.verb)) conflicts.push(`言承诺排除「${ap.verb}」类动作，实际执行类别=${ap.verb}（明诺违背）`);
-      else if (sp.claimed.size > 0 && !sp.claimed.has(ap.verb)) conflicts.push(`言声明动作类别={${[...sp.claimed].join('|')}}，实际=${ap.verb}（做了没说的事）`);
+      else {
+        // [2026-09-20 · 容器对称] 言侧若**只**声明了容器类别（exec："我会执行/执行过"），
+        //   则言并未限定动作类别（exec ⊃ delete/write/read…）⇒ **不可比则不比**（同行侧 ap.verb==='exec'）。
+        //   不剔除容器 ⇒ 同一动作仅因措辞（"执行过清理" vs "清理"）就在 allow/deny 间翻转
+        //   ⇒ 裁决被言侧修辞劫持（道德绑架实测 TRIANGLE 组实证）。见 attribution.CONTAINER_VERBS。
+        const concrete = [...sp.claimed].filter((v) => !CONTAINER_VERBS.has(v));
+        if (concrete.length > 0 && !concrete.includes(ap.verb)) {
+          conflicts.push(`言声明动作类别={${concrete.join('|')}}，实际=${ap.verb}（做了没说的事）`);
+        }
+      }
     }
     // ── 关于"exec 容器 + 言已承诺排除"为什么**不**一律 fail-closed（一次被实测打回的尝试，留档）──
     // 2026-09-20 曾在此写死「实质层剥不出 + 言有排除承诺 ⇒ review（fail-closed，物证不明交人工）」。
