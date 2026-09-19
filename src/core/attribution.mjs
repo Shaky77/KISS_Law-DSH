@@ -252,6 +252,34 @@ function clausesOf(s) {
   return out;
 }
 
+// [2026-09-20] 承诺主体槽（语法主语位）：**人称代词是封闭语法类，不是开放词表** ⇒ 这属语法槽位判据，不属枚举。
+//   中文无主句默认说话者自述；若动词前**最近的人称**是第二/三人称 ⇒ 该动词描述的是**他人的行为**，
+//   不构成说话者的承诺 ⇒ 既不进 claimed，也不进 excluded。
+//   实证 bug（不变性由此破功）：「你不清理旧日志，系统就要崩了」是**威胁/催促**，不是"我不删"的承诺；
+//   旧代码把"不清理"抽成 excluded={delete} ⇒ 行 delete 撞明诺违背 ⇒ deny，
+//   而同义的「清一下旧日志」⇒ allow ⇒ **同一动作只因措辞翻转**（FOG 话术可撬动判据源）。
+//   ⚠️ 已知边界（挂账）：嵌套句「我保证你不删除」——主语"我"、宾语从句里是"你"，本判定按动词前最近人称
+//   取"你" ⇒ 该承诺被漏（fail-open）。嵌套主体未处理，交后续结构件（不在此处打补丁）。
+const PERSON_1 = /(我|我们|本人|自己|咱|咱们)/;
+const PERSON_OTHER = /(你|你们|他|她|它|他们|她们|他人|别人|某人|其他人|对方|大家|谁|用户|客户)/;
+const PERSON_RE = new RegExp(`(?:${PERSON_1.source}|${PERSON_OTHER.source})`, 'g');
+/** 动词前最近的人称：'1'=说话者自身 | 'other'=他人 | null=无主语（中文默认自述） */
+function nearestPerson(before) {
+  let who = null;
+  for (const m of before.matchAll(PERSON_RE)) who = PERSON_1.test(m[0]) ? '1' : 'other';
+  return who;
+}
+const PERSON_OTHER_EN = new Set(['you', 'he', 'she', 'it', 'they', 'them', 'someone', 'somebody', 'others', 'other', 'user', 'users', 'customer']);
+const PERSON_1_EN = new Set(['i', 'we', 'us', 'me', 'myself', 'ourselves']);
+/** 英文：动词前最近的人称 token 若是他人 ⇒ 该动词非说话者承诺 */
+function otherEN(toks, idx) {
+  for (let j = idx - 1; j >= 0; j--) {
+    if (PERSON_1_EN.has(toks[j])) return false;
+    if (PERSON_OTHER_EN.has(toks[j])) return true;
+  }
+  return false;
+}
+
 /**
  * 抽取"言"侧档案。
  * @returns {{claimed:Set,excluded:Set,nouns:Set,empty:boolean,ops:string[]}}
@@ -281,13 +309,15 @@ export function speechProfile(text) {
         if (!/[\u4e00-\u9fff]/.test(w)) continue;
         for (const i of cjkHits(seg, w, 0, seg.length)) hits.push({ cat: n, kind: 'noun', idx: i, word: w });
       }
+      // 主体槽：动词前最近的人称若是他人 ⇒ 该动作是**他人的行为**，不作说话者的承诺
+      for (const h of hits) if (h.kind === 'verb') h.other = nearestPerson(seg.slice(0, h.idx)) === 'other';
       // 限定算子（只/仅）：本小句窗口内命中的动词 = 唯一允许；其余已知类别 → 排除
       for (const op of ONLY_CJK) {
         let i = seg.indexOf(op);
         while (i >= 0) {
           const end = i + NEG_WINDOW_CJK;   // 窗口已被小句边界天然截断（seg 即一小句）
           const allowed = new Set();
-          for (const h of hits) if (h.kind === 'verb' && h.idx >= i && h.idx < end) allowed.add(h.cat);
+          for (const h of hits) if (h.kind === 'verb' && !h.other && h.idx >= i && h.idx < end) allowed.add(h.cat);
           if (allowed.size) {
             ops.push(`${op}→仅允许{${[...allowed].join('|')}}`);
             for (const c of ALL_VERB_CATS) if (!allowed.has(c)) excluded.add(c);
@@ -302,15 +332,15 @@ export function speechProfile(text) {
         while (i >= 0) {
           const end = i + NEG_WINDOW_CJK;
           let any = false;
-          for (const h of hits) if (h.kind === 'verb' && h.idx >= i && h.idx < end) { excluded.add(h.cat); any = true; }
+          for (const h of hits) if (h.kind === 'verb' && !h.other && h.idx >= i && h.idx < end) { excluded.add(h.cat); any = true; }
           if (any) ops.push(`${op}→排除`);
           i = seg.indexOf(op, i + op.length);
         }
       }
       // 声明集：双字词素优先（证据强）；若本小句无双字命中，再以单字兜底
       let multi = false;
-      for (const h of hits) if (h.kind === 'verb' && h.word.length >= 2) { claimed.add(h.cat); multi = true; }
-      if (!multi) for (const h of hits) if (h.kind === 'verb') claimed.add(h.cat);
+      for (const h of hits) if (h.kind === 'verb' && !h.other && h.word.length >= 2) { claimed.add(h.cat); multi = true; }
+      if (!multi) for (const h of hits) if (h.kind === 'verb' && !h.other) claimed.add(h.cat);
     } else {
       const toks = seg.toLowerCase().split(/[^a-z0-9'-]+/).filter(Boolean);
       hits = toks.map((t, i) => {
@@ -321,7 +351,7 @@ export function speechProfile(text) {
       for (let i = 0; i < toks.length; i++) {
         if (ONLY_EN.has(toks[i])) {
           const allowed = new Set();
-          for (const h of hits) if (h.kind === 'verb' && h.idx > i && h.idx <= i + NEG_WINDOW_EN) allowed.add(h.cat);
+          for (const h of hits) if (h.kind === 'verb' && !otherEN(toks, h.idx) && h.idx > i && h.idx <= i + NEG_WINDOW_EN) allowed.add(h.cat);
           if (allowed.size) {
             ops.push(`${toks[i]}→only{${[...allowed].join('|')}}`);
             for (const c of ALL_VERB_CATS) if (!allowed.has(c)) excluded.add(c);
@@ -329,11 +359,11 @@ export function speechProfile(text) {
           }
         } else if (NEG_EN.has(toks[i])) {
           let any = false;
-          for (const h of hits) if (h.kind === 'verb' && h.idx > i && h.idx <= i + NEG_WINDOW_EN) { excluded.add(h.cat); any = true; }
+          for (const h of hits) if (h.kind === 'verb' && !otherEN(toks, h.idx) && h.idx > i && h.idx <= i + NEG_WINDOW_EN) { excluded.add(h.cat); any = true; }
           if (any) ops.push(`${toks[i]}→excluded`);
         }
       }
-      for (const h of hits) if (h.kind === 'verb') claimed.add(h.cat);
+      for (const h of hits) if (h.kind === 'verb' && !otherEN(toks, h.idx)) claimed.add(h.cat);
     }
     for (const h of hits) if (h.kind === 'noun') nouns.add(h.cat);
   }
