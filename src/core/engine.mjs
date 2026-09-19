@@ -412,10 +412,11 @@ export const DEFAULT_RIGID_ANCHORS = [
     // 键名是无限集，故按语义形状判而非列举名字；未来出现任何新名字自动覆盖。
     test: (call) => {
       const shell = extractShell(call) || '';
-      // [2026-09-19 语法槽位] 状语必须修饰**同一小句**的谓语 —— 先按分隔符切小句，
-      // 只在「含 push 谓语」的小句内找 force 状语（--force / refspec 前导 +）。
+      // [2026-09-19 语法槽位·缩句] 状语必须修饰**同一小句主干**的谓语 —— 按分隔符逐句「缩句」
+      // （删定状补、留主谓宾），只在「含 push 谓语」的小句主干内找 force 状语（--force / refspec 前导 +）。
       // 老判据要求文本**以** `git push` 开头（^git\s+push），真模型产出的多行脚本
-      // （set -e\ngit push origin "+HEAD:..."）谓语不在句首 ⇒ 漏判。语法上谓语不由位置决定。
+      // （set -e\ngit push origin "+HEAD:..."）谓语不在句首 ⇒ 漏判。语法上谓语按「谁干什么」定位，不由位置决定。
+      // 缩句相对「切小句」的关键：状语逐句挂到本句主干，不取全小句并集 ⇒ 杜绝跨句错挂（如 echo 小句误挂 +main）。
       const REF_FORCE = (v) => {
         const s = String(v ?? '').trim().replace(/^["']+|["']+$/g, '');
         return s.length > 1 && /^\+(?!\+)/.test(s);
