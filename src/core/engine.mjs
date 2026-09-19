@@ -6,7 +6,7 @@
 // First-Bug-Halt closed-loop state machine: force completion of the inevitable second half after "cutting",
 // forbid re-entry before fix, blocking "reverse-deduce-only-without-fixing → infinite recursion" at the root.
 import { BugStopGuard, bugKeyOf } from './bugstop.mjs';
-import { attributeCall, DELETION_LAYERS, GIT_DESTRUCTIVE } from './attribution.mjs';  // path-1 attribution + its deletion-layer set + git-destructive vocab (vocabulary owned by attribution; engine only consumes)
+import { attributeCall, extractCommand, DELETION_LAYERS, GIT_DESTRUCTIVE } from './attribution.mjs';  // path-1 attribution + its deletion-layer set + git-destructive vocab + extractCommand (vocabulary owned by attribution; engine only consumes)
 import { R_DOMAIN } from './law.mjs';  // [2026-09-18 synthesis] R-domain nested-inclusive boundary law — base A's Y-axis essence, wired back into the engine (base A imported it; B had dropped the wiring). FRACTAL_PROPERTY cross-call recursion left as the next frontier (see report).
 
 // [2026-09-18] R 域层级 → 权威权重（结构性推导，非枚举阈值、非拍脑袋数字）
@@ -745,6 +745,34 @@ const INSTR_LABEL = new RegExp(
 // for the same reason: JSON key colon isn't matched). → REVIEW tier, never allow.
 const COLON_CFG_OBJECT = new RegExp(String.raw`[^：:\n"']{2,16}[:：][^\n]{0,60}?` + CFG_OBJECT.source);
 
+// [2026-09-15 Iron-Law-8 hardening · evidence-driven] Detect destructive/delete-class actions whose "target (physical evidence) is not externalized".
+// Evidence (live import of WeiwenLawEngine, see _verify/verify_police_claim.mjs):
+//   run_command `rm -rf` with no arg / fs_delete with empty path originally returned allow
+//   (deduceRisk computes erosion=0, sOk=true on empty target → both hold → allow), violating Iron Law 8 "can't judge → REVIEW".
+// Police view: physical evidence absent → insufficient evidence → should REVIEW (hand back to human). This fn only flags
+// "destructive action + missing target"; it does NOT cover non-destructive exec (ls/cp/mv/echo… keep going through the
+// deduction layer, to avoid false positives). On hit → _decideCore returns review.
+function destructiveTargetMissing(call, attrib) {
+  const layer = attrib?.layer;
+  // structured delete tools: check the path arg directly (empty/unset = physical evidence absent)
+  if (layer === 'file-delete' || layer === 'cred-delete') {
+    const p = call?.args?.path;
+    return !(typeof p === 'string' && p.trim().length > 0);
+  }
+  // exec / run_command layer: flag only when command carries a destructive verb AND lacks a target (non-destructive cmds don't trigger)
+  if (layer === 'exec' || layer === 'exec-destructive') {
+    const { cmd } = extractCommand(call);
+    if (!cmd) return false;
+    if (!/\b(rm|rmdir|shred|unlink|mkfs|format|dd|truncate|wipefs)\b/i.test(cmd)) return false;
+    const rest = cmd
+      .replace(/^\s*(rm|rmdir|shred|unlink|mkfs[\w.]*|format|dd|truncate|wipefs)\b[^\s\w]*/i, '')
+      .replace(/(?:^|\s)-{1,2}[a-zA-Z]+/g, '')
+      .trim();
+    return rest.length === 0;
+  }
+  return false;
+}
+
 export class WeiwenLawEngine {
   constructor(opts = {}) {
     // Rigid-anchor rules: replaceable as a whole; default uses the example set
@@ -1370,6 +1398,19 @@ export class WeiwenLawEngine {
         kind: 'review',
         law: 'R',
         reason: `path-1 attribution anchor failed (name=${call?.name ?? ''} neutral or no observable behavior): action category unjudgeable, hand back to human, don't guess`,
+        attrib,
+        fractalSubM: true,
+      };
+    }
+    // [2026-09-15 Iron-Law-8 hardening · wired] Destructive/delete-class action with "target (physical evidence) not externalized" → insufficient evidence → review
+    // hooked to destructiveTargetMissing: flags only "destructive action + missing target", on hit hands back to human.
+    // This gate MUST sit after attrib.ok — attrib-unanchorable (neutral name) is already handled by the review above;
+    // here we only catch "category judgable but concrete object (physical evidence) absent", avoiding false positives on non-destructive exec.
+    if (destructiveTargetMissing(call, attrib)) {
+      return {
+        kind: 'review',
+        law: 'R',
+        reason: `Destructive action target (physical evidence) not externalized: ${attrib.layer}-layer action missing a concrete object, insufficient evidence, hand back to human, don't guess`,
         attrib,
         fractalSubM: true,
       };
