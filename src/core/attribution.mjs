@@ -36,6 +36,30 @@ const NOUN = {
 
 // 删除类语义层集合：layer 命名归本模块所有（attrib.layer 由 verb/noun 推导产出）。
 // 引擎只消费此命名导出，不重复声明字面量——词汇归属单一、改一处即全链跟随（能隐则隐）。
+// [2026-09-20] 🔴 域归属：**每个 D 必落某个 R 域** —— 这是记账的必经步骤，不是"命中规则后的副产品"。
+//   安 09-20 指正：「每一个 D 的发生，R 域自动匹配，匹配完，S 就应该记账了啊。」
+//   我原先把 S 的记账挂在 **锚命中** 上（mSystemMarks / mMagnitude 只在 `_bucketRHit` 即撞上刚性锚时才产生）
+//   ⇒ 被放行的 D **整轮不入账** ⇒ 账退化成离散撞击点，不是轨迹。这是**取错了来源**，不是框架没有。
+//   ⇒ 正确口径：D 定域于 X=t ⇒ 必落在 Y=R 的某一层 ⇒ **S 就该 +1**。
+//
+// 🔴 域是**全集覆盖**的（R_DOMAIN 嵌套：Cosmic⊃Earth⊃Macro⊃Micro）⇒ **不存在"无域"**。
+//   剥不出实质的（exec 容器 / 空动作）落**最外层 Cosmic(0)**：它在宇宙之内，只是层级未定。
+//   ⇒ **空值消失** ⇒ 顺带堵掉"空值被当成不可比 ⇒ fail-open"那个洞（空 ≠ 不可比）。
+//
+// 层级取自既有锚定义（DEFAULT_RIGID_ANCHORS.magnitude），不是新造刻度：
+//   文件系统完整性 / 凭证保密 = Micro(3)；共享远端仓库完整性 / 系统可用性 = Macro(2)。
+export const DOMAIN_OF_LAYER = {
+  'file-delete': 3, 'file-write': 3, 'file-read': 3, 'exec-destructive': 3,   // 文件系统完整性 = Micro
+  'cred-read': 3, 'cred-write': 3, 'cred-delete': 3,                          // 凭证保密 = Micro
+  'network-send': 2,                                                          // 共享远端 / 外传 = Macro
+};
+/** @returns {{level:number,name:string}} 该 D 最内层所落的 R 域；未知 ⇒ 最外层 Cosmic（域全集覆盖，永不空） */
+export function domainOf(layer) {
+  const lv = DOMAIN_OF_LAYER[String(layer ?? '')] ?? 0;
+  return { level: lv, name: R_DOMAIN_BY_LEVEL[lv] ?? `level ${lv}` };
+}
+const R_DOMAIN_BY_LEVEL = { 0: 'Cosmic', 1: 'Earth', 2: 'Macro', 3: 'Micro' };
+
 export const DELETION_LAYERS = new Set(['file-delete', 'cred-delete']);
 // [2026-09-20 · 容器类别] **exec 是容器，不是实质动作类别**：shell 里任何命令都走 exec，
 //   故 exec ⊃ {delete, write, read, send, …} —— 是上位词（hypernym），不是并列类别。
