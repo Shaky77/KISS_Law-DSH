@@ -60,6 +60,47 @@ export function domainOf(layer) {
 }
 const R_DOMAIN_BY_LEVEL = { 0: 'Cosmic', 1: 'Earth', 2: 'Macro', 3: 'Micro' };
 
+// ---------------- 小 d 分解 与 MAX（最大冲击）· [2026-09-20 接线] ----------------
+// 🔴 安 09-18 原话链（既有落档，**本轮才接线**）：X=t ⇒ 一个 t 一个 D（**内含多个小 d**）⇒
+//   **每个小 d 各匹配一个 R** ⇒ 落点 M；⇒ **多 R 并行于同一 D 产生多个 M**，M 有大小高低之分。
+//   实测：整条命令当单 d ⇒ 0/12 多命中；按(谓语,宾语)拆小 d ⇒ 3/10 多命中（复合命令）。
+// 🔴 安 09-20 纠偏（根因层）：**D 取 MAX 不是取最外层，而是取「最大冲击」**。
+//   按「活下去」第一性原理，层级是**反常识**的：宇宙→地球→宏观→中观→微观，**D 在微观取微观**。
+//   ⇒ **MAX(冲击) = 最微观落点（level 最大，3=Micro）**；**R 仲裁 = 最外层（level 最小，0=Cosmic）**。
+//   两者**方向相反且并存**：伤害落在微观（当下直接破稳态），仲裁上溯外层（根本规则层级）。
+//   ⇒ 与既有「多系统交互规则 S 取 min · D 取 max」同源：D 取 max 取的是**冲击**，不是层级。
+//   ⚠️ 层级档位是**相对的、分形的**（安：「宏观/中观/微观只是相对位置，不必纠结」）⇒ 不固化第五档。
+/**
+ * 小 d 分解：一个 D 拆成多个小 d。小 d = 片段内 (谓语, 宾语) 的一次配对。
+ * 与既有的「动词-宾语必须同片段绑定」同源（2026-09-19 长链实测修法），此处再按宾语拆开。
+ * @returns {Array<{verb:string|null,obj:string|null,seg:string}>}
+ */
+export function subDsOf(call) {
+  const cmd = String(call?.args?.cmd ?? call?.args?.command ?? '').trim();
+  if (!cmd) return [{ verb: null, obj: null, seg: cmd }];
+  const segs = cmd.split(/(?:;|&&|\|\||\||\n)+/).map((s) => s.trim()).filter(Boolean);
+  const out = [];
+  for (const seg of segs) {
+    const vm = seg.match(/^([A-Za-z_][\w.-]*)/);
+    if (!vm) continue;
+    const verb = vm[1];
+    const objs = (seg.match(/(?<=^|[\s=:'"(,])(\/[^-\s;|&"'(),]*|https?:\/\/[^\s;|&"'(),]*)/g) || []).map((s) => s.trim());
+    if (!objs.length) out.push({ verb, obj: null, seg });
+    else for (const o of objs) out.push({ verb, obj: o, seg });
+  }
+  return out.length ? out : [{ verb: null, obj: null, seg: cmd }];
+}
+/** MAX（最大冲击）：取**最微观落点**（level 最大）。无 M ⇒ null（不是 0，不是"安全"） */
+export function impactMax(levels) {
+  const xs = (levels ?? []).filter((x) => x != null);
+  return xs.length ? Math.max(...xs) : null;
+}
+/** R 仲裁（最外层为最终仲裁者）：取**最外层**（level 最小）。与 impactMax 方向相反 */
+export function arbiterOuter(levels) {
+  const xs = (levels ?? []).filter((x) => x != null);
+  return xs.length ? Math.min(...xs) : null;
+}
+
 export const DELETION_LAYERS = new Set(['file-delete', 'cred-delete']);
 // [2026-09-20 · 容器类别] **exec 是容器，不是实质动作类别**：shell 里任何命令都走 exec，
 //   故 exec ⊃ {delete, write, read, send, …} —— 是上位词（hypernym），不是并列类别。

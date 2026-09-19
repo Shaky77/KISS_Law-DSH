@@ -421,7 +421,14 @@ export const DEFAULT_RIGID_ANCHORS = [
         const s = String(v ?? '').trim().replace(/^["']+|["']+$/g, '');
         return s.length > 1 && /^\+(?!\+)/.test(s);
       };
-      const forceIn = (seg) => /--force(-with-lease)?\b/i.test(seg) || seg.split(/\s+/).some(REF_FORCE);
+      // [2026-09-20 结构修法·短选项簇解析] force 语义有两种书写形态：长写(--force / --force-with-lease)
+      // 与短写(-f)；短写可与其它短选项合并成簇(-uf / -fu / -ufv)。
+      // 老判据只认长写 ⇒ `git push -f origin main` 四锚全不命中 ⇒ **allow**（实测硬洞）。
+      // 判据不是再补一个"-f"字符串，而是**解析短选项簇**：凡以单 '-' 引导的纯字母串，
+      // 逐字母解出 f ⇒ 该 push 具备重写远端历史的能力。合并形态无限、解析规则有限。
+      const SHORT_HAS_F = (seg) =>
+        seg.split(/\s+/).some((t) => /^-[a-zA-Z]+$/.test(t) && t.slice(1).split('').includes('f'));
+      const forceIn = (seg) => /--force(-with-lease)?\b/i.test(seg) || seg.split(/\s+/).some(REF_FORCE) || SHORT_HAS_F(seg);
       for (const seg of shell.split(/&&|\|\||;|\||\n|\r/)) {
         if (/\bgit\s+push\b/i.test(seg) && forceIn(seg)) return true;
       }
@@ -432,7 +439,10 @@ export const DEFAULT_RIGID_ANCHORS = [
       const truthy = (v) => v === true || v === 'true' || v === 1;
       for (const [k, v] of Object.entries(call?.args ?? {})) {
         if (!truthy(v)) continue;
+        // 同族：结构化参数侧的短写（args/flags 键名 'f' 为真）——与命令文本侧短选项簇同一形态，
+        // 均为"force 语义的短写"，不因来源不同而异判（来源解耦，非相互抵消）。
         if (/force/i.test(k) && !/^(no|not|disable|without)[_-]?force/i.test(k)) return true;
+        if (k === 'f') return true;   // isPush 已前置 ⇒ 此处 'f' 只可能是 push 的 force 短写
       }
       for (const [k, v] of Object.entries(call?.flags ?? {})) {
         if (truthy(v) && /rewrites?[_-]?(remote[_-]?)?history/i.test(k)) return true;
