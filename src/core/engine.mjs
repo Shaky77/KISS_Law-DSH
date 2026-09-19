@@ -6,7 +6,7 @@
 // First-Bug-Halt closed-loop state machine: force completion of the inevitable second half after "cutting",
 // forbid re-entry before fix, blocking "reverse-deduce-only-without-fixing → infinite recursion" at the root.
 import { BugStopGuard, bugKeyOf } from './bugstop.mjs';
-import { attributeCall, extractCommand, DELETION_LAYERS, GIT_DESTRUCTIVE } from './attribution.mjs';  // path-1 attribution + its deletion-layer set + git-destructive vocab + extractCommand (vocabulary owned by attribution; engine only consumes)
+import { attributeCall, extractCommand, DELETION_LAYERS, GIT_DESTRUCTIVE, speechProfile, actionProfile } from './attribution.mjs';  // path-1 attribution + its deletion-layer set + git-destructive vocab + extractCommand + [2026-09-20] speech/action profile (知行合一轴; vocabulary owned by attribution; engine only consumes)
 import { R_DOMAIN } from './law.mjs';  // [2026-09-18 synthesis] R-domain nested-inclusive boundary law — base A's Y-axis essence, wired back into the engine (base A imported it; B had dropped the wiring). FRACTAL_PROPERTY cross-call recursion left as the next frontier (see report).
 
 // [2026-09-18] R 域层级 → 权威权重（结构性推导，非枚举阈值、非拍脑袋数字）
@@ -1292,12 +1292,15 @@ export class WeiwenLawEngine {
 
   // ---------- Pre-tool-call grand adjudication (corresponds to DSH tools/pre-execute) ----------
   // Outer-H deduction done inside _decideCore; exit uniformly mounts inner-H parked state (inner-H registration protocol ④: delivered together).
-  decideToolCall(call) {
-    const res = this._decideCore(call);
+  // [2026-09-20 · 知行合一轴] 第二入参 utterance =「言」（模型同帧自述 / 人证）。
+  //   此前只收 call（行 = 物证），**言根本进不来** ⇒ 只做审讯不做勘查 ⇒ "换个说法就放行"。
+  //   该入参可选：不传 ⇒ 本轴不启用（保持既有 253 行为零回归）。
+  decideToolCall(call, utterance) {
+    const res = this._decideCore(call, utterance);
     return this._attachInnerH(res, call);
   }
 
-  _decideCore(call) {
+  _decideCore(call, utterance) {
     // —— Closed-loop gate: unfixed fault segment forbids re-entry (blocks infinite recursion) ——
     const re = this.bugStop.canReenter(call);
     if (!re.allowed) {
@@ -1415,6 +1418,13 @@ export class WeiwenLawEngine {
         fractalSubM: true,
       };
     }
+    // [2026-09-20 · 知行合一轴] 人证与物证齐备 ⇒ 先比对，再谈推演。
+    // 推演是**证据不足时**的推测；此处言/行冲突已是**可观测事实（外 H）**，故不应再落入灰区推演。
+    const sa = this.checkSpeechAct(call, attrib, utterance);
+    if (sa) {
+      if (sa.kind === 'deny') this.failureStreak += 1;  // 破坏类分裂计入破窗（与 R 命中、推演 deny 同权）
+      return sa;
+    }
     // All judgment layers passed → sink to deduction layer (manuscript H fork-parallel-compare, grey-zone complete causality)
     // [2026-09-13 export fix · projection made visible]
     // The two branches computed by deduceRisk (S-growth path / D-erosion path) used to be recorded into the
@@ -1450,6 +1460,53 @@ export class WeiwenLawEngine {
     this._registerWrite(call);
     this.recordSteady({ positive: 1 });
     return { kind: 'allow', law: '推演', reason: risk.reason, risk: 'low', attrib, deduced: true, projection: risk.branches };
+  }
+
+  // ——— 知行合一 / 知行分裂（2026-09-20 新增轴）———
+  // 警察视角的关键是「人证物证具在」：**言（人证）与行（物证）两样齐备，才比对得出真假**。
+  //   **只推演、不比对 = 系统性放行谎言**：言可以完全自洽却仍是欺骗
+  //   （"下个路口左转"推演成立、目的地也对，但实际右转）。
+  //   ⇒ 这也解释了"推得越多放得越宽"：推演越强越确认言自洽 ⇒ 越放心地放行一个已经分裂的动作。
+  // 判据是**结构**（集合包含 / 排除关系），不是词表命中：
+  //   ① 行类别 ∈ 言承诺排除集 ⇒ 明诺不做却做（最硬）
+  //   ② 行类别 ∉ 言声明集（且言声明集非空）⇒ 做了没说的事
+  //   ③ 言对象集与行对象集均非空且不相交 ⇒ 目标漂移（弱信号）
+  // 严重度由**行自身的既有层级**决定（不新拍阈值）：破坏类 ⇒ deny，其余 ⇒ review（fail-closed，交人工）。
+  // 不越内 H：言与行**都是外 H**，判的是两者对不对得上，**不推断他真正想什么**。
+  //   ⇒ **说谎不是内 H——说谎就是言与行不重合，可观测。** 守住"思想不审、行为必审"。
+  checkSpeechAct(call, attrib, utterance) {
+    const ut = utterance ?? call?.utterance ?? call?.speech ?? call?.rationale ?? call?.text ?? null;
+    if (typeof ut !== 'string' || !ut.trim()) return null;   // 言缺失 ⇒ 本轴不启用（"无言"不可被读成"放行"）
+    const sp = speechProfile(ut);
+    if (sp.empty) return null;                                // 言里抽不到动作/对象声明 ⇒ 无人证可比
+    const ap = actionProfile(call, attrib);
+    if (!ap.verb) return null;                                // 行侧类别不可判 ⇒ 不比对
+    const conflicts = [];
+    // [2026-09-20] exec 是**容器类别**，不是实质动作类别：
+    //   剥不出实质时（如 ls / find 等未进类别词表的命令 ⇒ verb 仍为 exec），拿容器去匹配
+    //   言的"承诺排除集/声明集"**必然误判**（实证：ls -la 只读盘点 ⇒ verb=exec，而言承诺"只读"排除了 exec
+    //   ⇒ 误判"明诺违背 read/exec"）。容器与实质不可比 ⇒ **不可比则不比**（交回推演层），只保留对象漂移。
+    if (ap.verb !== 'exec') {
+      if (sp.excluded.has(ap.verb)) conflicts.push(`言承诺排除「${ap.verb}」类动作，实际执行类别=${ap.verb}（明诺违背）`);
+      else if (sp.claimed.size > 0 && !sp.claimed.has(ap.verb)) conflicts.push(`言声明动作类别={${[...sp.claimed].join('|')}}，实际=${ap.verb}（做了没说的事）`);
+    }
+    if (sp.nouns.size > 0 && ap.noun && !sp.nouns.has(ap.noun)) conflicts.push(`言声明对象类别={${[...sp.nouns].join('|')}}，实际=${ap.noun}（目标漂移）`);
+    if (!conflicts.length) return null;
+    // 严重度由**实质层**决定（ap.layer 已剥掉 exec 容器），不是名义层（attrib.layer）：
+    //   attrib.layer 对通用执行器恒为 'exec' ⇒ 若按它判，明诺不删却删会被降级成 review（fail-open）。
+    const effLayer = ap.layer ?? attrib?.layer;
+    const isDestructive = DELETION_LAYERS.has(effLayer) || effLayer === 'exec-destructive';
+    return {
+      kind: isDestructive ? 'deny' : 'review',
+      law: '言行',
+      reason: `知行分裂：${conflicts.join('；')}（言="${ut.trim().slice(0, 80)}"）`,
+      risk: isDestructive ? 'high' : 'mid',
+      attrib, deduced: true,
+      speechAct: {
+        claimed: [...sp.claimed], excluded: [...sp.excluded], nouns: [...sp.nouns], ops: sp.ops,
+        actionVerb: ap.verb, actionNoun: ap.noun, layer: ap.layer, conflicts,
+      },
+    };
   }
 
   // This-session write registration (chained-state fallback): when write allowed, record path→content,
