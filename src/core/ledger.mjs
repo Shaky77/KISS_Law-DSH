@@ -81,6 +81,10 @@ export class SAccountLedger {
       rDomains: Array.isArray(rDomains) ? [...rDomains] : (rDomains ? [rDomains] : []),
       reversible: rev.reversible,
       overwrite: rev.overwrite,
+      // [2026-09-20 · 洞③ 刻痕存原始动作] 旧实现只存 detail（版本标记）而丢弃原始动作串
+      //   ⇒ 事后审计拿到刻痕却读不出"当时到底做了什么"（coze/51 实测：sSeq[0].detail = null）。
+      //   刻痕＝账本的证据；无原始动作的刻痕不可溯。此处附加 action（只加字段，不改裁决）。
+      action: action ?? null,
       detail: detail ?? null,
       subsystem,
       t,

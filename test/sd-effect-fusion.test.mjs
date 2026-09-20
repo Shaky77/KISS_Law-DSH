@@ -53,7 +53,11 @@ test('fusion·P4 benign read + identifiable → allow with sdSignal, engine verd
 // ── After fusion: engine allow + effect unidentifiable + S-related → escalate to review
 //    (discarding the dross / M gate) ──
 test('fusion·allow + effect unidentifiable + S-related → escalate to review (rejecting blind unconfoundedness)', () => {
-  const call = { name: 'exec', args: { command: 'rm -rf ./cache' } };
+  // [2026-09-20 输入换型 · 扣子 coze/51 方向] 原输入 `rm -rf ./cache` 现在被**引擎自己**的
+  //   痕锚归属判据拦成 review（无锚 ⇒ review）⇒ 引擎先 review，fusion 只透传，
+  //   本测试要考的「engine allow 之上做 M 闸门升级」这条路径就不会被走到。
+  //   换成引擎放行的**可逆窗口**动作（cp），保留本测试的主题不变。
+  const call = { name: 'exec', args: { command: 'cp -r ./cache ./cache-bak' } };
   const r = fusedDecide(call, { engine: freshEngine(), psi: 0.7, overlap: 0.01, sRelevant: true });
   assert.equal(r.kind, 'review');
   assert.equal(r.sdUncertain, true);
@@ -78,14 +82,14 @@ test('fusion·P5 plaintext destruction → engine deny passes through', () => {
 
 // ── Reverse protection: the P1 miss (a known leaf-level blind spot) still exists after fusion;
 //    fusion does not paper over it ──
-test('fusion·P1 "rm -rf ." still missed (fusion does not hide the known leaf blind spot, pending core fix)', () => {
+test('fusion·P1 "rm -rf ." → 盲区已由痕锚归属判据关闭（不再靠 fusion 兜）', () => {
   const call = { name: 'exec', args: { command: 'rm -rf .' } };
   const r = fusedDecide(call, { engine: freshEngine(), psi: 0.9, overlap: 0.5, sRelevant: true });
-  // Note: here overlap is identifiable and sRelevant, so the sensor should have added weight, but P1
-  // is already ALLOW at the engine level — what this exposes is the engine.mjs SCOPE_REL_FULL regex
-  // blind spot (forbidden zone, requires separate authorization to fix). The fusion layer exposes it
-  // honestly and does not whitewash it.
-  assert.equal(r.kind, 'allow');
+  // [2026-09-20 判据变更 · 扣子 coze/51 方向] 本测试原记录：P1（`rm -rf .`）在引擎层是 ALLOW，
+  //   属 engine.mjs SCOPE_REL_FULL 正则的已知叶级盲区（禁区，需单独授权才动），fusion 只诚实暴露、不粉饰。
+  //   现已由**结构判据**（scar 类动作 + 无锚可归 ⇒ REVIEW）关闭——不依赖那条正则、不补路径/词表：
+  //   引擎自己给出 review ⇒ fusion 透传（review 只可能出现在"引擎先 allow"之后的反推前提也不再触发）。
+  assert.equal(r.kind, 'review');
 });
 
 // ── Blocker 1 regression lock: fail-open default → fail-closed (raised by Couizi, 2026-09-09) ──

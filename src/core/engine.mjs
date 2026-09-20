@@ -6,7 +6,7 @@
 // First-Bug-Halt closed-loop state machine: force completion of the inevitable second half after "cutting",
 // forbid re-entry before fix, blocking "reverse-deduce-only-without-fixing → infinite recursion" at the root.
 import { BugStopGuard, bugKeyOf } from './bugstop.mjs';
-import { attributeCall, extractCommand, DELETION_LAYERS, GIT_DESTRUCTIVE, speechProfile, actionProfile, CONTAINER_VERBS, domainOf } from './attribution.mjs';  // path-1 attribution + its deletion-layer set + git-destructive vocab + extractCommand + [2026-09-20] speech/action profile (知行合一轴; vocabulary owned by attribution; engine only consumes)
+import { attributeCall, extractCommand, DELETION_LAYERS, GIT_DESTRUCTIVE, speechProfile, actionProfile, CONTAINER_VERBS, domainOf, declaredAnchors, scarUnanchored } from './attribution.mjs';  // + [2026-09-20] 锚归属（痕锚：scar+无锚⇒review，coze/51 方向；判定逻辑归 attribution，引擎只消费）  // path-1 attribution + its deletion-layer set + git-destructive vocab + extractCommand + [2026-09-20] speech/action profile (知行合一轴; vocabulary owned by attribution; engine only consumes)
 import { R_DOMAIN } from './law.mjs';  // [2026-09-18 synthesis] R-domain nested-inclusive boundary law — base A's Y-axis essence, wired back into the engine (base A imported it; B had dropped the wiring). FRACTAL_PROPERTY cross-call recursion left as the next frontier (see report).
 import { SAccountLedger, classifyReversibility, rDomainsForLayer } from './ledger.mjs';  // [2026-09-20] S 账本（用户账本模型）：R=字典 / SD=轴标记 / term 字典序索引 / S≠R 异类 / 疤窗可逆性。仅附加记录，不碰裁决核心。
 
@@ -832,6 +832,10 @@ export class WeiwenLawEngine {
     // [2026-09-20] S 账本（用户账本模型）：R=字典 / SD=轴标记 / term 字典序索引 / S≠R 异类 / 疤窗可逆性。
     // 仅附加记录结构，不参与裁决判定（守"禁区"红线：不做全局强制自检）。
     this.sAccount = opts.sAccount ?? new SAccountLedger();
+    // [2026-09-20 · 锚池（痕锚归属用）] 已**声明**的对象/作用域（言锚）在本会话内累积成**任务锚**：
+    //   锚 = 已声明（不是"已做过"）；只在 utterance 出现时累积，纯读入、不参与别的判定。
+    //   用途：scar 类动作（不可逆）的痕若归不到任何锚 ⇒ REVIEW（扣子 coze/51 方向，见 attribution.scarUnanchored）。
+    this.anchorPool = { paths: new Set(), nouns: new Set() };
   }
 
   // ---------- S steady-state reserve: dual attributes (time scar irreversible + current value can rise/fall) ----------
@@ -863,7 +867,8 @@ export class WeiwenLawEngine {
     const sign = positive > 0 ? '+' : negative > 0 ? '-' : '0';
     const rDomains = rDomainsForLayer(attrib?.layer ?? attrib?.layers ?? null);
     const rev = action ? classifyReversibility(action) : { reversible: 'unknown', overwrite: false };
-    this.sAccount.record({ term, sign, rDomains, reversible: rev.reversible, overwrite: rev.overwrite, detail, subsystem, t: ts });
+    // [2026-09-20 · 洞③] action 一并沉入刻痕（原始动作 ⇒ 事后可溯）；可选，未传则留 null。
+    this.sAccount.record({ term, sign, rDomains, reversible: rev.reversible, overwrite: rev.overwrite, action, detail, subsystem, t: ts });
     return this.snapshot();
   }
 
@@ -1337,6 +1342,15 @@ export class WeiwenLawEngine {
       return { kind: 'deny', law: 'M', reason: re.reason, bugKey: re.bugKey, stage: re.stage, missing: re.missing, closedLoop: true };
     }
 
+    // [2026-09-20 · 锚池累积（只读入，不改裁决）] 言中**已声明**的对象/作用域 → 任务锚。
+    //   与 checkSpeechAct 同源取言（三处回退一致），但只做抽取累积，不在此处做任何判定。
+    const utt0 = utterance ?? call?.utterance ?? call?.speech ?? call?.rationale ?? call?.text ?? null;
+    if (typeof utt0 === 'string' && utt0.trim()) {
+      const da = declaredAnchors(utt0);
+      for (const p of da.paths) this.anchorPool.paths.add(p);
+      for (const n of da.nouns) this.anchorPool.nouns.add(n);
+    }
+
     const r = this.checkRigidAnchor(call);
     if (r) {
       // [2026-09-19 M 位移序列] 破窗读数 = M 位移在该 R 层的投影累积：
@@ -1448,6 +1462,24 @@ export class WeiwenLawEngine {
       if (sa.kind === 'deny') this.failureStreak += 1;  // 破坏类分裂计入破窗（与 R 命中、推演 deny 同权）
       return sa;
     }
+    // [2026-09-20 · 痕锚归属 · 扣子 coze/51 方向 · 已落地] scar 类（不可逆）动作 + 无法归属到任何已声明锚 ⇒ REVIEW。
+    //   位置刻意放在**言行比对之后、推演之前**：
+    //     · 之前 —— R 刚性锚（rm -rf / 等）已 deny、物证缺失已 remand、言行分裂已判 ⇒ 此处只兜"剩下的那些"；
+    //     · 之后 —— 推演之前 ⇒ 不再让"推演判 low ⇒ allow"把无锚的不可逆动作悄悄放行。
+    //   看的是**痕的锚归属**（Y 轴），不是路径形状/黑名单（X 轴）：合法链与攻击链在 X 轴同构、在 Y 轴不同构。
+    //   只锚 **scar 类（有限封闭集：删除语义）**，不碰只读类（无限开放集）⇒ 不重蹈"对所有未登记只读命令报警"的过宽修法。
+    //   代价意识：review 可确认（人一句话即放行），deny 不可恢复 ⇒ 判不出交人工是对的代价（铁律 3 缺省方向）。
+    const scar = scarUnanchored(call, attrib, this.anchorPool);
+    if (scar) {
+      return {
+        kind: 'review',
+        law: 'R',
+        reason: `不可逆动作（${scar.layer}）无法归属到任何已声明锚（言锚/任务锚）：痕归属不明、判不出 ⇒ 交人工确认，不猜（目标=${scar.targets.length ? scar.targets.join(' ') : '未给出'}；已声明路径=[${scar.declaredPaths.join(' ')}] 已声明类别=[${scar.declaredNouns.join(' ')}]）`,
+        attrib,
+        deduced: true,
+        scarUnanchored: scar,
+      };
+    }
     // All judgment layers passed → sink to deduction layer (manuscript H fork-parallel-compare, grey-zone complete causality)
     // [2026-09-13 export fix · projection made visible]
     // The two branches computed by deduceRisk (S-growth path / D-erosion path) used to be recorded into the
@@ -1481,7 +1513,9 @@ export class WeiwenLawEngine {
     }
     // Low risk: allow, record steady-state positive increment (S only grows). Register this session's write (chained fallback).
     this._registerWrite(call);
-    this.recordSteady({ positive: 1, attrib });
+    // [2026-09-20 · 洞③] 放行路径把**原始动作**带进刻痕（命令文本优先，其次路径，最后工具名）
+    //   —— 账本刻痕是证据：只记 sign/term 而丢掉动作 ⇒ 事后读不出"当时做了什么"（coze/51 实测 detail=null）。
+    this.recordSteady({ positive: 1, attrib, action: extractShell(call) || extractPath(call) || (call?.name ?? null) });
     return { kind: 'allow', law: '推演', reason: risk.reason, risk: 'low', attrib, deduced: true, projection: risk.branches };
   }
 

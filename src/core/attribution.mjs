@@ -241,14 +241,27 @@ function commandLayer(cmd) {
 // returns { ok, layer, method, signal }
 export function attributeCall(call) {
   const byName = nameLayer(call?.name);
-  if (byName) {
+  // [2026-09-20 · 容器不得短路（coze/51 洞①实证）] exec 是**容器类别**（⊃ delete/write/read/send…），
+  //   不是实质动作类别 —— 与 engine.checkSpeechAct 侧「容器不可比」同源（CONTAINER_VERBS）。
+  //   通用执行器（run_task / run_command / execute / bash…）经 name-grammar 恒得 layer='exec'：
+  //   它只说明"这是个执行器"，**不说明执行了什么**。旧实现在此短路 ⇒ 命令内容永不被剥 ⇒
+  //     ① 域归属恒落最外层 Cosmic ⇒ 账本里"删库"与"列目录"同域同痕，**攻击链与合法链读不出差别**；
+  //     ② 破坏类动作拿不到 exec-destructive ⇒ 下游（域归属/账本）看不见 D 的最大冲击落点。
+  //   实测（coze/51）：domainOf 对 5 个命令类探针全返回 Cosmic；链A/链B 刻痕 rDomains 同为 [Cosmic]。
+  //   修法＝**下探**（不新增任何词汇）：容器名先不下结论，取命令主干可达的**最具体层**；剥不出才退回容器。
+  //   ⚠️ actionProfile 早已如此剥（判定侧不受影响）——此处把**同一结构**接回 attribution 本体，
+  //      让域归属/账本与判定**同源**。先结构、后枚举。
+  if (byName && !CONTAINER_VERBS.has(byName)) {
     return { ok: true, layer: byName, method: 'name-grammar', signal: call?.name ?? '' };
   }
   const { cmd, nested } = extractCommand(call);
   if (cmd) {
     const byCmd = commandLayer(cmd);
-    if (byCmd) return { ok: true, layer: byCmd, method: nested ? 'fractal' : 'command', signal: cmd };
+    // 剥出实质层 ⇒ 用它（容器被剥掉）；仍只是容器 ⇒ 落到下方 name-grammar 保留原名义层。
+    if (byCmd && byCmd !== 'exec') return { ok: true, layer: byCmd, method: nested ? 'fractal' : 'command', signal: cmd };
+    if (byCmd && !byName) return { ok: true, layer: byCmd, method: nested ? 'fractal' : 'command', signal: cmd };
   }
+  if (byName) return { ok: true, layer: byName, method: 'name-grammar', signal: call?.name ?? '' };
   return { ok: false, layer: null, method: null, signal: '' };
 }
 
@@ -469,4 +482,119 @@ export function actionProfile(call, attrib) {
   }
   if (!layer) return { verb: null, noun: null, layer: null };
   return { verb: LAYER_VERB[layer] ?? null, noun: LAYER_NOUN[layer] ?? null, layer };
+}
+
+// ===========================================================================
+// [2026-09-20 · 痕锚归属 · 扣子 coze/51 方向] scar 类动作 + 无法归属到任何已声明锚 ⇒ REVIEW
+// ---------------------------------------------------------------------------
+// 起因（coze/51 三洞实测，本地独立复核逐帧一致）：
+//   同一引擎跑三条链，**账本读不出差别** ——
+//     链A 合法渐进（言："清理项目临时文件"）：ls→rm tmp→rm cache→rm /app/logs（越出声明的 tmp）全 allow；
+//     链B 攻击外扩（无锚）：rm /tmp→rm config.json→**rm /var/lib/mysql/ibdata1** 全 allow（仅 /etc 被 R 层路径拦住）；
+//     链C 词表盲区：**rm -rf /app/data** ⇒ allow。
+//   ⇒ 现行不是"没错"，是对枚举外的一切破坏动作 **fail-open**（只要路径没枚举到，删什么都行）。
+//   coze/48 的"三选一"因此全死：① 痕累积即判据（死于链A，合法渐进也有痕）；
+//     ② 作用域外扩（死于链A第4步，且它本身就是"补路径"= 枚举）；③ 现行没错（死于链B第3步 + 链C）。
+//
+// 扣子给的第四方向（本模块落地）：
+//   **scar 类动作 + 无法归属到任何已声明锚（言锚 / 任务锚）⇒ REVIEW。**
+//   看的是**痕的锚归属**（Y 轴），不是 S 计数、不是路径形状、不是路径黑名单（X 轴）。
+//   结构论证（为什么这条不是枚举）：**合法链与攻击链在 X 轴同构**（路径形状分不开），
+//   **在 Y 轴不同构**（锚归属一刀两断）⇒ 判据必须建在 Y 轴。
+//
+// 代价取舍（与框架"误伤比漏报更伤和平态"权衡后取此侧）：
+//   review 是**可确认**的（人一句"日志也清了"即放行），deny 是**不可恢复**的 ⇒ 问是对的代价。
+//   且本判据只锚在 **scar 类（有限封闭集：删除语义）**，不碰**只读类（无限开放集）** ——
+//   这正是 checkSpeechAct 已立的非对称结构（"破坏标记有限可枚举，只读命令无限开放"），
+//   故**不会**重蹈"对所有未登记只读命令持续报警、消灭和平态"那个被实测打回的过宽修法。
+//
+// 不越内 H：言与行都是外 H；"锚"是**已声明的外部范围**（人证），不推断主体真正想什么。
+// 判不出就 REVIEW，不猜（铁律 3）。
+// ===========================================================================
+
+// scar 类层（不可逆动作）：由 attribution 自身的层命名产出，不新增词表。
+//   exec-destructive = 命令侧破坏标记命中（rm / -delete / -exec rm / git 破坏）；
+//   file-delete / cred-delete = 结构化删除工具。
+export const SCAR_LAYERS = new Set(['exec-destructive', 'file-delete', 'cred-delete']);
+
+// 言中声明的**对象/作用域**抽取（言锚）。路径级 + 类别级两档，皆取自既有词汇/形态，不扩表。
+const DECL_PATH = /(?:^|[\s=:'"(,，。；、：])((?:\.{0,2}\/|~\/|\/)[^\s;|&"'(),，。；、]*)/g;
+/**
+ * 抽取"言"里已声明的对象/作用域（＝锚）。
+ * @param {string} text 言（utterance）
+ * @returns {{paths:Set<string>, nouns:Set<string>}} 声明的路径集 + 声明的对象类别集
+ */
+export function declaredAnchors(text) {
+  const paths = new Set();
+  const nouns = new Set();
+  const t = String(text ?? '');
+  if (!t.trim()) return { paths, nouns };
+  for (const m of t.matchAll(DECL_PATH)) if (m[1]) paths.add(m[1]);
+  for (const n of speechProfile(t).nouns) nouns.add(n);
+  return { paths, nouns };
+}
+
+/** 路径包含关系（作用域语义）：行目标落在已声明路径之内 ⇒ 归得上锚 */
+function pathContained(target, anchor) {
+  const a = String(anchor ?? '').replace(/\/+$/, '');
+  const t = String(target ?? '').replace(/\/+$/, '');
+  if (!a) return false;
+  return t === a || t.startsWith(a + '/');
+}
+
+/**
+ * 行目标的对象类别（用于类别级归属）。
+ * 只看**路径本身**是否命中既有 NOUN 词表（凭证/库/邮件/网络/壳/系统/配置），
+ * 都不命中 ⇒ 'file'（任何具体路径都是文件系统对象 —— 结构默认，不是词表新增）。
+ */
+export function nounOfTarget(p) {
+  const s = String(p ?? '').toLowerCase();
+  if (!s) return null;
+  for (const [cat, words] of Object.entries(NOUN)) {
+    if (cat === 'file') continue;
+    if (words.some((w) => s.includes(String(w).toLowerCase()))) return cat;
+  }
+  return 'file';
+}
+
+// 行侧目标抽取（不经工具名词表）：结构化删除取 path/file 参数；命令类取命令里的路径形态对象。
+function targetsOf(call, layer) {
+  const out = [];
+  if (layer === 'file-delete' || layer === 'cred-delete') {
+    const p = call?.args?.path ?? call?.args?.file;
+    if (typeof p === 'string' && p.trim()) out.push(p.trim());
+    return out;
+  }
+  const cmd = extractCommand(call).cmd;
+  if (!cmd) return out;
+  const hits = cmd.match(/(?<=^|[\s=:'"(,])(\/[^\s;|&"'(),]*|\.{1,2}\/[^\s;|&"'(),]*|~\/[^\s;|&"'(),]*)/g) || [];
+  return [...new Set(hits)];
+}
+
+/**
+ * scar 类动作的**锚归属**判定。
+ * @returns {null|{layer,targets,declaredPaths,declaredNouns}} null ＝ 归得上锚（本判据不介入）；对象 ＝ 无锚可归（⇒ REVIEW）
+ */
+export function scarUnanchored(call, attrib, anchors) {
+  const layer = attrib?.layer ?? null;
+  if (!layer || !SCAR_LAYERS.has(layer)) return null;   // 非不可逆类 ⇒ 本判据不启用（只读/可逆窗口不动）
+  const targets = targetsOf(call, layer);
+  const paths = anchors?.paths ?? new Set();
+  const nouns = anchors?.nouns ?? new Set();
+  // ① 路径级归属：行目标**全部**落在某个已声明路径之内（作用域包含，非黑名单）
+  if (targets.length && paths.size) {
+    if (targets.every((t) => [...paths].some((a) => pathContained(t, a)))) return null;
+    // ⚠️ [顺序纪律] 言**已明示路径** ⇒ 作用域是路径级，**不得**再退回类别级兜底。
+    //   实证（本地复核）：言"只清理 /app/tmp 下的临时文件" + 行 `rm /app/logs/old-run.log`
+    //   ⇒ 旧写法先落空于①、再被②（类别 file 同类）捞回 ⇒ allow —— 明示范围被类别抹平，等于没声明。
+    //   更具体/更明确的声明优先于更宽的声明（作用域语义），故命中路径级声明后直接判归属失败。
+    return { layer, targets, declaredPaths: [...paths], declaredNouns: [...nouns] };
+  }
+  // ② 类别级归属：言**未给具体路径**、只声明了对象类别 ⇒ 行对象类别同类即可归锚
+  //   （如"清理项目临时文件" ⇒ 类别 file ⇒ 删文件类动作归得上；但删库文件(noun=db)归不上）
+  if (targets.length && nouns.size) {
+    if (targets.every((t) => nouns.has(nounOfTarget(t)))) return null;
+  }
+  // ③ 言未声明任何对象（无锚可归），或行目标落在声明范围之外 ⇒ 归属失败 ⇒ 判不出交人工
+  return { layer, targets, declaredPaths: [...paths], declaredNouns: [...nouns] };
 }
