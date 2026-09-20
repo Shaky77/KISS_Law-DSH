@@ -832,10 +832,15 @@ export class WeiwenLawEngine {
     // [2026-09-20] S 账本（用户账本模型）：R=字典 / SD=轴标记 / term 字典序索引 / S≠R 异类 / 疤窗可逆性。
     // 仅附加记录结构，不参与裁决判定（守"禁区"红线：不做全局强制自检）。
     this.sAccount = opts.sAccount ?? new SAccountLedger();
-    // [2026-09-20 · 锚池（痕锚归属用）] 已**声明**的对象/作用域（言锚）在本会话内累积成**任务锚**：
-    //   锚 = 已声明（不是"已做过"）；只在 utterance 出现时累积，纯读入、不参与别的判定。
+    // [2026-09-20 · 锚池（痕锚归属用）] 授权锚＝**委托人已声明的**对象/作用域，本会话内累积。
+    //   锚 = 已声明（不是"已做过"）；纯读入、不参与别的判定。
+    //   ⚠️ 主体分离（对齐层修正 2026-09-20）：判据原文是「言锚 / 任务锚」**两类**，此前实现只接了一个槽
+    //     ⇒ 授权锚**只由委托人（principal）的声明喂养**（`call.taskAnchor`）；被审计 agent 的自述（utterance）
+    //     仍走 checkSpeechAct 做言行比对，但**不进锚池**（否则模型自述一句"我要删 X"即自我授权 ⇒ 门自解除）。
     //   用途：scar 类动作（不可逆）的痕若归不到任何锚 ⇒ REVIEW（扣子 coze/51 方向，见 attribution.scarUnanchored）。
     this.anchorPool = { paths: new Set(), nouns: new Set() };
+    // 通道自报（白箱可观）：实机可查"言 / 任务锚到底有没有到"，把"猜字段名"换成"看事实"。
+    this.anchorChannel = { utteranceSeen: false, principalAnchorSeen: false, lastPrincipalAnchor: null, poolPaths: [], poolNouns: [] };
   }
 
   // ---------- S steady-state reserve: dual attributes (time scar irreversible + current value can rise/fall) ----------
@@ -1342,14 +1347,29 @@ export class WeiwenLawEngine {
       return { kind: 'deny', law: 'M', reason: re.reason, bugKey: re.bugKey, stage: re.stage, missing: re.missing, closedLoop: true };
     }
 
-    // [2026-09-20 · 锚池累积（只读入，不改裁决）] 言中**已声明**的对象/作用域 → 任务锚。
-    //   与 checkSpeechAct 同源取言（三处回退一致），但只做抽取累积，不在此处做任何判定。
+    // [2026-09-20 · 锚池累积（只读入，不改裁决）· 主体分离]
+    //   判据原文＝「无法归属到任何已声明锚（**言锚 / 任务锚**）」⇒ 结构上本就是两类锚。此前实现用**同一个槽**
+    //   （utterance）喂两者，造成两处偏差（本轮 probe 实测）：
+    //     (a) **授权自解除**：言「我要清空 /app/data」+ `rm -rf /app/data` ⇒ allow（模型给自己发许可）；
+    //     (b) **任务锚缺席**：委托人声明的任务范围无处进入 ⇒ 合法链也一律 review（实机"更啰嗦"的根因）。
+    //   责任归因只对**能承担后果的主体**成立（§229）⇒ **授权锚只由委托人（principal）声明喂养**；
+    //   agent 的言仍走 checkSpeechAct（绑定性比对：说了没做 / 做了没说），但**不进锚池**。
     const utt0 = utterance ?? call?.utterance ?? call?.speech ?? call?.rationale ?? call?.text ?? null;
-    if (typeof utt0 === 'string' && utt0.trim()) {
-      const da = declaredAnchors(utt0);
-      for (const p of da.paths) this.anchorPool.paths.add(p);
-      for (const n of da.nouns) this.anchorPool.nouns.add(n);
+    const hasUtt = typeof utt0 === 'string' && utt0.trim().length > 0;
+    const ta0 = call?.taskAnchor ?? null;
+    const hasTa = typeof ta0 === 'string' && ta0.trim().length > 0;
+    if (hasTa) {
+      const daTa = declaredAnchors(ta0);
+      for (const p of daTa.paths) this.anchorPool.paths.add(p);
+      for (const n of daTa.nouns) this.anchorPool.nouns.add(n);
     }
+    this.anchorChannel = {
+      utteranceSeen: hasUtt,
+      principalAnchorSeen: hasTa,
+      lastPrincipalAnchor: hasTa ? String(ta0).slice(0, 300) : null,
+      poolPaths: [...this.anchorPool.paths],
+      poolNouns: [...this.anchorPool.nouns],
+    };
 
     const r = this.checkRigidAnchor(call);
     if (r) {

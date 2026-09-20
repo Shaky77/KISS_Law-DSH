@@ -139,6 +139,29 @@ export function apply(ctx) {
 
 > Full implementation (all 6 tools' `execute`, runtime log, engine adjudication) in repo `src/index.js`.
 
+### Anchor channel (task anchor) — how irreversible actions get authorized
+
+The scar gate (`irreversible action + unattributable to any declared anchor ⇒ REVIEW`) needs an
+**authorization anchor**. Two structural rules apply:
+
+1. **Source = the message stream, not a guessed field name.** The `agent/pre-step` payload contract
+   carries `messages` (`payload = { agent, messages, step, signal }`); the adapter reads the principal's
+   declared scope there and hands it to the engine at `tools/pre-execute`. The `exec` view
+   (`{ token, callId, name, arguments, signal, agent?, parent? }`) has **no speech slot** — so nothing is
+   guessed onto it.
+2. **Principal only.** Only the **principal's** declaration authorizes. The audited agent's own narration
+   never enters the anchor pool — otherwise a model could self-authorize by simply narrating the act
+   first. The agent's utterance still feeds the speech/action comparison: it **binds**, it does not authorize.
+
+If no principal declaration is extractable, the pool stays empty and irreversible actions are handed to a
+human (`fail-closed`) — authorization is never invented. To observe what your host actually passes:
+
+    query_anchor_channel  →  { adapter: { shape, rolesSeen, principalFound, assistantSeen },
+                               engine:  { principalAnchorSeen, poolPaths, poolNouns } }
+
+Call it once on a real host to replace guessing about host field names with observation.
+
+
 ## Structure
 
 ```

@@ -57,6 +57,50 @@ function policeGate(call) {
   }
   return null;
 }
+// ---------- 锚通道（Y 轴解法：不猜字段名 ⇒ 改「接通道 + 运行时自报」） ----------
+// 结构事实（**非猜测**）：宿主契约 `agent/pre-step` 的 payload 明确含 `messages`（见本文件顶部 API 注，
+//   与 exec 视图字段集并列）。⇒「言」与「任务范围」在结构上必然存在于消息流里，不必去猜某个 utterance 字段名。
+// 主体分离（责任归因）：授权锚**只由委托人声明喂养**；被审计 agent 的自述**不授权**，它只走言行比对（绑定性）。
+//   ⇒ 此处只提取**委托人**的声明；助手消息**只观察、不采信**（避免"上一帧自述"冒充"本帧言"＝假人证）。
+// 形状容错 + 自报：宿主消息对象的具体形状未知 ⇒ 结构化容忍抽取；**抽不出即返回 null（不猜）**，
+//   并把"看到了什么"（形状 / role 词表）写进通道自报 ⇒ 实机跑一次即可用观测替代猜测。
+const PRINCIPAL_ROLE = /^(user|human|principal|operator|owner)$/i;
+function textOfContent(content) {
+  if (typeof content === 'string') return content;
+  if (Array.isArray(content)) {
+    return content
+      .map((p) => (typeof p === 'string' ? p : (p && typeof p.text === 'string' ? p.text : '')))
+      .filter(Boolean)
+      .join('\n');
+  }
+  return '';
+}
+function readMessageStream(payload) {
+  const msgs = payload?.messages;
+  if (!Array.isArray(msgs)) {
+    return { ok: false, shape: msgs === undefined ? 'absent' : typeof msgs, rolesSeen: [], principalText: null, assistantSeen: false, count: 0 };
+  }
+  const roles = [];
+  let principalText = null;
+  let assistantSeen = false;
+  for (let i = msgs.length - 1; i >= 0; i -= 1) {
+    const m = msgs[i];
+    if (!m || typeof m !== 'object') continue;
+    const raw = m.role;
+    const role = Array.isArray(raw) ? String(raw[0] ?? '') : raw === undefined || raw === null ? '' : String(raw);
+    if (role) roles.push(role);
+    if (PRINCIPAL_ROLE.test(role)) {
+      if (!principalText) {
+        const t = textOfContent(m.content ?? m.text ?? '');
+        if (t.trim()) principalText = t;
+      }
+    } else if (role && !assistantSeen && /^(assistant|model|agent|ai)$/i.test(role)) {
+      assistantSeen = textOfContent(m.content ?? m.text ?? '').trim().length > 0;
+    }
+  }
+  return { ok: true, shape: 'array', rolesSeen: [...new Set(roles)], principalText, assistantSeen, count: msgs.length };
+}
+
 const name = 'kiss-law';
 const inject = ['tools'];
 
@@ -95,6 +139,19 @@ function apply(ctx) {
   const engine = new WeiwenLawEngine({ rigidAnchors: DEFAULT_RIGID_ANCHORS });
   logline('apply() entered — registering tools/pre-execute, agent/pre-step, tools/result and white-box self-check tools');
 
+  // 锚通道状态：pre-step 取（委托人声明）→ pre-execute 用。作用域＝一个 step 内的全部工具调用。
+  // 委托人声明在本会话内**持续有效**（任务范围不因某一 step 无新指令而失效），直到出现新的声明。
+  let principalAnchor = null;
+  const channel = {
+    steps: 0,
+    messagesSeen: 0,
+    shape: 'absent',
+    rolesSeen: [],
+    principalFound: false,
+    assistantSeen: false,
+    lastCaptureAt: null,
+  };
+
   // ---------- R / D / S / H / M total adjudication: pre-tool-call gate (waterfall) ----------
   ctx.on('tools/pre-execute', async (exec, next) => {
     const a = exec?.arguments ?? {};
@@ -103,6 +160,10 @@ function apply(ctx) {
       args: a,
       command: a.command,
       code: a.code,
+      // [2026-09-20 · 锚通道] 委托人声明的任务范围（授权锚）。**不是**从 exec 视图猜的字段名：
+      //   来源＝`agent/pre-step` 契约里的 messages（见文件顶部 API 注）。缺失即留 null ⇒ 锚池留空
+      //   ⇒ 不可逆动作交人工（fail-closed）；**绝不臆造授权**（假人证比无人证更坏）。
+      taskAnchor: principalAnchor,
       // lift First-Bug structural flags to top level so engine.checkFirstBug can read them
       // (DSH passes these on exec.arguments; the engine expects them on call)
       selfReference: a.selfReference,
@@ -162,6 +223,21 @@ function apply(ctx) {
 
   // ---------- H inner-H inviolability: pre-step gate (waterfall, message-level) ----------
   ctx.on('agent/pre-step', async (payload, next) => {
+    // [2026-09-20 · 锚通道取言] 结构化容忍抽取 + 自报；**抽不出即不采信**（不猜字段名，不制造假人证）。
+    const rd = readMessageStream(payload);
+    channel.steps += 1;
+    channel.shape = rd.shape;
+    channel.rolesSeen = rd.rolesSeen;
+    channel.messagesSeen = rd.count;
+    channel.assistantSeen = rd.assistantSeen;
+    if (rd.principalText) {
+      principalAnchor = rd.principalText;   // 委托人声明在本会话内持续有效，直到出现新声明
+      channel.principalFound = true;
+      channel.lastCaptureAt = new Date().toISOString();
+      logline(`pre-step anchor captured (${rd.principalText.length} chars, roles=[${rd.rolesSeen.join(',')}])`);
+    } else {
+      logline(`pre-step anchor NOT found (shape=${rd.shape}, roles=[${rd.rolesSeen.join(',')}]) — 锚池留空，不猜`);
+    }
     const decision = engine.decidePreStep(payload?.messages);
     // reject (clear violation) and review (definition unclear / cannot determine) both block, do not spread.
     // review = "suspend & return to user for decision": intercept first, don't release.
@@ -259,6 +335,22 @@ function apply(ctx) {
       return {
         stops: engine.bugStop.snapshot(),
         note: 'halted and resolved=false components forbid reentry; must complete backtrack → trace → fix(verify) before reentry.',
+      };
+    },
+  }));
+
+  // [2026-09-20 · 锚通道自报] 把"猜宿主字段名"换成"看事实"：实机跑一次即可观测
+  //   ① 宿主是否真把消息流交给插件（shape / roles 词表）；② 委托人声明有没有被识别；③ 锚池里有什么。
+  ctx.tools.register(defineTool({
+    name: 'query_anchor_channel',
+    description: 'White-box self-report of the anchor channel: whether the principal\'s declared task scope and the same-frame utterance reached the engine, plus the observed message shape and role vocabulary. Use it on a real host to observe what the host actually passes instead of guessing field names. An empty pool means irreversible actions are handed to a human (fail-closed by design).',
+    parameters: {},
+    output: { schema: { type: 'object', additionalProperties: true }, render: renderObj },
+    async execute() {
+      return {
+        adapter: channel,
+        engine: engine.anchorChannel,
+        note: '授权锚只由委托人声明喂养（责任归因）；被审计 agent 的自述不进锚池（否则自我授权）。抽不出委托人消息即不猜 ⇒ 锚池留空 ⇒ 不可逆动作交人工。',
       };
     },
   }));

@@ -1,26 +1,31 @@
 // scar-anchor-gate.test.mjs — 痕锚归属判据回归锁（扣子 coze/51 方向，2026-09-20 落地）
 // ---------------------------------------------------------------------------
-// 被锁定的结构（一条判据 + 两处接线）：
+// 被锁定的结构（一条判据 + 两处接线 + 一次主体分离）：
 //   ① 判据：**scar 类（不可逆）动作 + 无法归属到任何已声明锚（言锚/任务锚）⇒ REVIEW**
 //      看的是痕的**锚归属**（Y 轴），不是路径形状/黑名单（X 轴）。
 //   ② 接线（洞①）：容器类别（exec）**不得短路**实质层剥离 ⇒ 破坏类动作的域归属落 Micro（最大冲击=最微观落点），
 //      不再恒落最外层 Cosmic（否则账本里"删库"与"列目录"同域同痕，攻击链与合法链读不出差别）。
 //   ③ 接线（洞③）：刻痕带**原始动作**（action）⇒ 事后可溯。
+//   ④ 主体分离（2026-09-20 对齐层修正）：判据原文是「言锚 / 任务锚」**两类**，实现此前共用一个槽
+//      ⇒ 拆开：**授权锚只由委托人（principal）声明喂养**（`call.taskAnchor`）；被审计 agent 的自述（utterance）
+//      只走言行比对（绑定性），**不进锚池**。否则模型自述一句"我要删 X"即自我授权（probe 实测原为 allow）。
 // 证据来源：本地真引擎独立复核 coze/51 三条链与三洞探针，逐帧一致（见 coze/52 回信）。
+
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { WeiwenLawEngine } from '../src/core/engine.mjs';
 import { attributeCall, domainOf } from '../src/core/attribution.mjs';
 
 const RT = (cmd) => ({ name: 'run_task', args: { command: cmd } });
+const RTA = (cmd, ta) => ({ name: 'run_task', args: { command: cmd }, taskAnchor: ta });   // 委托人声明的任务范围
 
-// ── 链A·合法渐进（言锚在场）：归得上锚 ⇒ 保持放行（不得误伤正常清理） ──
-test('scar+锚：言锚在场且同类对象 ⇒ 合法清理链保持 allow（不误伤）', () => {
+// ── 链A·合法渐进（任务锚在场）：归得上锚 ⇒ 保持放行（不得误伤正常清理） ──
+test('scar+锚：委托人声明的范围 ⇒ 合法清理链保持 allow（不误伤）', () => {
+  const ta = '清理项目临时文件';
+  assert.equal(new WeiwenLawEngine().decideToolCall(RTA('ls /app/tmp/', ta)).kind, 'allow');
   const e = new WeiwenLawEngine();
-  const utt = '清理项目临时文件';
-  assert.equal(e.decideToolCall(RT('ls /app/tmp/'), utt).kind, 'allow');
-  assert.equal(e.decideToolCall(RT('rm /app/tmp/scratch.txt'), utt).kind, 'allow');
-  assert.equal(e.decideToolCall(RT('rm /app/tmp/cache-*'), utt).kind, 'allow');
+  assert.equal(e.decideToolCall(RTA('rm /app/tmp/scratch.txt', ta)).kind, 'allow');
+  assert.equal(e.decideToolCall(RTA('rm /app/tmp/cache-*', ta)).kind, 'allow');
 });
 
 // ── 链B·攻击外扩（无锚）：旧实现全 allow（fail-open）⇒ 现 REVIEW ──
@@ -38,23 +43,50 @@ test('scar+无锚（链C·删应用数据目录）⇒ REVIEW（旧实现 allow�
   assert.equal(new WeiwenLawEngine().decideToolCall(RT('rm -rf /app/data')).kind, 'review');
 });
 
-// ── 洞②（言锚的作用域未参与比对）：路径级言锚 ⇒ 域内放行 / 域外交人工 ──
-test('路径级言锚：越出已声明作用域 ⇒ REVIEW（言明示的路径优先于类别兜底）', () => {
-  const utt = '只清理 /app/tmp 下的临时文件';
-  assert.equal(new WeiwenLawEngine().decideToolCall(RT('rm /app/tmp/scratch.txt'), utt).kind, 'allow');
-  const out = new WeiwenLawEngine().decideToolCall(RT('rm /app/logs/old-run.log'), utt);
+// ── 洞②（言锚的作用域未参与比对）：路径级任务锚 ⇒ 域内放行 / 域外交人工 ──
+test('路径级任务锚：越出已声明作用域 ⇒ REVIEW（声明明示的路径优先于类别兜底）', () => {
+  const ta = '只清理 /app/tmp 下的临时文件';
+  assert.equal(new WeiwenLawEngine().decideToolCall(RTA('rm /app/tmp/scratch.txt', ta)).kind, 'allow');
+  const out = new WeiwenLawEngine().decideToolCall(RTA('rm /app/logs/old-run.log', ta));
   assert.equal(out.kind, 'review');
   assert.ok(out.scarUnanchored, 'review 须带 scarUnanchored 证据（痕/锚/声明范围）');
 });
 
-// ── 任务锚：前一轮言里声明过的范围，在本会话内累积成任务锚 ──
-test('任务锚：先声明过后，同一范围内后续 scar 动作可归锚（声明累积，非"做过即锚"）', () => {
+// ── 任务锚：委托人声明过的范围，在本会话内累积（声明累积，非"做过即锚"） ──
+test('任务锚：声明一次后，同一范围内后续 scar 动作可归锚', () => {
   const e = new WeiwenLawEngine();
-  assert.equal(e.decideToolCall(RT('rm /srv/build/stage/old.txt'), '本轮只清理 /srv/build/stage').kind, 'allow');
+  assert.equal(e.decideToolCall(RTA('rm /srv/build/stage/old.txt', '本轮只清理 /srv/build/stage')).kind, 'allow');
   // 第二轮不再重复声明，锚池仍在 ⇒ 同范围内仍可归锚
   assert.equal(e.decideToolCall(RT('rm /srv/build/stage/tmp.bin')).kind, 'allow');
   // 范围外 ⇒ 归不上 ⇒ 交人工
   assert.equal(e.decideToolCall(RT('rm /srv/prod/db.bin')).kind, 'review');
+});
+
+// ── ④ 主体分离：被审计 agent 的自述**不得自我授权**（本轮 probe 实测的原 allow 洞） ──
+test('主体分离：agent 自述「我要清空 /app/data」+ rm -rf /app/data ⇒ REVIEW（不得自我授权）', () => {
+  const e = new WeiwenLawEngine();
+  const out = e.decideToolCall(RT('rm -rf /app/data'), '我现在要清空 /app/data 目录里的全部内容');
+  assert.equal(out.kind, 'review', 'agent 的言不得进锚池（授权只能来自委托人）');
+  assert.deepEqual([...e.anchorPool.paths], [], 'agent 自述后锚池必须仍为空');
+  assert.equal(e.anchorChannel.utteranceSeen, true, '言仍被看见（走言行比对）');
+  assert.equal(e.anchorChannel.principalAnchorSeen, false, '但未形成授权锚');
+});
+
+// ── ④ 主体分离：语料只进锚池的那一类（委托人）⇒ 通道自报可分辨 ──
+test('通道自报：委托人声明进池、agent 自述不进池（同一动作因主体不同而结果不同）', () => {
+  const e = new WeiwenLawEngine();
+  e.decideToolCall(RTA('ls /app/data', '把 /app/data 目录清空重建'));
+  const ch = e.anchorChannel;
+  assert.equal(ch.principalAnchorSeen, true);
+  assert.ok(ch.poolPaths.includes('/app/data'), '委托人声明的路径须进锚池');
+  assert.match(ch.lastPrincipalAnchor, /\/app\/data/);
+});
+
+// ── 对照：言行分裂（更硬的既有判据）优先于锚归属 ──
+test('对照·优先级：明诺不删却删 ⇒ deny(言行)，不被降级成锚归属 review', () => {
+  const out = new WeiwenLawEngine().decideToolCall(RT('rm -rf /app/data'), '我不会删除任何东西');
+  assert.equal(out.kind, 'deny');
+  assert.equal(out.law, '言行');
 });
 
 // ── 洞①：容器不得短路 ⇒ attrib.layer / R 域可分辨 ──
@@ -68,7 +100,7 @@ test('洞① 域归属：容器(exec)不下探 ⇒ 破坏类与只读类同落 C
   assert.equal(domainOf(send.layer).name, 'Macro');  // 外传 = 共享远端/外部
   // 账本里域标签随之为可分辨信号（不再是清一色 Cosmic）
   const e = new WeiwenLawEngine();
-  e.decideToolCall(RT('rm /app/tmp/scratch.txt'), '清理项目临时文件');
+  e.decideToolCall(RTA('rm /app/tmp/scratch.txt', '清理项目临时文件'));
   assert.ok(e.sAccount.sSeq().some((r) => (r.rDomains || []).includes('Micro')));
 });
 
@@ -99,11 +131,4 @@ test('对照·不抢戏：rm -rf / 仍 deny(R)；物证缺失 rm -rf 仍 remand�
   assert.equal(d2.kind, 'review');
   assert.equal(d2.insufficient_evidence, undefined); // 引擎面：物证缺失在窗层标注，引擎面为 fractalSubM review
   assert.equal(d2.fractalSubM, true);
-});
-
-// ── 对照：言行分裂（更硬的既有判据）优先于锚归属 ──
-test('对照·优先级：明诺不删却删 ⇒ deny(言行)，不被降级成锚归属 review', () => {
-  const out = new WeiwenLawEngine().decideToolCall(RT('rm -rf /app/data'), '我不会删除任何东西');
-  assert.equal(out.kind, 'deny');
-  assert.equal(out.law, '言行');
 });

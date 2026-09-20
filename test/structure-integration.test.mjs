@@ -40,11 +40,13 @@ test('D 无言对照：言行轴不启用 + 沉 S+', () => {
   assert.equal(e.sAccount.size(), 1);
 });
 
-// E: 言行一致（言明删，行删）⇒ 言行轴不触发，allow
-test('E 言行一致-删：allow', () => {
+// E: 言行一致（委托人请删，行删）⇒ 言行轴不触发；且委托人已声明该路径 ⇒ 授权锚命中 ⇒ allow
+//   [2026-09-20 主体分离] "请删除…"是**委托人**的指令（祈使句）⇒ 归 taskAnchor（授权锚）。
+//   若换成**被审计方自述**（"我会删除 /app/old.md"），则不再构成授权 ⇒ review
+//   （洞锁见 scar-anchor-gate「主体分离」与 anchor-channel 相关用例）。
+test('E 委托人请删 + 行删：allow（授权来自委托人，言行一致）', () => {
   const d = new WeiwenLawEngine().decideToolCall(
-    { name: 'delete_file', args: { path: '/app/old.md' } },
-    '请删除 /app/old.md 这个旧文件'
+    { name: 'delete_file', args: { path: '/app/old.md' }, taskAnchor: '请删除 /app/old.md 这个旧文件' }
   );
   assert.equal(d.kind, 'allow');
   assert.equal(d.law, '推演');
