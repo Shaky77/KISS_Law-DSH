@@ -6,8 +6,9 @@
 // First-Bug-Halt closed-loop state machine: force completion of the inevitable second half after "cutting",
 // forbid re-entry before fix, blocking "reverse-deduce-only-without-fixing → infinite recursion" at the root.
 import { BugStopGuard, bugKeyOf } from './bugstop.mjs';
-import { attributeCall, extractCommand, DELETION_LAYERS, GIT_DESTRUCTIVE, speechProfile, actionProfile, CONTAINER_VERBS } from './attribution.mjs';  // path-1 attribution + its deletion-layer set + git-destructive vocab + extractCommand + [2026-09-20] speech/action profile (知行合一轴; vocabulary owned by attribution; engine only consumes)
+import { attributeCall, extractCommand, DELETION_LAYERS, GIT_DESTRUCTIVE, speechProfile, actionProfile, CONTAINER_VERBS, domainOf } from './attribution.mjs';  // path-1 attribution + its deletion-layer set + git-destructive vocab + extractCommand + [2026-09-20] speech/action profile (知行合一轴; vocabulary owned by attribution; engine only consumes)
 import { R_DOMAIN } from './law.mjs';  // [2026-09-18 synthesis] R-domain nested-inclusive boundary law — base A's Y-axis essence, wired back into the engine (base A imported it; B had dropped the wiring). FRACTAL_PROPERTY cross-call recursion left as the next frontier (see report).
+import { SAccountLedger, classifyReversibility, rDomainsForLayer } from './ledger.mjs';  // [2026-09-20] S 账本（用户账本模型）：R=字典 / SD=轴标记 / term 字典序索引 / S≠R 异类 / 疤窗可逆性。仅附加记录，不碰裁决核心。
 
 // [2026-09-18] R 域层级 → 权威权重（结构性推导，非枚举阈值、非拍脑袋数字）
 // 依据 R_DOMAIN 原文（作者不可变文本）：Cosmic⊃Earth⊃Macro⊃Micro，上层包含下层、下层服从上层，
@@ -828,6 +829,9 @@ export class WeiwenLawEngine {
     // Inner-H registration ledger (author agreement · 2026-08-30)
     this.innerHLedger = [];   // append-only: registration entries only sediment, never dissolve (same structure as S history scars)
     this.innerHSeq = 0;
+    // [2026-09-20] S 账本（用户账本模型）：R=字典 / SD=轴标记 / term 字典序索引 / S≠R 异类 / 疤窗可逆性。
+    // 仅附加记录结构，不参与裁决判定（守"禁区"红线：不做全局强制自检）。
+    this.sAccount = opts.sAccount ?? new SAccountLedger();
   }
 
   // ---------- S steady-state reserve: dual attributes (time scar irreversible + current value can rise/fall) ----------
@@ -835,7 +839,7 @@ export class WeiwenLawEngine {
   //   - current-value dimension: positive (S path) S(S+1) strengthens; negative (D path) |S(S-1)| absolute erosion, current value drops.
   //   - trauma is a history-scar record (absolute value), doesn't roll back current value.
   // Note: real path is M → H₀ fork → S₀(+1) or |S₀(S₀-1)| (see law.mjs's FEEDBACK_LOOP).
-  recordSteady({ positive = 0, negative = 0, trauma = 0, subsystem = 'core', topic = null, detail = null } = {}) {
+  recordSteady({ positive = 0, negative = 0, trauma = 0, subsystem = 'core', topic = null, detail = null, action = null, attrib = null } = {}) {
     const sub = this.sBySubsystem[subsystem] ?? 0;
     const delta = (positive > 0 ? positive : 0) - (negative > 0 ? Math.abs(negative) : 0);
     this.sBySubsystem[subsystem] = sub + delta;
@@ -852,6 +856,14 @@ export class WeiwenLawEngine {
     if (positive > 0) this._coalesce(`${base}::+1`, detail, '+', ts);
     if (negative > 0) this._coalesce(`${base}::-1`, detail, '-', ts);
     if (trauma > 0) this._coalesce(`${base}::trauma`, detail, 'trauma', ts);
+
+    // [2026-09-20 ledger wiring · additive] S 刻痕沉入 R 账本：term 字典序索引、R 域标签、可逆性标签。
+    // 仅附加记录，不改裁决逻辑、不碰禁区。attrib/action 为可选（onFailure 等调用点不传 ⇒ 标签留空/unknown）。
+    const term = topic ?? subsystem;
+    const sign = positive > 0 ? '+' : negative > 0 ? '-' : '0';
+    const rDomains = rDomainsForLayer(attrib?.layer ?? attrib?.layers ?? null);
+    const rev = action ? classifyReversibility(action) : { reversible: 'unknown', overwrite: false };
+    this.sAccount.record({ term, sign, rDomains, reversible: rev.reversible, overwrite: rev.overwrite, detail, subsystem, t: ts });
     return this.snapshot();
   }
 
@@ -891,6 +903,7 @@ export class WeiwenLawEngine {
       ledger: this.steadyLedger(),
       ledgerSize: this.sLedger.size,
       standbySize: this.sStandby.length, // silent standby (old versions) count, append-only kept
+      sAccountSize: this.sAccount.size(), // [2026-09-20] R 账本内的 S 刻痕总数（独立列表，S≠R）
       failureStreak: this.failureStreak,
       mHumanCap: this.mHumanCap,
       mBugForce: Object.fromEntries(this.mBugForce),
@@ -1468,7 +1481,7 @@ export class WeiwenLawEngine {
     }
     // Low risk: allow, record steady-state positive increment (S only grows). Register this session's write (chained fallback).
     this._registerWrite(call);
-    this.recordSteady({ positive: 1 });
+    this.recordSteady({ positive: 1, attrib });
     return { kind: 'allow', law: '推演', reason: risk.reason, risk: 'low', attrib, deduced: true, projection: risk.branches };
   }
 
