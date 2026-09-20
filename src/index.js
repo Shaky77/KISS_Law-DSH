@@ -57,14 +57,44 @@ function policeGate(call) {
   }
   return null;
 }
-// ---------- 锚通道（Y 轴解法：不猜字段名 ⇒ 改「接通道 + 运行时自报」） ----------
-// 结构事实（**非猜测**）：宿主契约 `agent/pre-step` 的 payload 明确含 `messages`（见本文件顶部 API 注，
-//   与 exec 视图字段集并列）。⇒「言」与「任务范围」在结构上必然存在于消息流里，不必去猜某个 utterance 字段名。
-// 主体分离（责任归因）：授权锚**只由委托人声明喂养**；被审计 agent 的自述**不授权**，它只走言行比对（绑定性）。
-//   ⇒ 此处只提取**委托人**的声明；助手消息**只观察、不采信**（避免"上一帧自述"冒充"本帧言"＝假人证）。
-// 形状容错 + 自报：宿主消息对象的具体形状未知 ⇒ 结构化容忍抽取；**抽不出即返回 null（不猜）**，
-//   并把"看到了什么"（形状 / role 词表）写进通道自报 ⇒ 实机跑一次即可用观测替代猜测。
-const PRINCIPAL_ROLE = /^(user|human|principal|operator|owner)$/i;
+// ---------- 锚源定位（Y 轴定案 2026-09-20：窗口面＝**观察面**，不是锚源） ----------
+// 上一版把 `agent/pre-step` 的 messages 当锚源（"取言在 pre-step、用在 pre-execute"）。**该定位是错的**，
+// 卡点正出在这里 —— 不是通道没接通，是**在错误的位置找锚**。
+//
+// 结构理由（非猜测）：
+//   ① 消息流是**事件流**（X 轴量）：委托人话 / agent 自述 / 系统提示按时间混序，在**文本层同构** —— 谁的言
+//      都是 string，唯一区分手段是 `role` 标签；而 role 是**宿主的表示法细节**（可能是数组、别名、对象），
+//      判据控制不了它。⇒ 把授权挂在窗口面上＝**把 Y 轴的量寄存在 X 轴的容器里**。
+//   ② 观察点是记录"发生了什么"的；控制点必须是"谁在结构上有权"。用观察点去拿授权，输入里授权的占比近零
+//      （事件流绝大部分是 agent 自己的推理与工具描述）⇒ 抽到的"锚"结构上必然是噪音。
+//
+// 实测两种失效模式（.probe-noise.mjs，读 `declaredAnchors`）：
+//   (a) **假接通**：委托人最新一条是"继续／好的／开始吧" ⇒ 抽不出任何锚（paths=[] nouns=[]）⇒ 锚池空却
+//       `principalAnchorSeen=true` ⇒ 自报显示"通道已通"、结构效果为零 ⇒ 让人误判为"还得继续修通道"（X 轴惯性）。
+//   (b) **假人证**：agent 自述含真路径（"我在想，接下来我要清空 /app/data" ⇒ paths=[/app/data]）⇒ 一旦
+//       role 判别出现偏差被采信，**真路径进池 ⇒ 不可逆动作放行**——比"无人证"更坏。
+//
+// 定案（方向·安 2026-09-20「言窗口面本就是噪音」）：
+//   **授权锚只从结构入口来（位置确定），不从文本内容识别。** 窗口面降级为**纯观测**：只报"看到了什么"
+//   （形状 / role 词表 / 线索），**一律不授权**。
+//   结构入口 = `setPrincipalScope()`（模块级 API，由宿主集成方在启动边界调用）。
+//   它**不是工具** ⇒ 模型调不到 ⇒ **结构上不可能自我授权**（主体分离由位置保证，不靠内容判别）。
+//   入口未接 ⇒ 锚池留空 ⇒ 不可逆动作交人工（fail-closed）。**这是设计，不是漏读消息。**
+const PRINCIPAL_ROLE_HINT = /^(user|human|principal|operator|owner)$/i;
+
+// 结构入口（宿主集成方调用；模型不可达）。返回上一值便于回退，不给"开关式骑墙"留口。
+let _hostPrincipalScope = null;
+/**
+ * 宿主在**启动/step 边界**显式声明任务范围（授权锚的唯一来源）。
+ * 传非字符串或空串 ⇒ 清空（锚池随之留空 ⇒ 不可逆动作交人工）。
+ * @param {string|null} text
+ * @returns {string|null} 调用前的值
+ */
+export function setPrincipalScope(text) {
+  const prev = _hostPrincipalScope;
+  _hostPrincipalScope = typeof text === 'string' && text.trim() ? text : null;
+  return prev;
+}
 function textOfContent(content) {
   if (typeof content === 'string') return content;
   if (Array.isArray(content)) {
@@ -78,10 +108,10 @@ function textOfContent(content) {
 function readMessageStream(payload) {
   const msgs = payload?.messages;
   if (!Array.isArray(msgs)) {
-    return { ok: false, shape: msgs === undefined ? 'absent' : typeof msgs, rolesSeen: [], principalText: null, assistantSeen: false, count: 0 };
+    return { ok: false, shape: msgs === undefined ? 'absent' : typeof msgs, rolesSeen: [], principalClue: null, assistantSeen: false, count: 0 };
   }
   const roles = [];
-  let principalText = null;
+  let principalClue = null;
   let assistantSeen = false;
   for (let i = msgs.length - 1; i >= 0; i -= 1) {
     const m = msgs[i];
@@ -89,16 +119,26 @@ function readMessageStream(payload) {
     const raw = m.role;
     const role = Array.isArray(raw) ? String(raw[0] ?? '') : raw === undefined || raw === null ? '' : String(raw);
     if (role) roles.push(role);
-    if (PRINCIPAL_ROLE.test(role)) {
-      if (!principalText) {
+    if (PRINCIPAL_ROLE_HINT.test(role)) {
+      // **仅作线索**（给人看"宿主消息里最近一条疑似委托人的话是什么"），**不作授权**。
+      if (!principalClue) {
         const t = textOfContent(m.content ?? m.text ?? '');
-        if (t.trim()) principalText = t;
+        if (t.trim()) principalClue = t;
       }
     } else if (role && !assistantSeen && /^(assistant|model|agent|ai)$/i.test(role)) {
       assistantSeen = textOfContent(m.content ?? m.text ?? '').trim().length > 0;
     }
   }
-  return { ok: true, shape: 'array', rolesSeen: [...new Set(roles)], principalText, assistantSeen, count: msgs.length };
+  return { ok: true, shape: 'array', rolesSeen: [...new Set(roles)], principalClue, assistantSeen, count: msgs.length };
+}
+
+// 结构入口探测（**观测**，不是猜字段名）：把宿主交给插件的**结构对象**的键集记下来。
+//   payload.agent / apply(ctx) 的 ctx 若真挂了任务范围（scope / task / instructions 之类），那才是锚该待的位置；
+//   此处不认定任何字段名，只如实吐键集 ⇒ 实机跑一次，用观测决定要不要把结构入口接到那里。
+function observeBoundary(obj) {
+  if (!obj || typeof obj !== 'object') return { present: false, kind: obj === undefined ? 'absent' : typeof obj, keys: [] };
+  const keys = Object.keys(obj).sort();
+  return { present: true, kind: Array.isArray(obj) ? 'array' : 'object', keys, keyCount: keys.length };
 }
 
 const name = 'kiss-law';
@@ -139,17 +179,23 @@ function apply(ctx) {
   const engine = new WeiwenLawEngine({ rigidAnchors: DEFAULT_RIGID_ANCHORS });
   logline('apply() entered — registering tools/pre-execute, agent/pre-step, tools/result and white-box self-check tools');
 
-  // 锚通道状态：pre-step 取（委托人声明）→ pre-execute 用。作用域＝一个 step 内的全部工具调用。
-  // 委托人声明在本会话内**持续有效**（任务范围不因某一 step 无新指令而失效），直到出现新的声明。
-  let principalAnchor = null;
+  // 授权锚：**只由结构入口喂养**（`setPrincipalScope`，宿主集成方调用）。窗口面不再供养。
+  // 委托人声明的任务范围在会话内持续有效；入口未接 ⇒ 恒 null ⇒ 锚池空 ⇒ 不可逆动作交人工（fail-closed）。
   const channel = {
+    authority: 'structural-entry',      // 授权来源声明：位置确定，非内容识别
+    authoritySeen: _hostPrincipalScope !== null,
     steps: 0,
     messagesSeen: 0,
     shape: 'absent',
     rolesSeen: [],
-    principalFound: false,
+    clueSeen: false,                    // 窗口面线索（**仅供人看，不授权**）
+    clueNonAuthoritative: true,
+    lastClue: null,
     assistantSeen: false,
-    lastCaptureAt: null,
+    lastObservedAt: null,
+    agentBoundary: observeBoundary(undefined),
+    applyCtxBoundary: observeBoundary(ctx),
+    structGap: '授权锚须由宿主在结构边界提供（setPrincipalScope：启动 scope / 任务配置）。窗口面文本是观察面，不作锚源（噪音）⇒ 入口未接时锚池留空、不可逆动作交人工 = 设计而非漏读。',
   };
 
   // ---------- R / D / S / H / M total adjudication: pre-tool-call gate (waterfall) ----------
@@ -160,10 +206,10 @@ function apply(ctx) {
       args: a,
       command: a.command,
       code: a.code,
-      // [2026-09-20 · 锚通道] 委托人声明的任务范围（授权锚）。**不是**从 exec 视图猜的字段名：
-      //   来源＝`agent/pre-step` 契约里的 messages（见文件顶部 API 注）。缺失即留 null ⇒ 锚池留空
-      //   ⇒ 不可逆动作交人工（fail-closed）；**绝不臆造授权**（假人证比无人证更坏）。
-      taskAnchor: principalAnchor,
+      // [2026-09-20 · 锚源定案] 授权锚＝宿主在**结构边界**声明的任务范围（`setPrincipalScope`）。
+      //   来源**不是**消息文本（窗口面是观察面 ⇒ 噪音），也**不是** exec 视图里猜的字段名。
+      //   入口未接 ⇒ null ⇒ 锚池留空 ⇒ 不可逆动作交人工（fail-closed）；**绝不臆造授权**（假人证比无人证更坏）。
+      taskAnchor: _hostPrincipalScope,
       // lift First-Bug structural flags to top level so engine.checkFirstBug can read them
       // (DSH passes these on exec.arguments; the engine expects them on call)
       selfReference: a.selfReference,
@@ -223,21 +269,20 @@ function apply(ctx) {
 
   // ---------- H inner-H inviolability: pre-step gate (waterfall, message-level) ----------
   ctx.on('agent/pre-step', async (payload, next) => {
-    // [2026-09-20 · 锚通道取言] 结构化容忍抽取 + 自报；**抽不出即不采信**（不猜字段名，不制造假人证）。
+    // [2026-09-20 · 窗口面＝观察面] 只**观测**，不取锚：形状 / role 词表 / 线索如实记录，
+    //   授权一律不从此处产生（否则＝把 Y 轴的量寄存在 X 轴的容器里；两种失效模式见文件顶部实测）。
     const rd = readMessageStream(payload);
     channel.steps += 1;
     channel.shape = rd.shape;
     channel.rolesSeen = rd.rolesSeen;
     channel.messagesSeen = rd.count;
     channel.assistantSeen = rd.assistantSeen;
-    if (rd.principalText) {
-      principalAnchor = rd.principalText;   // 委托人声明在本会话内持续有效，直到出现新声明
-      channel.principalFound = true;
-      channel.lastCaptureAt = new Date().toISOString();
-      logline(`pre-step anchor captured (${rd.principalText.length} chars, roles=[${rd.rolesSeen.join(',')}])`);
-    } else {
-      logline(`pre-step anchor NOT found (shape=${rd.shape}, roles=[${rd.rolesSeen.join(',')}]) — 锚池留空，不猜`);
-    }
+    channel.clueSeen = rd.principalClue !== null;
+    if (rd.principalClue) channel.lastClue = rd.principalClue.slice(0, 200);
+    channel.authoritySeen = _hostPrincipalScope !== null;
+    channel.agentBoundary = observeBoundary(payload?.agent);
+    channel.lastObservedAt = new Date().toISOString();
+    logline(`pre-step observed (shape=${rd.shape}, roles=[${rd.rolesSeen.join(',')}], clue=${rd.principalClue ? 'yes' : 'no'}, authority=${channel.authoritySeen ? 'structural-entry' : 'NONE'}) — 窗口面不授权，锚池不由此填充，不猜`);
     const decision = engine.decidePreStep(payload?.messages);
     // reject (clear violation) and review (definition unclear / cannot determine) both block, do not spread.
     // review = "suspend & return to user for decision": intercept first, don't release.
@@ -339,18 +384,19 @@ function apply(ctx) {
     },
   }));
 
-  // [2026-09-20 · 锚通道自报] 把"猜宿主字段名"换成"看事实"：实机跑一次即可观测
-  //   ① 宿主是否真把消息流交给插件（shape / roles 词表）；② 委托人声明有没有被识别；③ 锚池里有什么。
+  // [2026-09-20 · 锚源自报] 把"猜宿主字段名 / 猜哪条消息算授权"换成"看事实"：实机跑一次即可观测
+  //   ① 宿主是否真把消息流交给插件（shape / roles 词表 / 线索）；② 结构入口是否接通；③ 锚池里有什么；
+  //   ④ 宿主的结构对象（payload.agent / apply ctx）上有哪些键 —— 这是**接真入口**所需的事实，不猜字段名。
   ctx.tools.register(defineTool({
     name: 'query_anchor_channel',
-    description: 'White-box self-report of the anchor channel: whether the principal\'s declared task scope and the same-frame utterance reached the engine, plus the observed message shape and role vocabulary. Use it on a real host to observe what the host actually passes instead of guessing field names. An empty pool means irreversible actions are handed to a human (fail-closed by design).',
+    description: 'White-box self-report of the anchor source: whether the structural entry (host-declared task scope) is connected, what the anchor pool holds, and what the host actually passes (message shape, role vocabulary, structural-object keys). The utterance window is an observation surface and never grants authority by design; an empty pool means irreversible actions go to a human (fail-closed).',
     parameters: {},
     output: { schema: { type: 'object', additionalProperties: true }, render: renderObj },
     async execute() {
       return {
         adapter: channel,
         engine: engine.anchorChannel,
-        note: '授权锚只由委托人声明喂养（责任归因）；被审计 agent 的自述不进锚池（否则自我授权）。抽不出委托人消息即不猜 ⇒ 锚池留空 ⇒ 不可逆动作交人工。',
+        note: '授权锚唯一来源＝结构入口 setPrincipalScope（宿主在启动/step 边界声明任务范围）；被审计 agent 的自述与窗口面文本**都不授权**（否则＝自我授权 / 假人证）。入口未接 ⇒ 锚池留空 ⇒ 不可逆动作交人工，此为设计而非漏读。',
       };
     },
   }));

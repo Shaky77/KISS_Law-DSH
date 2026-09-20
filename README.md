@@ -125,7 +125,7 @@ export function apply(ctx) {
   // ③ result audit hook: observe only, never rewrite
   ctx.on('tools/result', (res) => { if (res?.error) engine.onFailure(); });
 
-  // ④ 5 white-box self-check tools (one excerpt; rest isomorphic)
+  // ④ 7 white-box self-check tools (one excerpt; rest isomorphic)
   ctx.tools.register(defineTool({
     name: 'query_iron_laws',
     description: 'Return the three immutable iron laws of KISS’s Law.',
@@ -137,26 +137,40 @@ export function apply(ctx) {
 }
 ```
 
-> Full implementation (all 6 tools' `execute`, runtime log, engine adjudication) in repo `src/index.js`.
+> Full implementation (all 7 tools' `execute`, runtime log, engine adjudication) in repo `src/index.js`.
 
-### Anchor channel (task anchor) — how irreversible actions get authorized
+### Anchor source (task scope) — how irreversible actions get authorized
 
 The scar gate (`irreversible action + unattributable to any declared anchor ⇒ REVIEW`) needs an
-**authorization anchor**. Two structural rules apply:
+**authorization anchor**. Three structural rules apply:
 
-1. **Source = the message stream, not a guessed field name.** The `agent/pre-step` payload contract
-   carries `messages` (`payload = { agent, messages, step, signal }`); the adapter reads the principal's
-   declared scope there and hands it to the engine at `tools/pre-execute`. The `exec` view
-   (`{ token, callId, name, arguments, signal, agent?, parent? }`) has **no speech slot** — so nothing is
-   guessed onto it.
+1. **Source = a structural entry, not the message stream.** The `agent/pre-step` payload carries
+   `messages` (`payload = { agent, messages, step, signal }`), but the **message stream is an observation
+   surface, not an authorization source**: at the text layer a principal's words and the audited agent's
+   own narration are isomorphic (both plain strings — only the host's `role` labelling separates them, and
+   that labelling is a host representation detail). Reading authority out of it puts a Y-axis quantity into
+   an X-axis container, and empirically yields two failure modes: a *false connection* (a bare "continue"
+   extracts no anchor yet reports the channel as connected, so the real gap stays hidden) and a *false
+   witness* (an agent narrating "I am about to wipe /app/data" hands a real path into the pool). Authority
+   therefore comes from `setPrincipalScope(scope)` instead — a **module-level API** the host integration
+   calls at the task boundary. It is not a tool, so the model cannot reach it: principal/audited-party
+   separation holds **by position**, not by content inspection. The `exec` view
+   (`{ token, callId, name, arguments, signal, agent?, parent? }`) has **no scope slot** — so nothing is
+   guessed onto it either.
 2. **Principal only.** Only the **principal's** declaration authorizes. The audited agent's own narration
    never enters the anchor pool — otherwise a model could self-authorize by simply narrating the act
    first. The agent's utterance still feeds the speech/action comparison: it **binds**, it does not authorize.
+3. **Scope in force now — replaced, not accrued.** The pool reflects the declaration currently in force.
+   A changed or withdrawn scope takes effect immediately; if it survived merely because it had been
+   declared once, authorization could never be taken back (and a single mis-attributed path would stay
+   valid forever).
 
-If no principal declaration is extractable, the pool stays empty and irreversible actions are handed to a
+If no structural entry is connected, the pool stays empty and irreversible actions are handed to a
 human (`fail-closed`) — authorization is never invented. To observe what your host actually passes:
 
-    query_anchor_channel  →  { adapter: { shape, rolesSeen, principalFound, assistantSeen },
+    query_anchor_channel  →  { adapter: { authority, authoritySeen, shape, rolesSeen,
+                                          clueSeen, clueNonAuthoritative, assistantSeen,
+                                          agentBoundary: { present, keys }, structGap },
                                engine:  { principalAnchorSeen, poolPaths, poolNouns } }
 
 Call it once on a real host to replace guessing about host field names with observation.
@@ -167,10 +181,10 @@ Call it once on a real host to replace guessing about host field names with obse
 ```
 package.json          # dsh field declares bundle
 kiss-law.patch.yml    # mount patch (headless profile overlay)
-src/index.js          # plugin entry: hooks + 5 white-box self-check tools
+src/index.js          # plugin entry: hooks + 7 white-box self-check tools
 src/core/law.mjs      # framework definition (RSDHM / three iron laws / R hierarchy / conduction chain)
 src/core/engine.mjs   # pure-logic adjudication engine (zero DSH dependency, unit-testable)
-test/                 # unit tests + real-case tests + alignment regression (local 123/123 passing, commit 905499f)
+test/                 # unit tests + real-case tests + alignment regression (local 307/307 passing)
 examples/             # runnable demos (demo-tool-loop / demo-backtrack-run)
 DESIGN.md             # architecture design (mapping / risks / usage flow / mount)
 ```
@@ -214,7 +228,7 @@ export DEEPSEEK_API_KEY=sk-xxxx     # Linux/macOS
 #    $env:DEEPSEEK_API_KEY="sk-xxxx" # Windows PowerShell
 ```
 
-Once mounted, any Agent running under that profile automatically gains the 6 white-box self-check tools (`query_iron_laws` / `query_steady_state` / `list_rigid_anchors` / `query_conduction_chain` / `query_boundary` / `query_bugstop`), and every tool call passes through the `tools/pre-execute` hard-guard gate (R/D/S/H/M total adjudication) plus the `agent/pre-step` inner-H inviolability gate.
+Once mounted, any Agent running under that profile automatically gains the 7 white-box self-check tools (`query_iron_laws` / `query_steady_state` / `list_rigid_anchors` / `query_conduction_chain` / `query_boundary` / `query_bugstop` / `query_anchor_channel`), and every tool call passes through the `tools/pre-execute` hard-guard gate (R/D/S/H/M total adjudication) plus the `agent/pre-step` inner-H inviolability gate.
 
 ### Daily use vs stress testing
 
@@ -256,7 +270,7 @@ Once mounted, any Agent running under that profile automatically gains the 6 whi
 ## Development
 
 - **Dependencies**: Node.js `^22.19 || >=24`; runtime dependency only `@deepseek-ai/dsh-tools` (peerDependency, optional).
-- **Testing**: `npm test` (i.e. `node --test "test/*.test.mjs"`); currently **123/123 passing** (commit `905499f`).
+- **Testing**: `npm test` (i.e. `node --test "test/*.test.mjs"`); currently **307/307 passing**.
 - **Build**: no build needed (pure ESM + yml overlay); after editing `src/core/engine.mjs`, rerun `npm test` for regression.
 - **Contributing**: the framework-native (mind-map layer) is frozen in the base edition; this live-system edition carries engineering iteration. Changes via PR against this repo, with `node --test` output attached.
 

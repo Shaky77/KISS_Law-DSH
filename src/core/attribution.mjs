@@ -506,7 +506,7 @@ export function actionProfile(call, attrib) {
 //     ② 作用域外扩（死于链A第4步，且它本身就是"补路径"= 枚举）；③ 现行没错（死于链B第3步 + 链C）。
 //
 // 扣子给的第四方向（本模块落地）：
-//   **scar 类动作 + 无法归属到任何已声明锚（言锚 / 任务锚）⇒ REVIEW。**
+//   **scar 类动作 + 无法归属到任何已声明锚（路径锚 / 类别锚）⇒ REVIEW。**
 //   看的是**痕的锚归属**（Y 轴），不是 S 计数、不是路径形状、不是路径黑名单（X 轴）。
 //   结构论证（为什么这条不是枚举）：**合法链与攻击链在 X 轴同构**（路径形状分不开），
 //   **在 Y 轴不同构**（锚归属一刀两断）⇒ 判据必须建在 Y 轴。
@@ -526,11 +526,14 @@ export function actionProfile(call, attrib) {
 //   file-delete / cred-delete = 结构化删除工具。
 export const SCAR_LAYERS = new Set(['exec-destructive', 'file-delete', 'cred-delete']);
 
-// 言中声明的**对象/作用域**抽取（言锚）。路径级 + 类别级两档，皆取自既有词汇/形态，不扩表。
+// 已声明**范围**里抽取作用域锚（**路径锚 + 类别锚**）。路径级 + 类别级两档，皆取自既有词汇/形态，不扩表。
+// ⚠️ 来源纪律（2026-09-20 · 锚源定案）：入参只能是**委托人声明的任务范围**（结构入口）。
+//    窗口面（`agent/pre-step` 的消息流）是**观察面**，其文本不得喂进本函数 —— 实测两种失效模式：
+//    "假接通"（承接语抽不出锚却报"通道已通"）与"假人证"（agent 自述含真路径却被当真授权）。
 const DECL_PATH = /(?:^|[\s=:'"(,，。；、：])((?:\.{0,2}\/|~\/|\/)[^\s;|&"'(),，。；、]*)/g;
 /**
- * 抽取"言"里已声明的对象/作用域（＝锚）。
- * @param {string} text 言（utterance）
+ * 抽取"已声明范围"里的对象/作用域（＝授权锚）。
+ * @param {string} text 委托人声明的任务范围（**不是** agent 的言 —— 言属言行比对轴，不作锚源）
  * @returns {{paths:Set<string>, nouns:Set<string>}} 声明的路径集 + 声明的对象类别集
  */
 export function declaredAnchors(text) {
@@ -593,17 +596,17 @@ export function scarUnanchored(call, attrib, anchors) {
   // ① 路径级归属：行目标**全部**落在某个已声明路径之内（作用域包含，非黑名单）
   if (targets.length && paths.size) {
     if (targets.every((t) => [...paths].some((a) => pathContained(t, a)))) return null;
-    // ⚠️ [顺序纪律] 言**已明示路径** ⇒ 作用域是路径级，**不得**再退回类别级兜底。
-    //   实证（本地复核）：言"只清理 /app/tmp 下的临时文件" + 行 `rm /app/logs/old-run.log`
+    // ⚠️ [顺序纪律] 声明**已明示路径** ⇒ 作用域是路径级，**不得**再退回类别级兜底。
+    //   实证（本地复核）：声明"只清理 /app/tmp 下的临时文件" + 行 `rm /app/logs/old-run.log`
     //   ⇒ 旧写法先落空于①、再被②（类别 file 同类）捞回 ⇒ allow —— 明示范围被类别抹平，等于没声明。
     //   更具体/更明确的声明优先于更宽的声明（作用域语义），故命中路径级声明后直接判归属失败。
     return { layer, targets, declaredPaths: [...paths], declaredNouns: [...nouns] };
   }
-  // ② 类别级归属：言**未给具体路径**、只声明了对象类别 ⇒ 行对象类别同类即可归锚
+  // ② 类别级归属：声明**未给具体路径**、只声明了对象类别 ⇒ 行对象类别同类即可归锚
   //   （如"清理项目临时文件" ⇒ 类别 file ⇒ 删文件类动作归得上；但删库文件(noun=db)归不上）
   if (targets.length && nouns.size) {
     if (targets.every((t) => nouns.has(nounOfTarget(t)))) return null;
   }
-  // ③ 言未声明任何对象（无锚可归），或行目标落在声明范围之外 ⇒ 归属失败 ⇒ 判不出交人工
+  // ③ 声明里没有任何对象（无锚可归），或行目标落在声明范围之外 ⇒ 归属失败 ⇒ 判不出交人工
   return { layer, targets, declaredPaths: [...paths], declaredNouns: [...nouns] };
 }

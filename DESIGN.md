@@ -1,6 +1,6 @@
 # KISS's Law Universal Causal Engine (White-Box Presentation) · DSH Plugin · Architecture Design
 
-> Status: design doc + **engine unit tests passing (18/18)**. DSH adapter layer calibrated against v0.1.0-rc.6 source-level API.  
+> Status: design doc + **engine unit tests passing (22/22)**. DSH adapter layer calibrated against v0.1.0-rc.6 source-level API.  
 > Source: author's revelation (Xia Qi / Shaky77). Framework-native strictly, not softened, not altered.
 
 ---
@@ -84,7 +84,7 @@ dsh-kiss-law-plugin/
 │       ├── law.mjs        # framework definition layer (RSDHM / iron laws / conduction chain / V0.6.1 essence) —— framework-native
 │       └── engine.mjs    # guard engine (pure logic, zero DSH dependency, independently unit-testable)
 ├── test/
-│   ├── engine.test.mjs   # node --test scenarios (16 assertions, all passing)
+│   ├── engine.test.mjs   # node --test scenarios (22 scenarios, all passing)
 │   ├── cases.test.mjs    # real-world case tests
 │   └── alignment.test.mjs # alignment regression (locks 2026-08-20 author alignments)
 ├── examples/             # post-alignment API live-test scripts
@@ -190,7 +190,7 @@ Currently produced as the **technical-implementation edition** (developer-facing
 
 ## 10. Next steps
 
-- [x] Engine unit tests (16/16 passing) —— accuracy deterministically verified.
+- [x] Engine unit tests (22/22 passing) —— accuracy deterministically verified.
 - [x] Install DSH locally + mount plugin on real device + run headless scenarios with Key (verify wiring and real stability).
 - [x] Calibrate `exec`/`event` fields against DSH RC iterations (engine unaffected).
 - [x] **Rigid-anchor rules and three iron laws finalized** (author-set, immutable) → iron laws in law.mjs's THREE_IRON_LAWS (with "causal law accompanies every system" supplement); R-domain nesting hierarchy in R_DOMAIN (Cosmic⊃Earth⊃Macro⊃Micro). The `rigidAnchors` example set remains concrete violation criteria, author may supplement by R level.

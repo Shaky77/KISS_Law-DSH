@@ -834,12 +834,15 @@ export class WeiwenLawEngine {
     this.sAccount = opts.sAccount ?? new SAccountLedger();
     // [2026-09-20 · 锚池（痕锚归属用）] 授权锚＝**委托人已声明的**对象/作用域，本会话内累积。
     //   锚 = 已声明（不是"已做过"）；纯读入、不参与别的判定。
-    //   ⚠️ 主体分离（对齐层修正 2026-09-20）：判据原文是「言锚 / 任务锚」**两类**，此前实现只接了一个槽
-    //     ⇒ 授权锚**只由委托人（principal）的声明喂养**（`call.taskAnchor`）；被审计 agent 的自述（utterance）
-    //     仍走 checkSpeechAct 做言行比对，但**不进锚池**（否则模型自述一句"我要删 X"即自我授权 ⇒ 门自解除）。
+    //   ⚠️ 来源纪律（2026-09-20 锚源定案）：锚**只有一个来源**＝委托人在结构边界声明的任务范围
+    //     （`call.taskAnchor`，由适配层 setPrincipalScope 供入）。判据里的两档是**抽法的两档**：
+    //     路径锚（作用域包含）/ 类别锚（对象类别同类）—— 不是"言锚 + 任务锚"两个来源。
+    //     ⚠️ 池反映**当前有效范围**（**替换**语义，非只增刻痕）：每次裁决按当前声明重建，见 _decideCore。
+    //   ⚠️ 窗口面（agent/pre-step 的消息流）是**观察面**：其文本**不进锚池**（实测会造成"假接通"与"假人证"）；
+    //     被审计 agent 的自述（utterance）只走 checkSpeechAct 做言行比对，同样不进池（否则"我要删 X"即自我授权）。
     //   用途：scar 类动作（不可逆）的痕若归不到任何锚 ⇒ REVIEW（扣子 coze/51 方向，见 attribution.scarUnanchored）。
     this.anchorPool = { paths: new Set(), nouns: new Set() };
-    // 通道自报（白箱可观）：实机可查"言 / 任务锚到底有没有到"，把"猜字段名"换成"看事实"。
+    // 锚源自报（白箱可观）：实机可查"结构入口有没有接通 / 池里有什么"，把"猜字段名"换成"看事实"。
     this.anchorChannel = { utteranceSeen: false, principalAnchorSeen: false, lastPrincipalAnchor: null, poolPaths: [], poolNouns: [] };
   }
 
@@ -1347,21 +1350,29 @@ export class WeiwenLawEngine {
       return { kind: 'deny', law: 'M', reason: re.reason, bugKey: re.bugKey, stage: re.stage, missing: re.missing, closedLoop: true };
     }
 
-    // [2026-09-20 · 锚池累积（只读入，不改裁决）· 主体分离]
-    //   判据原文＝「无法归属到任何已声明锚（**言锚 / 任务锚**）」⇒ 结构上本就是两类锚。此前实现用**同一个槽**
-    //   （utterance）喂两者，造成两处偏差（本轮 probe 实测）：
+    // [2026-09-20 · 锚池累积（只读入，不改裁决）· 来源单一]
+    //   判据＝「无法归属到任何已声明锚」⇒ 归属的两档是**抽法**（路径锚 / 类别锚），**不是两个来源**。
+    //   之前实现的两个偏差（本轮 probe 实测）：
     //     (a) **授权自解除**：言「我要清空 /app/data」+ `rm -rf /app/data` ⇒ allow（模型给自己发许可）；
-    //     (b) **任务锚缺席**：委托人声明的任务范围无处进入 ⇒ 合法链也一律 review（实机"更啰嗦"的根因）。
-    //   责任归因只对**能承担后果的主体**成立（§229）⇒ **授权锚只由委托人（principal）声明喂养**；
-    //   agent 的言仍走 checkSpeechAct（绑定性比对：说了没做 / 做了没说），但**不进锚池**。
+    //     (b) **锚源错位**：授权从**窗口面文本**里识别 ⇒ 承接语（"继续"）抽空锚却报"通道已通"（假接通），
+    //         agent 自述一旦被 role 判别误采信即真路径进池（假人证）。实机"更啰嗦 / 看着通了却没用"的根因。
+    //   定案（2026-09-20）⇒ **锚只有一个来源：委托人在结构边界声明的任务范围**（`call.taskAnchor`）。
+    //     agent 的言仍走 checkSpeechAct（绑定性比对：说了没做 / 做了没说），**不进锚池**；
+    //     窗口面文本亦然（观察面 ≠ 授权面）。
     const utt0 = utterance ?? call?.utterance ?? call?.speech ?? call?.rationale ?? call?.text ?? null;
     const hasUtt = typeof utt0 === 'string' && utt0.trim().length > 0;
     const ta0 = call?.taskAnchor ?? null;
     const hasTa = typeof ta0 === 'string' && ta0.trim().length > 0;
+    // ⚠️ **替换语义，不是累积**（2026-09-20 由测试暴露的结构洞）：授权范围是**当前有效量**，
+    //   不是历史刻痕（S 类"只增不减"在此不适用）。累积会开出两个越权方向：
+    //     (a) 委托人缩小/撤回范围后，旧范围**永久留在池里** ⇒ 授权只增不减、撤不回；
+    //     (b) 一旦某次把噪音误采信入池（假人证），该路径**永久有效** ⇒ 一次误判＝永久放宽。
+    //   ⇒ 每次裁决按**当前声明重建**池；无声明即空池（fail-closed：宁收紧，不放松）。
     if (hasTa) {
       const daTa = declaredAnchors(ta0);
-      for (const p of daTa.paths) this.anchorPool.paths.add(p);
-      for (const n of daTa.nouns) this.anchorPool.nouns.add(n);
+      this.anchorPool = { paths: daTa.paths, nouns: daTa.nouns };
+    } else {
+      this.anchorPool = { paths: new Set(), nouns: new Set() };
     }
     this.anchorChannel = {
       utteranceSeen: hasUtt,
@@ -1494,7 +1505,7 @@ export class WeiwenLawEngine {
       return {
         kind: 'review',
         law: 'R',
-        reason: `不可逆动作（${scar.layer}）无法归属到任何已声明锚（言锚/任务锚）：痕归属不明、判不出 ⇒ 交人工确认，不猜（目标=${scar.targets.length ? scar.targets.join(' ') : '未给出'}；已声明路径=[${scar.declaredPaths.join(' ')}] 已声明类别=[${scar.declaredNouns.join(' ')}]）`,
+        reason: `不可逆动作（${scar.layer}）无法归属到任何已声明范围锚（路径锚/类别锚）：痕归属不明、判不出 ⇒ 交人工确认，不猜（目标=${scar.targets.length ? scar.targets.join(' ') : '未给出'}；已声明路径=[${scar.declaredPaths.join(' ')}] 已声明类别=[${scar.declaredNouns.join(' ')}]）`,
         attrib,
         deduced: true,
         scarUnanchored: scar,
