@@ -21,7 +21,9 @@ const VERB = {
   write: ['write', 'writes', 'writing', 'edit', 'update', 'create', 'save', '建', '写', '改', '存'],
   delete:['delete', 'del', 'remove', 'rm', 'drop', 'purge', 'erase', 'unlink', '删', '删除', '清'],
   exec:  ['exec', 'execute', 'run', 'invoke', 'shell', 'bash', 'sh', 'python', 'node', 'call', '执行', '运行', '跑'],
-  send:  ['send', 'mail', 'email', 'transmit', 'exfil', 'push', 'upload', '发', '邮', '传'],
+  // [2026-09-20 · 中英同构补缺] 见 §对外不可逆：'push' / 'publish' 早已在 EN 侧，CN 侧却无对应词
+  //   ⇒ 同一句话换中文写，言侧就抽不到 ⇒ **中英不同构**（不是"词表不够长"，是两侧缺对位）。
+  send:  ['send', 'mail', 'email', 'transmit', 'exfil', 'push', 'upload', 'publish', '推送', '发布', '发', '邮', '传'],
 };
 const NOUN = {
   file:       ['file', 'files', 'document', 'doc', 'text', 'folder', 'dir', 'path', '文档', '文件', '目录', '夹'],
@@ -233,6 +235,13 @@ function commandLayer(cmd) {
   if (/\b-exec\s+[^;]{0,80}?\b(rm|shred|unlink|mv|dd)\b/i.test(cmd)) return 'exec-destructive';  // find -exec rm
   if (new RegExp(CMD_POS + '(cat|head|tail|read|less|more|vi|vim|nano|type|open)\\b', 'i').test(cmd)) return 'cred-read';
   if (new RegExp(CMD_POS + '(curl|wget|scp|rsync|ftp|nc|ssh)\\b', 'i').test(cmd)) return 'network-send';
+  // [2026-09-20 · 对外不可逆（push / publish）—— 与"外传"同层，理由同 228-233 的封闭性论证]
+  //   它们与 curl 同族而非与 rm 同族：**本机数据不动，不可逆的是"共享远端已被推进"**
+  //   ——本地 git reset 改不回别人的克隆（对外不可逆 ⊄ 本地可复原）。故归 network-send（共享远端 = Macro）。
+  //   实证（本轮运行体感探针）：言「我不会推送任何东西」+ 行 `git push origin main` ⇒ 行 verb 退化成容器 exec
+  //   ⇒ 容器不可比 ⇒ **整条言行轴静默** ⇒ allow。言已立排除承诺、行正是那一类 ⇒ 这是 fail-open。
+  //   只登记**对外不可逆**这一封闭族（push / publish）；只读/可逆命令无限开放，仍一律不登记（同 228-233）。
+  if (new RegExp(CMD_POS + '(git\\s+push|npm\\s+publish|docker\\s+push|gh\\s+release)\\b', 'i').test(cmd)) return 'network-send';
   return 'exec';
 }
 
