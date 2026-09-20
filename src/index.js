@@ -68,15 +68,24 @@ function policeGate(call) {
 //   ② 观察点是记录"发生了什么"的；控制点必须是"谁在结构上有权"。用观察点去拿授权，输入里授权的占比近零
 //      （事件流绝大部分是 agent 自己的推理与工具描述）⇒ 抽到的"锚"结构上必然是噪音。
 //
-// 实测两种失效模式（.probe-noise.mjs，读 `declaredAnchors`）：
-//   (a) **假接通**：委托人最新一条是"继续／好的／开始吧" ⇒ 抽不出任何锚（paths=[] nouns=[]）⇒ 锚池空却
-//       `principalAnchorSeen=true` ⇒ 自报显示"通道已通"、结构效果为零 ⇒ 让人误判为"还得继续修通道"（X 轴惯性）。
-//   (b) **假人证**：agent 自述含真路径（"我在想，接下来我要清空 /app/data" ⇒ paths=[/app/data]）⇒ 一旦
+// 实测（读 `declaredAnchors`，11 组样本）—— 其中 (b) 是**真失效**，(a) 是**我读错**（安 2026-09-20 纠正）：
+//   (a) **指针被误当容器**（旧措辞"假接通／通道已通"**已废弃**）：
+//       委托人最新一条是"继续／好的／开始吧" ⇒ 直读 declaredAnchors 得 paths=[] nouns=[]。
+//       ⇒ 若照 X 轴读法判"抽不出锚＝噪音"，就丢了真相：**"继续"不携带内容，但它不是无信息 —— 它是指针**，
+//         引用的是**在场的东西**：① 上下文；② **一个真实被打断的在飞行为**。
+//         安的实例（2026-09-20）：误触打断后只回"继续"，agent 依旧知道要做什么 —— 不是凭空知道，
+//         是因为**被指对象还在场**。
+//       ⇒ 正确定性：**内容量可作指针（reference），不可作锚（anchor）**。"抽不出锚"≠"无锚"，
+//         可能只是"锚不在本帧文本里"。故窗口面该干的是**指向**；锚源必须在**结构位置**上。
+//       ⚠️ 为何废弃旧措辞：说"假接通"会把下一个维护者引回"再修修通道"的 X 轴惯性（枚举永远补不完）。
+//   (b) **假人证（真失效）**：agent 自述含真路径（"我在想，接下来我要清空 /app/data" ⇒ paths=[/app/data]）⇒ 一旦
 //       role 判别出现偏差被采信，**真路径进池 ⇒ 不可逆动作放行**——比"无人证"更坏。
 //
 // 定案（方向·安 2026-09-20「言窗口面本就是噪音」）：
 //   **授权锚只从结构入口来（位置确定），不从文本内容识别。** 窗口面降级为**纯观测**：只报"看到了什么"
 //   （形状 / role 词表 / 线索），**一律不授权**。
+//   🔴 推论（安 2026-09-20 实例）：**中断 ≠ 撤回**。委托人中断 / 只说"继续"时，范围**不消失**
+//     （在场量不因无信息帧而离场），只有**显式撤回**才让范围离场 ⇒ 契约纪律见 `setPrincipalScope`。
 //   结构入口 = `setPrincipalScope()`（模块级 API，由宿主集成方在启动边界调用）。
 //   它**不是工具** ⇒ 模型调不到 ⇒ **结构上不可能自我授权**（主体分离由位置保证，不靠内容判别）。
 //   入口未接 ⇒ 锚池留空 ⇒ 不可逆动作交人工（fail-closed）。**这是设计，不是漏读消息。**
@@ -84,15 +93,35 @@ const PRINCIPAL_ROLE_HINT = /^(user|human|principal|operator|owner)$/i;
 
 // 结构入口（宿主集成方调用；模型不可达）。返回上一值便于回退，不给"开关式骑墙"留口。
 let _hostPrincipalScope = null;
+// 范围变更留痕（append-only 观测，上限 20 条）：**撤回必须有痕**。
+//   委托人收回授权＝责任归因的关键事件；静默清空不可溯 ⇒ 事后查不出"什么时候没的范围"、
+//   也分不清"委托人撤了"还是"宿主实现把中断当成了撤回"。
+const _scopeChanges = [];
 /**
  * 宿主在**启动/step 边界**显式声明任务范围（授权锚的唯一来源）。
- * 传非字符串或空串 ⇒ 清空（锚池随之留空 ⇒ 不可逆动作交人工）。
- * @param {string|null} text
+ *
+ * ⚠️ 契约纪律（2026-09-20 · 安的实例：「误触打断 ⇒ 只回"继续" ⇒ agent 仍知道要做什么」）：
+ *   **「本帧没有新声明」≠「撤回」**。
+ *   · 委托人中断 / 只说"继续" ⇒ 宿主**什么都不做** ⇒ 范围**保持有效**
+ *     （范围的在场量不因某一帧无信息而消失 —— "继续"是指针，指向仍在场的被打断行为）；
+ *   · 只有委托人**明确收回**时才传 null / 空串 ⇒ 显式撤回（留痕）。
+ *   若把"没新声明"实现成"清空"，则每一次误触打断都静默撤回授权 ⇒ 合法链全交人工，
+ *   且丢失无痕：使用者只体感"更啰嗦"，查不出为什么。
+ * @param {string|null} text 非空串＝声明/替换；null/空串＝**显式撤回**
  * @returns {string|null} 调用前的值
  */
 export function setPrincipalScope(text) {
   const prev = _hostPrincipalScope;
-  _hostPrincipalScope = typeof text === 'string' && text.trim() ? text : null;
+  const next = typeof text === 'string' && text.trim() ? text : null;
+  _hostPrincipalScope = next;
+  // 只在**状态真变化**时留痕：重复声明/重复清空不是"变更"，不得刷屏（留痕要能一眼看出"何时没的"）。
+  if (prev !== next) _scopeChanges.push({
+    at: new Date().toISOString(),
+    kind: next === null ? 'revoke' : prev === null ? 'declare' : 'replace',
+    from: prev === null ? null : prev.slice(0, 120),
+    to: next === null ? null : next.slice(0, 120),
+  });
+  if (_scopeChanges.length > 20) _scopeChanges.shift();
   return prev;
 }
 function textOfContent(content) {
@@ -184,6 +213,10 @@ function apply(ctx) {
   const channel = {
     authority: 'structural-entry',      // 授权来源声明：位置确定，非内容识别
     authoritySeen: _hostPrincipalScope !== null,
+    authorityChanges: [..._scopeChanges],  // 变更留痕（declare/replace/revoke）：撤回**可溯**，不静默
+    // 中断 ≠ 撤回（2026-09-20 · 安的实例）：委托人中断 / 只说"继续" ⇒ 宿主不动 ⇒ 上面这次范围**保留**；
+    //   只有显式 revoke 才让范围离场。故此自报读作纪律说明：空池只可能来自"入口未声明"或"显式撤回"，
+    //   **不可能**来自"本帧没新声明"。
     steps: 0,
     messagesSeen: 0,
     shape: 'absent',
@@ -280,6 +313,7 @@ function apply(ctx) {
     channel.clueSeen = rd.principalClue !== null;
     if (rd.principalClue) channel.lastClue = rd.principalClue.slice(0, 200);
     channel.authoritySeen = _hostPrincipalScope !== null;
+    channel.authorityChanges = [..._scopeChanges];   // 留痕刷新（撤回可溯）
     channel.agentBoundary = observeBoundary(payload?.agent);
     channel.lastObservedAt = new Date().toISOString();
     logline(`pre-step observed (shape=${rd.shape}, roles=[${rd.rolesSeen.join(',')}], clue=${rd.principalClue ? 'yes' : 'no'}, authority=${channel.authoritySeen ? 'structural-entry' : 'NONE'}) — 窗口面不授权，锚池不由此填充，不猜`);

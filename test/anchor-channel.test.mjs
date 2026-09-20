@@ -9,11 +9,15 @@
 //   ③ **入口未接 ⇒ 锚池留空 ⇒ 不可逆动作交人工**（fail-closed）。这是设计，不是"漏读消息"。
 //   ④ **替换语义**：锚池反映**当前有效范围**，非只增刻痕 —— 撤回/改范围立即生效（授权撤不回＝越权）。
 //
-// 探针实测（直读 declaredAnchors）——两种失效模式，故窗口面不可作锚源：
-//   (a) 假接通：委托人最新一条＝"继续／好的／开始吧" ⇒ paths=[] nouns=[] ⇒ 锚池空却报"已授权"
-//       ⇒ 表面"通道通了"、实际零授权能力 ⇒ 诱人继续修通道（X 轴惯性）；
-//   (b) 假人证：agent 自述"我在想，接下来我要清空 /app/data" ⇒ paths=[/app/data] ⇒ 一旦 role 判别偏差被采信，
-//       真路径进池 ⇒ 不可逆动作放行（比"无人证"更坏）。
+// 结构实测（直读 declaredAnchors，11 组样本）—— 一条真失效，一条是**我读错**（安 2026-09-20 纠正）：
+//   (a) **指针被误当容器**：委托人最新一条＝"继续／好的／开始吧" ⇒ paths=[] nouns=[]
+//       ⇒ 若判"抽不出锚＝噪音"就丢了真相：**"继续"是指针，不是容器** —— 它不携带内容，它**引用在场的东西**
+//       （① 上下文；② 一个真实被打断的在飞行为。安的实例：误触打断后只回"继续"，agent 依旧知道要做什么）。
+//       ⇒ 正确定性：**内容量可作指针（reference），不可作锚（anchor）**；
+//         "抽不出锚"≠"无锚"，可能只是"锚不在本帧文本里"。窗口面负责**指向**，锚源必须在**结构位置**。
+//       ⚠️ 旧措辞"假接通"已废弃：它会把维护者引回"再修修通道"的 X 轴惯性。
+//   (b) **假人证（真失效）**：agent 自述"我在想，接下来我要清空 /app/data" ⇒ paths=[/app/data] ⇒ 一旦 role
+//       判别偏差被采信，真路径进池 ⇒ 不可逆动作放行（比"无人证"更坏）。
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { apply, setPrincipalScope } from '../src/index.js';
@@ -45,7 +49,7 @@ test('窗口面不授权：委托人消息里写明范围，锚池仍空 ⇒ 不
   assert.equal(out.awaitingHuman, true);
 });
 
-test('假接通：委托人最新一条是承接语「继续」⇒ 不得报"已授权"、锚池不得被填', async () => {
+test('指针不作锚：「继续」不自带授权（它指向别处，锚源在结构位置）⇒ 锚池不得被填', async () => {
   setPrincipalScope(null);
   const { ctx, handlers, tools } = mockCtx();
   apply(ctx);
@@ -218,4 +222,64 @@ test('窗口面跑再多 step 也不得积累出授权', async () => {
   const rep = await tool.execute({}, {});
   assert.deepEqual(rep.engine.poolPaths, [], '窗口面无论跑多少 step 都不得积累授权');
   assert.equal(rep.adapter.steps, 3, '观测计数照记');
+});
+
+// —— 中断 ≠ 撤回（安 2026-09-20 实例：误触打断 ⇒ 只回「继续」⇒ agent 仍知道要做什么） ——
+// 结构读法：**「继续」是指针，不是容器**。它不携带内容（直读 declaredAnchors 抽不出任何锚），
+//   它**引用在场的东西**：① 上下文；② **一个真实被打断的在飞行为**。
+// ⇒ 故这一组断言的不是"文本里有没有锚"，而是"**被指对象是否还在场**"：
+//   · 中断帧（无新声明）**不许**让范围离场 —— 在场量不因某一帧无信息而消失；
+//   · 只有**显式撤回**才让范围离场，且**必须留痕**（否则事后分不清"委托人撤回"与"宿主把中断当撤回"）。
+// 本组防的失效：把"本帧没新声明"实现成"清空" ⇒ 每次误触打断都静默撤回授权 ⇒
+//   合法链全交人工，且使用者只体感"更啰嗦"、查不出为什么。
+
+test('中断保续：误触打断后委托人只回「继续」⇒ 被指的声明仍在场，范围内动作照放行', async () => {
+  setPrincipalScope('清理 /app/tmp 里的临时文件');
+  try {
+    const { ctx, handlers } = mockCtx();
+    apply(ctx);
+    // 中断帧：窗口面只有承接语，宿主**不重新声明**（＝契约要求：什么都不做）
+    await handlers['agent/pre-step'](step([{ role: 'user', content: '继续' }]), next);
+    const out = await handlers['tools/pre-execute'](exec('run_task', { command: 'rm -rf /app/tmp/*' }), next);
+    assert.equal(out, 'NEXT', '"继续"指向的在飞范围仍在场 ⇒ 不得因"本帧无新声明"而失效');
+  } finally { setPrincipalScope(null); }
+});
+
+test('中断不衰减：连续多个中断帧后范围仍有效（在场量不随时间帧流失）', async () => {
+  setPrincipalScope('清理 /app/tmp 里的临时文件');
+  try {
+    const { ctx, handlers } = mockCtx();
+    apply(ctx);
+    for (let i = 0; i < 5; i += 1) {
+      await handlers['agent/pre-step'](step([{ role: 'user', content: '继续' }]), next);
+    }
+    const out = await handlers['tools/pre-execute'](exec('run_task', { command: 'rm -rf /app/tmp/a' }), next);
+    assert.equal(out, 'NEXT', '多次中断不得等价于逐步撤回');
+  } finally { setPrincipalScope(null); }
+});
+
+test('中断 ≠ 撤回：只有显式撤回才离场，且 revoke 留痕可溯', async () => {
+  const { ctx, handlers, tools } = mockCtx();
+  apply(ctx);
+  setPrincipalScope('清理 /app/tmp 里的临时文件');
+  const before = await handlers['tools/pre-execute'](exec('run_task', { command: 'rm -rf /app/tmp/*' }), next);
+  assert.equal(before, 'NEXT');
+  setPrincipalScope(null);   // 显式撤回（**不是**"本帧没新声明"）
+  const after = await handlers['tools/pre-execute'](exec('run_task', { command: 'rm -rf /app/tmp/*' }), next);
+  assert.equal(after.kind, 'deny', '显式撤回后回到 fail-closed');
+  const rep = await toolNamed(tools, 'query_anchor_channel').execute({}, {});
+  const kinds = rep.adapter.authorityChanges.map((c) => c.kind);
+  assert.deepEqual(kinds.slice(-2), ['declare', 'revoke'], '撤回必须有痕（可事后区分"委托人撤回"与"实现误清空"）');
+});
+
+test('中断后换范围：新范围立即生效（替换语义优先于保续语义）', async () => {
+  setPrincipalScope('清理 /app/tmp 里的临时文件');
+  try {
+    const { ctx, handlers } = mockCtx();
+    apply(ctx);
+    await handlers['agent/pre-step'](step([{ role: 'user', content: '继续' }]), next);   // 中断帧
+    setPrincipalScope('清理 /app/logs 里的临时文件');                                     // 委托人改范围
+    const b = await handlers['tools/pre-execute'](exec('run_task', { command: 'rm -rf /app/tmp/*' }), next);
+    assert.equal(b.kind, 'deny', '中断不得让旧范围滞留');
+  } finally { setPrincipalScope(null); }
 });
