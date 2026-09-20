@@ -283,3 +283,61 @@ test('中断后换范围：新范围立即生效（替换语义优先于保续�
     assert.equal(b.kind, 'deny', '中断不得让旧范围滞留');
   } finally { setPrincipalScope(null); }
 });
+
+// —— 门覆盖全部调用路径（结构事实，非约定；dsh 源码级核验 2026-09-20） ——
+// 结掉一个"承认不知道"的欠账：容器 / 子代理路径是否**全走** decideToolCall？核验结论（读宿主源码，非推测）：
+//   · `ToolRegistry.prepareExecution` 对**每个** execution 跑 `ctx.waterfall(carrier, 'tools/pre-execute', exec, …)`
+//     （dsh-tools/lib/index.js）——门在**调度器层**，不在某个 agent 上；
+//   · 包自带 invariants 强制 "pre-execute 每个 execution 一次、且必在 execute 之前"
+//     （dsh-tools/lib/invariant.js）——**机器级**保证不可跳过；
+//   · Code Mode 的 `run_code` 子调用带 `parent: exec.token`（dsh-tools/lib/code-mode.js）⇒ 走同一道门。
+// ⇒ 结构上不可绕过 ⇒ 适配层**不得为任何调用者开例外**（本组即锁这个"不得"）。
+//
+// 附带的判据收获：`agent` / `parent` 是宿主**白给的位置量**（谁在调、从哪派生）——
+//   与我一直在窗口面找的"言"正好对照：**位置量公开放着没人用，内容量（言）在图外根本取不到**。
+//   位置量不改裁决（授权只认委托人声明的范围），故断言是"裁决一致"而非"裁决不同"。
+
+const execAt = (name, args, who) => ({ token: 't', callId: 'c1', name, arguments: args, signal: null, ...who });
+
+test('门覆盖全路径：派生 / 容器调用（带 agent / parent）与主调用裁决一致，不得开例外', async () => {
+  const whoVariants = [
+    { agent: 'main' },
+    { agent: 'sub-1', parent: 'tok-parent' },   // Code Mode run_code 子调用形状
+    { parent: 'tok-parent' },                   // 宿主只给 parent
+    {},                                         // 两者都缺
+  ];
+  setPrincipalScope(null);
+  try {
+    for (const who of whoVariants) {
+      const { ctx, handlers } = mockCtx();
+      apply(ctx);
+      const out = await handlers['tools/pre-execute'](execAt('run_task', { command: 'rm -rf /app/data' }, who), next);
+      assert.equal(out.kind, 'deny', `调用者 ${JSON.stringify(who)} 在无声明范围时不得被放行`);
+    }
+  } finally { setPrincipalScope(null); }
+});
+
+test('位置量不参与裁决：同一范围内派生调用照放行（不因 parent / agent 存在而误伤）', async () => {
+  setPrincipalScope('清理 /app/tmp 里的临时文件');
+  try {
+    const { ctx, handlers } = mockCtx();
+    apply(ctx);
+    const main = await handlers['tools/pre-execute'](execAt('run_task', { command: 'rm -rf /app/tmp/*' }, { agent: 'main' }), next);
+    const sub = await handlers['tools/pre-execute'](execAt('run_task', { command: 'rm -rf /app/tmp/a' }, { agent: 'sub-1', parent: 'tok-parent' }), next);
+    assert.equal(main, 'NEXT');
+    assert.equal(sub, 'NEXT', '位置量是主体归属的依据，不是裁决依据');
+  } finally { setPrincipalScope(null); }
+});
+
+test('位置量观测：自报如实记调用位点（含派生调用计数）', async () => {
+  setPrincipalScope(null);
+  const { ctx, handlers, tools } = mockCtx();
+  apply(ctx);
+  await handlers['tools/pre-execute'](execAt('run_task', { command: 'ls /tmp' }, { agent: 'main' }), next);
+  await handlers['tools/pre-execute'](execAt('run_task', { command: 'ls /tmp' }, { agent: 'sub-1', parent: 'tok-parent' }), next);
+  await handlers['tools/pre-execute'](execAt('run_task', { command: 'ls /tmp' }, {}), next);
+  const rep = await toolNamed(tools, 'query_anchor_channel').execute({}, {});
+  assert.equal(rep.adapter.callSites.total, 3, '每个调用都过门（含派生调用）＝门覆盖全路径的可观测证据');
+  assert.equal(rep.adapter.callSites.withAgent, 2);
+  assert.equal(rep.adapter.callSites.withParent, 1);
+});

@@ -6,6 +6,24 @@
 //   - Pre-tool-call gate: ctx.on('tools/pre-execute', (exec, next) => Promise<PreToolDecision>)
 //       waterfall; return { kind:'deny', reason } to block, or return next() to release.
 //       exec read-only view contains { token, callId, name, arguments, signal, agent?, parent? }.
+//
+//   - Gate coverage & gate position (read from dsh source 2026-09-20, settling an earlier "unknown"):
+//       · Coverage is **structural, not conventional**: `ToolRegistry.prepareExecution` runs
+//         `ctx.waterfall(carrier, 'tools/pre-execute', exec, …)` for **every** execution
+//         (dsh-tools/lib/index.js), and the package's own invariants enforce "pre-execute fires once
+//         per execution, and before execute/post-execute" (dsh-tools/lib/invariant.js).
+//         Container sub-calls (Code Mode `run_code` dispatch) carry `parent: exec.token`
+//         (dsh-tools/lib/code-mode.js) and pass through the same gate.
+//         ⇒ Nothing bypasses the gate by construction — so no per-caller exception is needed here,
+//           and none is allowed (locked by test: derived/sub-agent calls adjudicate identically).
+//       · Position is **between decided and done**: the gate runs after the agent has *produced* the
+//         call and before dispatch. The agent's **speech** lives upstream of the gate, i.e. inside H
+//         (out of the coordinate graph). ⇒ On this side we can only adjudicate **act vs principal
+//         scope** (both in-graph). This is why the speech window is *not* an anchor source: it is not
+//         "a channel we failed to wire", it is a quantity that the graph does not contain.
+//       · Position quantities given freely by the host here: `agent` (who) / `parent` (derived from
+//         which call) / `token` · `callId` (where this act sits). Structural ⇒ usable.
+//         Content quantities (`arguments`, and any narrative) ⇒ never authorization.
 //   - Pre-step gate: ctx.on('agent/pre-step', (payload, next) => Promise<PreStepDecision>)
 //       payload = { agent, messages, step, signal }; return { kind:'reject' } to reject the whole step (no reason field).
 //   - Audit hook: ctx.on('tools/result', (res) => void) observe only, do not rewrite (result already immutable).
@@ -229,10 +247,17 @@ function apply(ctx) {
     agentBoundary: observeBoundary(undefined),
     applyCtxBoundary: observeBoundary(ctx),
     structGap: '授权锚须由宿主在结构边界提供（setPrincipalScope：启动 scope / 任务配置）。窗口面文本是观察面，不作锚源（噪音）⇒ 入口未接时锚池留空、不可逆动作交人工 = 设计而非漏读。',
+    // [2026-09-20 · 位置量观测] 宿主在门这一侧**自带**的结构位置：`agent`（谁在调）/ `parent`（从哪派生）。
+    //   纯观测、**不参与裁决**（授权仍只认委托人声明的范围）；用途＝实机一跑即知该宿主是否给位置量，
+    //   以及**派生调用有没有被计数**（＝"门覆盖全路径"的可观测证据，非推测）。
+    callSites: { total: 0, withAgent: 0, withParent: 0 },
   };
 
   // ---------- R / D / S / H / M total adjudication: pre-tool-call gate (waterfall) ----------
   ctx.on('tools/pre-execute', async (exec, next) => {
+    channel.callSites.total += 1;
+    if (exec?.agent !== undefined) channel.callSites.withAgent += 1;
+    if (exec?.parent !== undefined) channel.callSites.withParent += 1;
     const a = exec?.arguments ?? {};
     const call = {
       name: exec?.name,
