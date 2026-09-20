@@ -69,16 +69,16 @@ After it runs: DeepSeek will **proactively call the `query_iron_laws` tool** and
 
 ## Mount into DSH (production)
 
-Add `kiss-law.patch.yml` as an overlay into your DSH profile (the exact path depends on your DSH version; see the mount section in [`DESIGN.md`](./DESIGN.md)). Once mounted, any Agent running under that profile automatically gets the 6 white-box tools.
+Add `kiss-law.patch.yml` as an overlay into your DSH profile (the exact path depends on your DSH version; see the mount section in [`DESIGN.md`](./DESIGN.md)). Once mounted, any Agent running under that profile automatically gets the 7 white-box tools.
 
-> Note: the exact native-mount profile path varies with the DSH version. This repo has verified through real runs that the plugin loads in DSH and all 5 tools register. If the official API changes, verify against the current official docs.
+> Note: the exact native-mount profile path varies with the DSH version. This repo has verified through real runs that the plugin loads in DSH and all 7 tools register. If the official API changes, verify against the current official docs.
 
 ## How the model calls it (for AI engineers)
 
-> **Plain version**: the plugin registers 6 white-box tools with DSH; the model calls them like ordinary functions to **self-check boundaries**, while 3 hooks do **hard interception**.
+> **Plain version**: the plugin registers 7 white-box tools with DSH; the model calls them like ordinary functions to **self-check boundaries**, while 3 hooks do **hard interception**.
 > **Pro version**: excerpted from `src/index.js` (full code in repo), see the block below.
 
-### 6 white-box tools (real registered names)
+### 7 white-box tools (real registered names)
 
 | Tool | What the model uses it for |
 |---|---|
@@ -88,6 +88,7 @@ Add `kiss-law.patch.yml` as an overlay into your DSH profile (the exact path dep
 | `query_conduction_chain` | get conduction chain R→S→D→H→M and framework essence |
 | `query_boundary` | query inner-H boundary (this plugin never reads/writes the subjective black box) |
 | `query_bugstop` | query First-Bug Halt loop status: which fault links are halted-unrepaired, missing steps (backtrack/trace/fix), whether the white-box loop is closed |
+| `query_anchor_channel` | self-report of the anchor channel: whether the principal's declared task scope reached the engine, plus the observed message shape / role vocabulary (observe what the host actually passes, instead of guessing field names) |
 
 ### 3 hard gates (hooks)
 
@@ -184,7 +185,7 @@ kiss-law.patch.yml    # mount patch (headless profile overlay)
 src/index.js          # plugin entry: hooks + 7 white-box self-check tools
 src/core/law.mjs      # framework definition (RSDHM / three iron laws / R hierarchy / conduction chain)
 src/core/engine.mjs   # pure-logic adjudication engine (zero DSH dependency, unit-testable)
-test/                 # unit tests + real-case tests + alignment regression (local 307/307 passing)
+test/                 # unit tests + real-case tests + alignment regression (local 314/314 passing)
 examples/             # runnable demos (demo-tool-loop / demo-backtrack-run)
 DESIGN.md             # architecture design (mapping / risks / usage flow / mount)
 ```
@@ -198,7 +199,7 @@ This repository is an **external plugin** for DeepSeek Harness (dsh, command `ds
 - Node.js `^22.19 || >=24` (hard requirement of dsh; odd versions unsupported)
 - A DeepSeek API Key (or any OpenAI-compatible endpoint key)
 - dsh is currently in developer preview (v0.1.x); the official notice states breaking API changes may occur — pin a specific version for production
-- **Compatibility statement**: verified against DSH v0.1.x (measured 2026-08-27: 6 white-box tools registered + 3 gates working); mainline evolves fast — re-check against the current official docs before integrating (see DESIGN.md for mounting details).
+- **Compatibility statement**: verified against DSH v0.1.x (measured 2026-08-27: 6 white-box tools registered + 3 gates working; the engine now registers 7 tools (`query_anchor_channel` added 2026-09-20) — DSH-mount re-verification pending); mainline evolves fast — re-check against the current official docs before integrating (see DESIGN.md for mounting details).
 
 ### Option 1: npx quick start (recommended for first try)
 
@@ -270,7 +271,7 @@ Once mounted, any Agent running under that profile automatically gains the 7 whi
 ## Development
 
 - **Dependencies**: Node.js `^22.19 || >=24`; runtime dependency only `@deepseek-ai/dsh-tools` (peerDependency, optional).
-- **Testing**: `npm test` (i.e. `node --test "test/*.test.mjs"`); currently **307/307 passing**.
+- **Testing**: `npm test` (i.e. `node --test "test/*.test.mjs"`); currently **314/314 passing**.
 - **Build**: no build needed (pure ESM + yml overlay); after editing `src/core/engine.mjs`, rerun `npm test` for regression.
 - **Contributing**: the framework-native (mind-map layer) is frozen in the base edition; this live-system edition carries engineering iteration. Changes via PR against this repo, with `node --test` output attached.
 
