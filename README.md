@@ -75,7 +75,7 @@ Add `kiss-law.patch.yml` as an overlay into your DSH profile (the exact path dep
 
 ## How the model calls it (for AI engineers)
 
-> **Plain version**: the plugin registers 7 white-box tools with DSH; the model calls them like ordinary functions to **self-check boundaries**, while 3 hooks do **hard interception**.
+> **Plain version**: the plugin registers 7 white-box tools with DSH; the model calls them like ordinary functions to **self-check boundaries**, while 3 hooks **hard-gate** it (2 gate the act/step, 1 gates the receipt) and a 4th hook is a read-only audit.
 > **Pro version**: excerpted from `src/index.js` (full code in repo), see the block below.
 
 ### 7 white-box tools (real registered names)
@@ -90,11 +90,14 @@ Add `kiss-law.patch.yml` as an overlay into your DSH profile (the exact path dep
 | `query_bugstop` | query First-Bug Halt loop status: which fault links are halted-unrepaired, missing steps (backtrack/trace/fix), whether the white-box loop is closed |
 | `query_anchor_channel` | self-report of the anchor channel: whether the principal's declared task scope reached the engine, plus the observed message shape / role vocabulary (observe what the host actually passes, instead of guessing field names) |
 
-### 3 hard gates (hooks)
+### 3 hard gates (hooks) + 1 read-only audit hook
 
-- `tools/pre-execute` → returns `{ kind: 'deny', reason }` to block the action
-- `agent/pre-step` → returns `{ kind: 'reject' }` to reject the whole step
-- `tools/result` → observe only, never rewrite
+- `tools/pre-execute` (waterfall) → returns `{ kind: 'deny', reason }` to block the **act**
+- `agent/pre-step` (waterfall) → returns `{ kind: 'reject' }` to reject the whole **step**
+- `tools/post-execute` (waterfall) → returns `{ kind: 'block', feedback }` and the host returns the call as an `isError` whose content is that feedback, severing a failed **receipt** into a corrective error
+- `tools/result` (emit) → observe only, never rewrite — by contract it has no return channel at all
+
+All four sit outside the model: two gate the act/step, one gates the receipt; none touches inner H.
 
 ### Full plugin entry (excerpt from `src/index.js`)
 
@@ -123,10 +126,19 @@ export function apply(ctx) {
     return next();
   });
 
-  // ③ result audit hook: observe only, never rewrite
-  ctx.on('tools/result', (res) => { if (res?.error) engine.onFailure(); });
+  // ③ receipt gate: D broken-window stop-loss lands on the receipt
+  ctx.on('tools/post-execute', async (exec, result, next) => {
+    if (result?.isError && engine.breakAtReceipt()) {
+      return { kind: 'block', feedback: [{ type: 'text', text: 'halt → reverse → trace → fix before re-entry' }] };
+    }
+    return next();
+  });
 
-  // ④ 7 white-box self-check tools (one excerpt; rest isomorphic)
+  // ④ audit hook (emit): observe only, never rewrite
+  //    NB the contract is (exec, result) — reading `error` off the first parameter silently no-ops accrual.
+  ctx.on('tools/result', (exec, result) => { if (result?.error) engine.onFailure(); });
+
+  // ⑤ 7 white-box self-check tools (one excerpt; rest isomorphic)
   ctx.tools.register(defineTool({
     name: 'query_iron_laws',
     description: 'Return the three immutable iron laws of KISS’s Law.',
@@ -176,6 +188,20 @@ human (`fail-closed`) — authorization is never invented. To observe what your 
 
 Call it once on a real host to replace guessing about host field names with observation.
 
+### Structural entries (host side, unreachable by the model)
+
+Module-level APIs for the host integrator — deliberately **not** tools, so the audited model cannot
+reach them (separation holds **by position**, not by content inspection):
+
+| entry | when the host calls it | why it must exist structurally |
+|---|---|---|
+| `setPrincipalScope(scope)` | at the task boundary (task start / explicit revoke) | the message stream is an observation surface, not an authorization source (see above) |
+| `healBrokenWindow(note)` | after the fault is actually fixed, or by human ruling | once the broken window is in force, `pre-execute` refuses **every** call — including the repair action itself ⇒ with no host-side entry, the stop-loss is a **session-level deadlock** (only a process restart gets out). The engine's `healWindow()` is reachable only through `resolveBug()` / `settleWindow()`, and in a DSH session the audited model can trigger neither ⇒ what was missing is the **wire**, not the **capability**. |
+
+`healBrokenWindow` returns `{ at, note, kind, instances, wereBroken }`. `wereBroken` is read **before**
+healing, so the report cannot claim a heal that had nothing to heal; every call is traced (append-only,
+cap 20) because releasing a stop-loss is an accountability event, not a silent state flip.
+
 
 ## Structure
 
@@ -185,21 +211,21 @@ kiss-law.patch.yml    # mount patch (headless profile overlay)
 src/index.js          # plugin entry: hooks + 7 white-box self-check tools
 src/core/law.mjs      # framework definition (RSDHM / three iron laws / R hierarchy / conduction chain)
 src/core/engine.mjs   # pure-logic adjudication engine (zero DSH dependency, unit-testable)
-test/                 # unit tests + real-case tests + alignment regression (local 314/314 passing)
+test/                 # unit tests + real-case tests + alignment regression (local 332/332 passing)
 examples/             # runnable demos (demo-tool-loop / demo-backtrack-run)
 DESIGN.md             # architecture design (mapping / risks / usage flow / mount)
 ```
 
 ## Deploy / Integrate with DeepSeek Harness
 
-This repository is an **external plugin** for DeepSeek Harness (dsh, command `dsh`, built on the Cordis plugin framework, MIT). KISS's Law mounts as a causal constraint layer that sits *outside the model, inside execution* — it does not modify the dsh kernel and is not tied to any specific model.
+This repository is an **external plugin** for DeepSeek Harness (dsh, command `dsh`, built on the Cordis plugin framework, MIT). KISS's Law mounts as a causal constraint layer that sits *outside the model* (2 gates on the act/step, 1 on the receipt) — it does not modify the dsh kernel and is not tied to any specific model.
 
 ### Requirements
 
 - Node.js `^22.19 || >=24` (hard requirement of dsh; odd versions unsupported)
 - A DeepSeek API Key (or any OpenAI-compatible endpoint key)
 - dsh is currently in developer preview (v0.1.x); the official notice states breaking API changes may occur — pin a specific version for production
-- **Compatibility statement**: verified against DSH v0.1.x (measured 2026-08-27: 6 white-box tools registered + 3 gates working; the engine now registers 7 tools (`query_anchor_channel` added 2026-09-20) — DSH-mount re-verification pending); mainline evolves fast — re-check against the current official docs before integrating (see DESIGN.md for mounting details).
+- **Compatibility statement**: verified against DSH v0.1.x — live runs measured 2026-08-19 and 2026-09-21: 7 white-box tools registered, and 3 hard gates + 1 read-only audit hook working end to end (the receipt gate was observed blocking on a real failed call and returning the corrective receipt). Mainline evolves fast — re-check against the current official docs before integrating (see DESIGN.md for mounting details).
 
 ### Option 1: npx quick start (recommended for first try)
 
@@ -240,7 +266,7 @@ Once mounted, any Agent running under that profile automatically gains the 7 whi
 
 - **dsh plugin install**: `dsh plugin --profile web remove "dsh-kiss-law"`, restart to take effect.
 - **overlay mount**: remove the `kiss-law.patch.yml` reference from dsh launch config (cordis.yml plugins list or `--patch`), restart to take effect.
-- The plugin writes no persistent state; after removal the Agent no longer has the white-box tools or the 3 hard gates, and nothing is left behind.
+- The plugin writes no persistent state; after removal the Agent no longer has the white-box tools, the 3 hard gates or the audit hook, and nothing is left behind.
 
 ### Notes
 
@@ -271,7 +297,7 @@ Once mounted, any Agent running under that profile automatically gains the 7 whi
 ## Development
 
 - **Dependencies**: Node.js `^22.19 || >=24`; runtime dependency only `@deepseek-ai/dsh-tools` (peerDependency, optional).
-- **Testing**: `npm test` (i.e. `node --test "test/*.test.mjs"`); currently **314/314 passing**.
+- **Testing**: `npm test` (i.e. `node --test "test/*.test.mjs"`); currently **332/332 passing**.
 - **Build**: no build needed (pure ESM + yml overlay); after editing `src/core/engine.mjs`, rerun `npm test` for regression.
 - **Contributing**: the framework-native (mind-map layer) is frozen in the base edition; this live-system edition carries engineering iteration. Changes via PR against this repo, with `node --test` output attached.
 

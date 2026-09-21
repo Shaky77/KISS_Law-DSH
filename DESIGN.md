@@ -123,8 +123,20 @@ ctx.on('agent/pre-step', (event, next) => {
   next();
 });
 
-// White-box audit (observe only, do not rewrite)
-ctx.on('tools/result', (res) => { if (res?.error) engine.onFailure(); });
+// Receipt gate (waterfall) —— D broken-window stop-loss lands on the receipt.
+// It is the last adjudication point: once the broken window is in force every later call is refused at
+// pre-execute and never reaches a receipt, so this failure is the only one the receipt side can speak on.
+// Fail-open: adjudication applies only to receipts that already failed; a successful result passes untouched.
+ctx.on('tools/post-execute', async (exec, result, next) => {
+  if (result?.isError && engine.breakAtReceipt()) {
+    return { kind: 'block', feedback: [/* corrective: halt → reverse → trace → fix */] };
+  }
+  return next();
+});
+
+// White-box audit (emit; observe only, do not rewrite — the result is already frozen)
+// Contract is (exec, result): the FIRST parameter is the execution, the result is the SECOND.
+ctx.on('tools/result', (exec, result) => { if (result?.error) engine.onFailure(); });
 ```
 
 Self-check tools: `query_steady_state` / `list_rigid_anchors` / `query_conduction_chain` / `query_boundary` / `query_iron_laws`. Finalized iron laws in law.mjs's THREE_IRON_LAWS (immutable); R-domain nesting hierarchy in R_DOMAIN (Cosmic⊃Earth⊃Macro⊃Micro).
@@ -163,7 +175,7 @@ Finalized in law.mjs's `CALIBRATION` (rule / parallelWith / rLayerVerification) 
 
 ## 7. RC adaptation notes (risks)
 
-1. **API may still change**: DSH is a v0.1 RC preview; official notes future breaking API changes. This plugin's hook names (`tools/pre-execute` / `agent/pre-step` / `tools/result`) are calibrated against rc.6 source; if `exec`/`event` object fields differ from official `docs/`, only the `index.js` adapter layer is affected, engine logic is not.
+1. **API may still change**: DSH is a v0.1 RC preview; official notes future breaking API changes. This plugin's hook names (`tools/pre-execute` / `agent/pre-step` / `tools/post-execute` / `tools/result`) are calibrated against rc.6 source; if `exec`/`event` object fields differ from official `docs/`, only the `index.js` adapter layer is affected, engine logic is not.
 2. **API Key required**: running model inference on real device needs your own DeepSeek API Key (headless via `$DSH_HOME/.credentials.yaml` or env var). This repo contains no keys.
 3. **Creation-mode risk**: Creation mode has high privileges (equivalent to Shell); do not use it to execute model-generated code scenarios, to prevent privilege escalation.
 4. **Node version**: DSH requires Node ≥ 22.19 or ≥ 24; this machine's managed Node 22.22.2 satisfies.

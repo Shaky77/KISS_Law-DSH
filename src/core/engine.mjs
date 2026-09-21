@@ -1685,6 +1685,43 @@ export class WeiwenLawEngine {
     if (loss > 0) this.recordSteady({ negative: Math.abs(loss), trauma: Math.abs(loss) });
   }
 
+  // ---------- Receipt-side break-window projection (receipt gate, 2026-09-21) ----------
+  // Would *this* failure push the deviation accrual to the broken-window threshold? Pure read:
+  // writes no failureStreak and sets no windowBroken — criteria stay single-sourced with
+  // checkBreakWindow() instead of being re-compared in the adapter layer.
+  // Why project instead of reading after accrual (structural, not a patch):
+  //   failure accrual happens *after* the receipt (the tools/result audit hook); and once the
+  //   window is broken, every later call is refused at pre-execute and therefore **never reaches
+  //   a receipt** ⇒ the receipt side gets exactly one chance to speak: the failure that brings the
+  //   accrual to the threshold. After that it is structurally silent — the window has closed.
+  //   ⇒ the returned `streak` is a projection (current + this failure), not the current value.
+  // Adapter contract: the plugin blocks a receipt only when this returns non-null (fail-open else).
+  breakAtReceipt() {
+    const cap = this.maxFailureStreak;
+    // Criterion single-sourced with checkBreakWindow(): the window is **in force** when either the
+    // explicit stop-loss flag is set (R-layer projection route, 2026-09-18) or the streak already
+    // reached the cap. Reading only the flag was wrong — the streak route breaks the window without
+    // ever setting that flag, so a window *already in force* was reported as "about to reach the
+    // threshold" (e.g. 6/5): a live stop-loss described as if it had not happened yet.
+    if (this.windowBroken || this.failureStreak >= cap) {
+      return {
+        broken: true,
+        streak: this.failureStreak + 1,
+        cap,
+        reason: 'Broken-window stop-loss is still in force (D): nothing is released until the fault is fixed or the window is settled — a fault must not spread and kill the whole.',
+      };
+    }
+    if (this.failureStreak + 1 >= cap) {
+      return {
+        broken: false,
+        streak: this.failureStreak + 1,
+        cap,
+        reason: `Consecutive failures/deviations are about to reach the broken-window threshold (${this.failureStreak + 1}/${cap}): D broken-window stop-loss engages so the fault cannot spread and kill the whole.`,
+      };
+    }
+    return null;
+  }
+
   // Broken-window heal: after D stop-loss, a fix action clears broken-window count (cut to preserve continuity → lateral restart)
   healWindow() {
     this.failureStreak = 0;

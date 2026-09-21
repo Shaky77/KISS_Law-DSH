@@ -28,7 +28,7 @@ distribute your contribution under both licenses.
 ## Before you submit
 
 - [ ] The change does not touch the judgment layer (`src/core/engine.mjs` / `src/core/law.mjs` / `src/core/bugstop.mjs`); if a judgment change is genuinely needed, open an issue to discuss it first
-- [ ] Tests are green: run `npm test` (i.e. `node --test "test/*.test.mjs"`); current baseline is **314/314 passing**
+- [ ] Tests are green: run `npm test` (i.e. `node --test "test/*.test.mjs"`); current baseline is **332/332 passing**
 - [ ] New scenarios come with new cases, and existing tests are neither modified nor deleted
 - [ ] No new runtime dependencies (the only runtime dependency is `@deepseek-ai/dsh-tools`, an optional peerDependency)
 

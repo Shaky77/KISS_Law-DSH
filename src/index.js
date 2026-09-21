@@ -26,6 +26,11 @@
 //         Content quantities (`arguments`, and any narrative) ⇒ never authorization.
 //   - Pre-step gate: ctx.on('agent/pre-step', (payload, next) => Promise<PreStepDecision>)
 //       payload = { agent, messages, step, signal }; return { kind:'reject' } to reject the whole step (no reason field).
+//   - Receipt gate: ctx.on('tools/post-execute', (exec, result, next) => Promise<PostToolDecision>)
+//       waterfall; runs after the act has landed and before the receipt reaches the model. Return
+//       { kind:'block', feedback:[ContentBlock] } and the host returns the call as an isError whose
+//       content is that feedback; return next() to accept. Failed calls DO pass through it
+//       (dsh-tools: "Tool and unknown-tool failures still receive post-execute").
 //   - Audit hook: ctx.on('tools/result', (res) => void) observe only, do not rewrite (result already immutable).
 //   - Tool registration: ctx.tools.register(defineTool({ name, description, parameters, output:{schema,render}, async execute(args, exec) }))
 //       output is a mandatory field (mandatory canonical output declaration).
@@ -142,6 +147,47 @@ export function setPrincipalScope(text) {
   if (_scopeChanges.length > 20) _scopeChanges.shift();
   return prev;
 }
+
+// ---------- Structural entry (host integrator side; unreachable by the model): broken-window heal ----------
+// Why this entry is mandatory, not a convenience (structural reason):
+//   once the broken window is in force, `pre-execute` refuses **every** call — including the repair
+//   action itself ⇒ with no host-side entry the break is a **session-level deadlock** (the only way
+//   out is restarting the process). The engine already has `healWindow()`, but it is only reached
+//   through `resolveBug()` (closed loop verified) and `settleWindow()` (phase expiry) — and in a DSH
+//   session neither is reachable by the audited model ⇒ what was missing is the **wire**, not the
+//   **capability**. This export is that wire.
+// Same discipline as `setPrincipalScope`: a module-level API, **not a tool** ⇒ the model cannot call
+//   it ⇒ self-unlocking is structurally impossible (separation of principal is guaranteed by position,
+//   not by inspecting content).
+// Heal is traced (append-only, cap 20): releasing a stop-loss is an accountability event — a silent
+//   clear would leave "when/why did it lift?" unanswerable afterwards.
+const _liveEngines = new Set();
+const _windowHeals = [];
+/**
+ * Host-side: explicitly reset the D broken-window stop-loss **after the fault is actually fixed**
+ * (or after a human ruling). Applies to every plugin instance registered in this process.
+ * @param {string} note why it is being lifted (recorded in the trace; null if omitted)
+ * @returns {{at:string, note:string|null, kind:string, instances:number, wereBroken:number}}
+ *          `wereBroken` = how many instances were actually in the broken state before the reset
+ */
+export function healBrokenWindow(note) {
+  const at = new Date().toISOString();
+  const text = typeof note === 'string' ? note.trim() : '';
+  let wereBroken = 0;
+  for (const e of _liveEngines) {
+    try {
+      // Truthful accounting: count the state *before* healing, so the report cannot claim a heal
+      // that had nothing to heal.
+      if (e.windowBroken || e.failureStreak >= e.maxFailureStreak) wereBroken += 1;
+      e.healWindow();
+    } catch { /* one bad instance must not block the others */ }
+  }
+  const rec = { at, note: text || null, kind: 'heal-window', instances: _liveEngines.size, wereBroken };
+  _windowHeals.push(rec);
+  if (_windowHeals.length > 20) _windowHeals.shift();
+  logline(`healBrokenWindow(${text || 'no note given'}) — instances=${_liveEngines.size}, wereBroken=${wereBroken}`);
+  return rec;
+}
 function textOfContent(content) {
   if (typeof content === 'string') return content;
   if (Array.isArray(content)) {
@@ -188,6 +234,47 @@ function observeBoundary(obj) {
   return { present: true, kind: Array.isArray(obj) ? 'array' : 'object', keys, keyCount: keys.length };
 }
 
+// ---------- Receipt-gate helpers (2026-09-21) ----------
+// Failed-ness is read from the host's own structural marks (`isError` / an `error` object), never by
+// string-matching the outcome — the same discipline as "position quantities are structural, content
+// quantities are not authorization".
+function isFailedReceipt(result) {
+  return result?.isError === true || result?.error != null;
+}
+
+// The host replaces the receipt `content` with our `feedback` when it blocks, so the original outcome
+// must be carried across — otherwise a block destroys the very evidence it is based on.
+function receiptTextOf(result, limit = 800) {
+  const blocks = Array.isArray(result?.content) ? result.content : [];
+  const parts = [];
+  for (const b of blocks) {
+    if (typeof b === 'string') parts.push(b);
+    else if (b && typeof b.text === 'string') parts.push(b.text);
+    else if (b && typeof b.type === 'string') parts.push(`[${b.type}]`);
+  }
+  let s = parts.join('\n').trim();
+  if (!s && typeof result?.error?.message === 'string') s = result.error.message.trim();
+  if (!s) return '(empty receipt)';
+  return s.length > limit ? `${s.slice(0, limit)}…[truncated, ${s.length - limit} chars omitted]` : s;
+}
+
+// Framework-native corrective: halt, then close the loop. Not an apology, not a retry hint — the
+// receipt is where M lands, so it must say what M requires before re-entry.
+function haltFeedback(bw, bugKey) {
+  return [
+    "[KISS's Law · D broken-window stop-loss / M First-Bug Halt]",
+    bw.reason,
+    `This receipt is the point where the deviation accrual reached the threshold (${bw.streak}/${bw.cap}).`,
+    'The break point lands HERE — on this receipt — not on some later call: once the broken window is in',
+    'force every later call is refused before it executes, so this is the last moment the framework can speak.',
+    'Required before re-entry (backtracking alone does not close the loop):',
+    '  1. reverse-deduce the logic of what just failed;',
+    '  2. trace-mark the root-cause layer (M closed loop: reverse → trace → fix);',
+    '  3. fix it and pass verification — only then may this call be re-issued.',
+    `Do not re-issue this call, or any look-alike, as-is. BUG identity: ${bugKey}.`,
+  ].join('\n');
+}
+
 const name = 'kiss-law';
 const inject = ['tools'];
 
@@ -224,7 +311,13 @@ function branchesSummary(br) {
 
 function apply(ctx) {
   const engine = new WeiwenLawEngine({ rigidAnchors: DEFAULT_RIGID_ANCHORS });
-  logline('apply() entered — registering tools/pre-execute, agent/pre-step, tools/result and white-box self-check tools');
+  // Register this instance so the host-side heal entry (`healBrokenWindow`) can reach it. A host may
+  // inject the plugin many times in one process (one per agent/session, and harnesses re-inject per
+  // case) ⇒ the set is bounded: past 32 instances the oldest ref is dropped, so heal stays a "lift the
+  // stop-loss in this process" action instead of an unbounded reference holder.
+  _liveEngines.add(engine);
+  if (_liveEngines.size > 32) _liveEngines.delete(_liveEngines.values().next().value);
+  logline('apply() entered — registering tools/pre-execute, agent/pre-step, tools/post-execute (receipt gate), tools/result and white-box self-check tools');
 
   // 授权锚：**只由结构入口喂养**（`setPrincipalScope`，宿主集成方调用）。窗口面不再供养。
   // 委托人声明的任务范围在会话内持续有效；入口未接 ⇒ 恒 null ⇒ 锚池空 ⇒ 不可逆动作交人工（fail-closed）。
@@ -251,6 +344,18 @@ function apply(ctx) {
     //   纯观测、**不参与裁决**（授权仍只认委托人声明的范围）；用途＝实机一跑即知该宿主是否给位置量，
     //   以及**派生调用有没有被计数**（＝"门覆盖全路径"的可观测证据，非推测）。
     callSites: { total: 0, withAgent: 0, withParent: 0 },
+    // [2026-09-21 · 回执门观测] 第三个真能拦的门位置在回执侧。这里只**如实记数**，供实机跑一次即知
+    //   门有没有被派发、失败回执有没有到达、阻断有没有真的发生 —— 不猜宿主行为。
+    receiptGate: {
+      seen: 0,            // 经过回执门的调用数（含成功，证明门被派发）
+      failedSeen: 0,      // 其中带失败信号的（门只对这些施加裁决）
+      blocked: 0,         // 实际阻断数（回执被改写成纠错错误）
+      failOpen: true,     // 监听器抛错 ⇒ accept：门不得把健康运行弄坏
+      cap: engine.maxFailureStreak,
+      lastAt: null,
+      lastReason: null,
+      lastStreak: null,
+    },
   };
 
   // ---------- R / D / S / H / M total adjudication: pre-tool-call gate (waterfall) ----------
@@ -352,9 +457,83 @@ function apply(ctx) {
     return next();
   });
 
+  // ---------- D broken-window stop-loss at the receipt: post-execute gate (waterfall) ----------
+  // Position: after the act has landed, before the receipt reaches the model — the last adjudication
+  // point in the whole pipeline. Contract read from dsh-tools source (2026-09-21), not guessed:
+  //   · Coverage — `ToolRegistry.postExecute` runs for every execution that is not already final, and
+  //     the package states outright that "Tool and unknown-tool failures still receive post-execute"
+  //     (dsh-tools/lib/index.js) ⇒ a failed or unknown tool is adjudicated here too.
+  //   · The verdict is consumed — `{kind:'block', feedback}` makes the host return the call as an
+  //     `isError` whose `content` is the corrective `feedback` (postExecute, same file). Not decoration.
+  //   · A throwing listener turns the whole call into an error ⇒ this body never throws at the host:
+  //     every path degrades to `accept` (fail-open). A gate that can break a healthy run is worse
+  //     than no gate.
+  // Why adjudicate **here** (structural reason, not back-filling a gap we forgot):
+  //   once the broken window is in force, every later call is refused at pre-execute and **never
+  //   reaches a receipt** ⇒ the receipt side gets exactly one chance to speak: the failure that brings
+  //   the deviation accrual to the threshold. After that it is structurally silent — the window closed.
+  //   ⇒ So this is not "one more interception". It is **where the break point lands**: the fault
+  //     receipt is severed into a corrective receipt on the spot (M lands on the receipt), instead of
+  //     only refusing the *next* call.
+  // Fail-open boundary, stated up front: adjudication applies **only to receipts that already failed**.
+  //   A successful result is passed through untouched (no content replacement, no value rewrite) — so a
+  //   misjudgement can never turn a healthy outcome into an error.
+  ctx.on('tools/post-execute', async (exec, result, next) => {
+    let decision = null;
+    try {
+      channel.receiptGate.seen += 1;
+      if (isFailedReceipt(result)) {
+        channel.receiptGate.failedSeen += 1;
+        const bw = engine.breakAtReceipt();
+        if (bw) {
+          const call = {
+            name: exec?.name,
+            args: exec?.arguments ?? {},
+            command: exec?.arguments?.command,
+            code: exec?.arguments?.code,
+          };
+          const bugKey = bugKeyOf(call);
+          decision = {
+            kind: 'block',
+            law: 'D',
+            reason: `[KISS's Law·D] ${bw.reason}`,
+            bugKey,
+            closedLoop: true,
+            // The host replaces the receipt `content` with this feedback, so the original outcome must
+            // be carried across — a block may never destroy the evidence it is based on.
+            feedback: [
+              { type: 'text', text: haltFeedback(bw, bugKey) },
+              { type: 'text', text: `--- original receipt, preserved ---\n${receiptTextOf(result)}` },
+            ],
+          };
+          // Counters and the log line are written only once the block is actually delivered: if building
+          // the feedback throws, the catch below degrades to accept — and a counter incremented earlier
+          // would then be claiming a block that never happened.
+          channel.receiptGate.blocked += 1;
+          channel.receiptGate.lastAt = new Date().toISOString();
+          channel.receiptGate.lastReason = bw.reason;
+          channel.receiptGate.lastStreak = `${bw.streak}/${bw.cap}`;
+          logline(`post-execute ${exec?.name} -> block (D broken-window at receipt, ${bw.streak}/${bw.cap}, bugKey=${bugKey})`);
+        }
+      }
+    } catch (e) {
+      decision = null;   // fail-open
+      logline(`post-execute gate failed open: ${e?.message ?? e}`);
+    }
+    return decision ?? (typeof next === 'function' ? next() : { kind: 'accept' });
+  });
+
   // ---------- White-box audit: result hook (observe only, do not rewrite) ----------
-  ctx.on('tools/result', (res) => {
-    if (res?.error) engine.onFailure();
+  // Host contract (dsh-tools/lib/types/index.d.ts): `'tools/result'(exec, result)` — the FIRST parameter
+  // is the execution; the frozen result is the SECOND. Reading `error` off the first parameter turns
+  // failure accrual into a silent no-op, and the real-device run proved exactly that (2026-09-21): the
+  // accrual never happened, so the receipt gate above projected failureStreak = 0 forever and could
+  // never speak. Position, not content — the slot is part of the contract, so no shim for the old shape.
+  ctx.on('tools/result', (exec, result) => {
+    if (result?.error) {
+      engine.onFailure();
+      logline(`result audit: failure accrued (streak=${engine.failureStreak}/${engine.maxFailureStreak})`);
+    }
   });
 
   // ---------- White-box self-check tools (model can query, verify framework running) ----------
