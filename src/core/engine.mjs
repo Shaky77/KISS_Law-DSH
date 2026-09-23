@@ -7,7 +7,7 @@
 // forbid re-entry before fix, blocking "reverse-deduce-only-without-fixing → infinite recursion" at the root.
 import { BugStopGuard, bugKeyOf } from './bugstop.mjs';
 import { attributeCall, extractCommand, commandLayer, DELETION_LAYERS, GIT_DESTRUCTIVE, speechProfile, actionProfile, CONTAINER_VERBS, domainOf, declaredAnchors, scarUnanchored } from './attribution.mjs';  // + [2026-09-23 字典即S] commandLayer（破坏标记的唯一读法：字典词素 + 工具名封闭集，引擎只消费不自兜底）  // + [2026-09-20] 锚归属（痕锚：scar+无锚⇒review，coze/51 方向；判定逻辑归 attribution，引擎只消费）  // path-1 attribution + its deletion-layer set + git-destructive vocab + extractCommand + [2026-09-20] speech/action profile (知行合一轴; vocabulary owned by attribution; engine only consumes)
-import { R_DOMAIN } from './law.mjs';  // [2026-09-18 synthesis] R-domain nested-inclusive boundary law — base A's Y-axis essence, wired back into the engine (base A imported it; B had dropped the wiring). FRACTAL_PROPERTY cross-call recursion left as the next frontier (see report).
+import { R_DOMAIN, FRACTAL_PROPERTY } from './law.mjs';  // R 域刚性锚点常量 + 分形属性常量：destructive 检测须体现 R_DOMAIN 边界法则；跨调用组合须接 FRACTAL_PROPERTY 分形横向递归（接线，非加层）。[2026-09-24 同构回填 · base A → B] 旧注记的 "FRACTAL_PROPERTY cross-call recursion left as the next frontier" 至此交付（见 ALIGNMENT_REPORT）。
 import { SAccountLedger, classifyReversibility, rDomainsForLayer } from './ledger.mjs';  // [2026-09-20] S 账本（用户账本模型）：R=字典 / SD=轴标记 / term 字典序索引 / S≠R 异类 / 疤窗可逆性。仅附加记录，不碰裁决核心。
 
 // [2026-09-18] R 域层级 → 权威权重（结构性推导，非枚举阈值、非拍脑袋数字）
@@ -232,6 +232,10 @@ function inferCallSemantics(call, ctx = {}) {
   // Execution-sink criterion: not just explicit interpreter form (bash -c/pipe/eval),
   // the exec-class tool itself (run_task/exec/bash etc. with TOOL_CATEGORY=exec) is the execution sink — unknown vars in task/payload are also non-auditable.
   const isExecTool = TOOL_CATEGORY[call?.name] === 'exec' || TOOL_CATEGORY[call?.name] === 'exec-destructive';
+  const isCredWrite = isCredWriteSignal(category, path, sh);
+  const isExternal = EXTERNAL_TARGET.test(sh) || (isExecOrExfil && EXTERNAL_TARGET.test(packed));
+  // sink 暴露：将内容外传至外部目标 / 写凭据存放位 / 外传类语义（跨调用组合的右端）
+  const isSinkExposure = isExternal || isCredWrite || category === 'exfil' || category === 'exfil-net';
   return {
     category,
     path,
@@ -240,9 +244,9 @@ function inferCallSemantics(call, ctx = {}) {
     // when head verb is a non-read action it isn't a read leak (mv ~/.aws/credentials /tmp/bak is a move not a read);
     // write_file's args.path is a write-class tool, judged by isCredWrite for write direction, not affected by this filter (sh empty).
     isCred: (CREDENTIAL_PATH.test(path) && !credNonReadHead(sh)) || (CREDENTIAL_SH.test(sh) && !credNonReadHead(sh)) || hasEnvSecretRef(sh) || hasEnvSecretRef(packed),
-    isCredWrite: isCredWriteSignal(category, path, sh),
+    isCredWrite,
     isSystem: SYSTEM_PATH.test(path) || SYSTEM_PATH.test(sh),
-    isExternal: EXTERNAL_TARGET.test(sh) || (isExecOrExfil && EXTERNAL_TARGET.test(packed)),
+    isExternal,
     hitsInnerH: hitsInnerH(packed),
     // Directional signal (not content signal): whether execution content is auditable before execution.
     // All three segments must hold (opaque source → transform/eval → execution sink), avoiding "writing a doc" misjudged as execution.
@@ -252,6 +256,9 @@ function inferCallSemantics(call, ctx = {}) {
     // reference to file written this session → content produced this session, needs review (cross-call state, chained fallback)
     refsSessionWritten: sessionHits.length > 0,
     sessContentDanger,
+    // 跨调用组合（FRACTAL_PROPERTY 分形横向递归·同 R 域同构包含源与汇）：本会话先前读取的敏感源
+    // 与当前暴露 sink 的动作落于同一 R 域（sessRead 与当前 sink 同构包含）→ 组合效应需复核（保守）
+    refsSessionSensitiveRead: isSinkExposure && (ctx?.sessRead?.size > 0),
     // SSH trust-injection channel: writing authorized_keys is a high-trust action, at least conservative
     isAuthSink: /authorized_keys/i.test(path),
   };
@@ -269,12 +276,13 @@ function simulateBranch(s, kind) {
     //   white box can't give steady-state credit to "unreadable-before-execution" things, so when non-auditable S+1 directly fails,
     //   the logic is "cannot prove steady-state so no +1", not "no problem found so allow".
     // Auditability extension (2026-08-25): not just form (isOpaqueExec), unknown variable reference / this-session write reference are also non-auditable.
-    const opaque = s.isOpaqueExec || s.hasOpaqueVar || s.refsSessionWritten;
+    // [2026-09-24 同构回填 · base A → B] 再扩一格：跨调用敏感源→汇组合（本会话读过敏感源 ∧ 当前为 sink）同样不可审计。
+    const opaque = s.isOpaqueExec || s.hasOpaqueVar || s.refsSessionWritten || s.refsSessionSensitiveRead;
     const auditable = !opaque;
     const purelyBenign = auditable && !s.isCred && !s.isSystem && !s.isExternal && !s.hitsInnerH && !s.isAuthSink;
     return {
       path: 'S+1', finalS: purelyBenign ? +1 : 0,
-      ...(auditable ? {} : { note: '执行内容不可审计（不透明源/未知变量/引用本会话写入文件）→ 无法证明稳态增量，S+1 不成立' }),
+      ...(auditable ? {} : { note: '执行内容不可审计（不透明源/未知变量/引用本会话写入文件/跨调用敏感源→汇组合）→ 无法证明稳态增量，S+1 不成立' }),
     };
   }
   // D-1 path (=|S-1|): assume call triggers damage. Erosion amount graded by risk-signal severity (objective structure, not enumerating specific values).
@@ -291,6 +299,9 @@ function simulateBranch(s, kind) {
   const dangerousCat = ['read', 'exfil', 'exfil-net', 'exec', 'exec-destructive'].includes(s.category);
   if (s.isCred && dangerousCat) return { path: 'D-1', finalS: -3, note: '凭据暴露' };
   if (s.isExternal && ['exfil', 'exfil-net', 'exec'].includes(s.category)) return { path: 'D-1', finalS: -2, note: '向外部外传数据' };
+  // 跨调用组合（FRACTAL_PROPERTY 分形横向递归）：本会话先前读取敏感源（凭据/系统路径），
+  // 当前动作将其暴露至 sink（同 R 域同构包含源与汇）→ 保守 review（不 deny，防误伤）
+  if (s.refsSessionSensitiveRead) return { path: 'D-1', finalS: -2, note: `跨调用组合效应（${FRACTAL_PROPERTY.rule}）：本会话先前读取敏感源，当前动作将其暴露至 sink（同 R 域同构包含源与汇）→ 需人工确认` };
   if (s.isAuthSink) return { path: 'D-1', finalS: -2, note: 'SSH 信任注入（写授权密钥文件），需人工确认' };
   if (s.isCredWrite) return { path: 'D-1', finalS: -2, note: '写凭据存放位（篡改/植入身份凭据），需人工确认' };
   if (s.isSystem && ['read', 'write', 'exec', 'exec-destructive'].includes(s.category)) return { path: 'D-1', finalS: -1, note: '系统信息泄露/完整性受损' };
@@ -929,6 +940,10 @@ export class WeiwenLawEngine {
     // This-session write registry: allowed writes record path→content,
     // later exec-class calls referencing a registered path trigger review (refsSessionWritten). Only register this session's writes, don't guess the filesystem.
     this.sessWritten = new Map();
+    // 跨调用敏感源读取登记表（FRACTAL_PROPERTY 分形横向递归·同 R 域同构包含源与汇）：
+    // 本会话读取的凭据/系统路径（敏感源）记入此 Set，供后续 sink 暴露调用按分形横向递归
+    // 判定「源→汇」组合效应（保守 review，不 deny，防误伤）。只登记本会话读取，不猜文件系统。
+    this.sessRead = new Set();
     // Inner-H registration ledger (author agreement · 2026-08-30)
     this.innerHLedger = [];   // append-only: registration entries only sediment, never dissolve (same structure as S history scars)
     this.innerHSeq = 0;
@@ -1394,7 +1409,10 @@ export class WeiwenLawEngine {
   }
 
   deduceRisk(call) {
-    const s = inferCallSemantics(call, { sessWritten: this.sessWritten });
+    const s = inferCallSemantics(call, { sessWritten: this.sessWritten, sessRead: this.sessRead });
+    // 跨调用敏感源登记（FRACTAL_PROPERTY 分形横向递归）：本会话读取的凭据/系统路径（敏感源）
+    // 记入 sessRead，供后续 sink 暴露调用判定「源→汇」组合效应。仅登记 read 类敏感源读取，不猜。
+    if (s.path && (s.isCred || s.isSystem) && s.category === 'read') this.sessRead.add(s.path);
     // H fork: S-increment path + D-increment(erosion) path simulated simultaneously (parallel, not either-or)
     const bS = simulateBranch(s, 'S+1');
     const bD = simulateBranch(s, 'D-1');

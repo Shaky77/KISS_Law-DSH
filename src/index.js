@@ -451,7 +451,19 @@ function apply(ctx) {
     // reject (clear violation) and review (definition unclear / cannot determine) both block, do not spread.
     // review = "suspend & return to user for decision": intercept first, don't release.
     if (decision.kind === 'reject' || decision.kind === 'review') {
-      logline(`pre-step -> ${decision.kind}${decision.law ? '(' + decision.law + ')' : ''} (suspend & return to user for decision)`);
+      if (decision.kind === 'review') {
+        // PreStepDecision 契约仅 {kind:'reject'}、不携带 reason/branches，
+        // 故富信息（定义不明缘由 + 留证身份 + 推演后果）记入 runtime.log 供审计，
+        // 宿主侧以 reject 阻断该步、交还用户裁决。
+        // [2026-09-24 同构回填 · base A → B] 这一格是 base A 的既有能力：契约不给回传通道时，
+        //   **唯一不留白的方式是把留证写进审计日志** —— 否则 pre-step 的 review 事后不可追溯（bugKey 与后果双失）。
+        const call = { name: 'pre-step', args: { messages: payload?.messages } };
+        const bug = bugKeyOf(call);
+        const branches = deduceBranches(engine, call);
+        logline(`pre-step review (definition unclear) -> suspend & return to user for decision, bugKey=${bug}` + (branches ? ` branches=${JSON.stringify(branches)}` : ''));
+      } else {
+        logline(`pre-step -> reject(${decision.law})`);
+      }
       return { kind: 'reject' }; // PreStepDecision only {kind:'reject'}, no reason field
     }
     return next();
