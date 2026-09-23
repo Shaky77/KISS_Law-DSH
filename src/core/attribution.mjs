@@ -214,6 +214,116 @@ function extractCommand(call) {
   return { cmd: '', nested: false };
 }
 
+// ---- 字典读命令：破坏标记（VERB.delete 词族）在命令串里的读取 —— [2026-09-23 · 安裁定「字典就是S」· 接线] ----
+// 结构理由：安 09-20 已立「**破坏标记有限可封闭枚举 · 只读命令无限开放**」⇒ 破坏标记的识别落在本模块。
+//   但旧实现只用手写正则枚举**具体工具名的写法**（rm|rmdir|shred|unlink|mkfs|format|dd|truncate|wipefs），
+//   而字典 VERB.delete 早已收全同义动词（remove/delete/del/purge/erase/unlink/rm/drop/删/删除/清）——只是无人来问。
+//   实测穿透（安称「异体字」）：`remove_tree` / `FileUtils.rm_rf` / `--remove-files` 三条全部穿门而过。
+// 修法（先结构后枚举）：读法唯一化 —— 命令词素过**同一本字典、同一套分词**；不新增词、不新增正则。
+//
+// 🟢 [2026-09-23 · 安二次裁定]「**字典 / 词典 / 成语字典等等，都是语言工具，你可以归纳到一起总结为一个 S 点，
+//   而不是分开。分开以后就又降维成 X 轴了。所以，这本身就是 S 的内部套嵌法。**」
+//   🔴 结构 ＝ **一个 S（查典法则）在三个粒度上重复长一遍**，不是三本并列的字典：
+//       字级：词素        → 语义类             （`nameLayer`；典的唯一来源，本文件既有的那本）
+//       词级：动作位词素   → 是否删除            （**同一法则**作用于「谓语位」——见 `atActionSlot`）
+//       句级：解释器段     → **递归**同一法则      （**套嵌**：代码段里的谓语位 ＝ 调用名 / 段首词）
+//   ⇒ 实现形式是**同一个函数被递归调用**（粒度不同），而不是"三条并列通道"——并列就是 X 轴枚举。
+//   位置纪律：只读**动作位**。段首命令名 / （解释器段内递归后的）代码谓语位／选项名。
+//   ⇒ **自由参数位的词不读**：`echo "remove the old file"` 里的 remove 是**数据**，
+//     不得读成动作 —— 否则把"提到"读成"在做"，正是 review 通胀的根（安 09-20 已因此打回过一次过宽修法）。
+//   ⚠️ 实测（`_stash/dsh-probes/linear-vs-holistic.mjs`）：线性扫法把**数据位**读成动作 ——
+//     `bash -c 'echo delete-me'` / `python3 -c "print('delete')"` / `perl -e 'print "remove"'` 三条
+//     仅因宿主是解释器就被判 `exec-destructive`（而 `echo …` 同义串却放行）⇒ 判词取决于宿主形态，不取决于角色。
+//     套嵌法则修掉此病：进解释器后**再走一遍动作位判据**，数据位自然不读。
+//   ⚠️ 真正**不可由法则推导、只能「收录」**的是第三层「成语」＝**固定搭配的整体语义**：
+//     实测 `rsync --delete`（删除）与 `docker run --rm`（容器清理）**词形同族、语义不同**
+//     ⇒ 必须作为**典的条目**收录（与"破坏标记有限可封闭枚举"同源），故③保持既有口径（不塌方），
+//       该层差异**登记为待收录**，不在此硬编。
+const INTERPRETER_HEAD = /^(?:bash|sh|zsh|ksh|dash|python\d*(?:\.\d+)*|node|perl|ruby|php)$/i;
+const SEG_SPLIT = /(?:;|&&|\|\||\||\n)+/;
+const CMD_TOKEN_SPLIT = /[\s()'"`<>=$:;,&|\[\]{}\\]+/;
+const CALL_NAME = /([A-Za-z_$][\w.$]*)\s*\(/g;      // 代码段里的调用名＝代码语言的「谓语位」
+
+// [2026-09-23 · 安「能做的全部先做了」· 第三/四粒度：槽位扩展 + 数据边界]
+//   ④ 数据边界（前置条件）：`CMD_TOKEN_SPLIT` 把引号当普通分隔符**剥掉** ⇒ "是否在引号内"的信息在分词阶段就丢了，
+//      位置判据无从区分「动作」与「被谈论的动作」（实测误判：`grep -r "rm -rf" /var/log`、`echo "清理 /tmp"`）。
+//      ⇒ 位置判定前先把**引号内内容摘除**（数据位＝不被执行的内容）。
+//      ⚠️ 例外：解释器段的引号内是**代码**不是数据，故递归通道用**原文**（见 lexiconDestructive ③）。
+const QUOTED_LITERAL = /"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'/g;
+/** 数据边界：把引号内内容摘成空格，只留**骨架**（动作位可见的部分）。 */
+const stripData = (t) => String(t || '').replace(QUOTED_LITERAL, ' ');
+
+const isDeleteWord = (w) => {
+  const l = w ? nameLayer(w) : null;
+  return l === 'file-delete' || l === 'cred-delete';
+};
+
+// [成语层 · 收录] —— 安 09-23：「字典、词典、成语字典等等，都是语言工具…这本身就是 S 的内部套嵌法。」第三层即此。
+//   **固定搭配的整体语义，不可由字级/词级推导** —— 实测 `rsync --delete`（真删除）与 `docker run --rm`（容器清理）
+//   **词形同族、语义相反** ⇒ 只能作为**典的条目**收录（与「破坏标记有限可封闭枚举」同源：有限封闭集、可穷尽）。
+//   ⚠️ 这是**收录**，不是"加规则"：不假装能从 `--rm` 推出"非破坏"，只登记这条搭配的既有语义。
+//   ⚠️ 也不等同于"豁免名单"：它以 **(宿主, 选项) 搭配**为键 —— 是成语，不是词。
+const IDIOM_NON_FS = [
+  { host: /^(?:docker|podman|nerdctl)$/i, opt: /^--?rm$/i, note: '容器生命周期清理，不触碰文件系统' },
+];
+const idiomNonFs = (seg, opt) => {
+  const first = String(seg).split(CMD_TOKEN_SPLIT).filter(Boolean)[0] ?? '';
+  return IDIOM_NON_FS.some((it) => it.opt.test(opt) && it.host.test(first));
+};
+
+/** S 的**套嵌法则**（唯一一条）：一段文本的「动作位」（谓语位）是否删除。
+ *  动作位 ＝ 第一个非选项词（命令 / 代码段首）∨ 代码调用名（`name(` 形态）。
+ *  **数据位不读**（引号内参数、非首位词）—— 这正是「查到这个词」与「读成在做这件事」的分界。
+ *  ⚠️ 入参应是**已剥数据位**的骨架（段级传 `stripData(seg)`，递归层传原文——那一层的引号内是代码）。 */
+function atActionSlot(text) {
+  const s = String(text || '');
+  const head = s.split(CMD_TOKEN_SPLIT).filter(Boolean).find((t) => !t.startsWith('-'));
+  if (head && isDeleteWord(head)) return true;    // 槽位 1 **接受路径形式**（`/bin/rm -rf /` 是真命令的路径写法）
+  for (const m of s.matchAll(CALL_NAME)) if (isDeleteWord(m[1])) return true;
+  return false;
+}
+
+/** ★ 第三粒度：**子命令位**（第 2 个非选项词）为破坏词素 ∧ 段内存在**自由路径宾语**。
+ *  结构理由（不靠工具名单）：`kubectl delete pod`（删抽象资源）与 `deploy purge /var/www`（删文件树）
+ *  **词素同族、判词相反** —— 分界不在"是哪个工具"，而在**该段有没有文件系统落点**：
+ *  删除动作必须有一个可删的**路径**。故判据 ＝ (子命令位破坏词素) × (自由路径宾语)。
+ *  - "自由"＝ 不被选项引导：`kubectl delete -f /manifest.yaml` 的路径是 `-f` 的**参数**，不是宾语 ⇒ 不算。
+ *  - 槽位 1 归 `atActionSlot`（保持既有口径：命令名即动作，宾语可省略/相对），此处只管槽位 2。 */
+function subSlotDestructive(bare) {
+  const toks = String(bare || '').split(CMD_TOKEN_SPLIT).filter(Boolean);
+  const nonOpt = toks.filter((t) => !t.startsWith('-'));
+  const slot2 = nonOpt[1];
+  if (!slot2 || slot2.startsWith('/') || !isDeleteWord(slot2)) return false;   // 槽位须是**词**，不是路径
+  for (let i = 1; i < toks.length; i++) {
+    if (!toks[i].startsWith('/')) continue;                 // 只认绝对路径（文件系统落点）
+    if (toks[i - 1].startsWith('-')) continue;              // 选项参数（如 `-f /manifest.yaml`）≠ 自由宾语
+    return true;
+  }
+  return false;
+}
+
+function lexiconDestructive(cmd) {
+  if (!cmd) return false;
+  for (const seg of String(cmd).split(SEG_SPLIT)) {
+    const s = seg.trim();
+    if (!s) continue;
+    const bare = stripData(s);                                    // ④ 数据边界：引号内不参与位置判定
+    if (atActionSlot(bare)) return true;                          // ① 动作位＝槽位 1
+    if (subSlotDestructive(bare)) return true;                    // ② ★ 子命令位＝槽位 2 × 自由路径宾语
+    const head = s.split(CMD_TOKEN_SPLIT).filter(Boolean)[0] ?? '';
+    if (INTERPRETER_HEAD.test(head)) {                            // ③ ★ 套嵌：递归下降一层（用**原文**：引号内是代码）
+      const code = s.slice(s.indexOf(head) + head.length);
+      if (atActionSlot(code)) return true;
+    }
+    for (const t of bare.split(CMD_TOKEN_SPLIT)) {                // ⑤ 状语位（选项）
+      if (!t.startsWith('-') || !isDeleteWord(t)) continue;
+      if (idiomNonFs(bare, t)) continue;                          // ★ 成语层收录：词形同族、语义非文件系统 ⇒ 不算破坏
+      return true;
+    }
+  }
+  return false;
+}
+
 function commandLayer(cmd) {
   if (!cmd) return null;
   if (GIT_DESTRUCTIVE.test(cmd)) return 'exec-destructive';
@@ -226,13 +336,25 @@ function commandLayer(cmd) {
   //   这一条覆盖**未来任何 `-xxx` 参数**，不是逐个选项打补丁——先结构、后枚举。
   //   注：`-delete` / `-exec rm` 等**删除标记本身就是参数**，故其检测（上文）保持在参数位，不受此约束。
   const CMD_POS = '(?<![-\\w])';
-  if (new RegExp(CMD_POS + '(rm|rmdir|shred|unlink|mkfs|format|dd|truncate|wipefs)\\b', 'i').test(cmd)) return 'exec-destructive';
+  // [2026-09-23 · 数据边界同样适用于工具名正则线] 引号内是**数据**（不被执行）⇒ 不得把"提到 rm"读成"在做 rm"。
+  //   实测（本轮撞出来的既有边界）：`grep -r "rm -rf" /var/log`、`echo "run rm -rf /tmp/x"`、
+  //   `sed -n "/rm -rf/p" /etc/history`、`grep -r "dd if=" /var/log` —— 6/6 因引号内命中而判破坏
+  //   ⇒ review 通胀（不是误杀，但是结构性噪声）。
+  //   ⚠️ 例外同 lexiconDestructive ③：**解释器段**引号内是**代码**，保持原文 —— 否则 `bash -c "rm -rf /"` 会塌方。
+  const DESTRUCTIVE_NAME = new RegExp(CMD_POS + '(rm|rmdir|shred|unlink|mkfs|format|dd|truncate|wipefs)\\b', 'i');
+  for (const seg of String(cmd).split(SEG_SPLIT)) {
+    const head = seg.trim().split(CMD_TOKEN_SPLIT).filter(Boolean)[0] ?? '';
+    if (DESTRUCTIVE_NAME.test(INTERPRETER_HEAD.test(head) ? seg : stripData(seg))) return 'exec-destructive';
+  }
   // [2026-09-20 · 破坏标记，有限封闭集] 只登记**删除语义的形态**，不登记"哪些命令是只读的"
   //   ——结构理由：**破坏标记有限可枚举，只读命令无限开放**（详见 engine.checkSpeechAct 留档注释）。
   //   实证（NPD 组 S1 轮3）：言承诺"不涉及写入、删除"，行=`find /app/tmp -mindepth 1 -maxdepth 1 -print -delete`
   //   ⇒ 真删除却因 find 不在词表而判 exec ⇒ 明诺违背匹配不上 ⇒ 漏（allow）。
   if (/\s-delete\b/i.test(cmd)) return 'exec-destructive';                     // find ... -delete
   if (/\b-exec\s+[^;]{0,80}?\b(rm|shred|unlink|mv|dd)\b/i.test(cmd)) return 'exec-destructive';  // find -exec rm
+  // [2026-09-23 · 字典即S] 字典补读：同义动词换写法（异体字）由**词素**接住，不再逐个工具名加正则。
+  //   次序与既有破坏检查同层（破坏优先于读/外传），故置于读写判定之前。
+  if (lexiconDestructive(cmd)) return 'exec-destructive';
   if (new RegExp(CMD_POS + '(cat|head|tail|read|less|more|vi|vim|nano|type|open)\\b', 'i').test(cmd)) return 'cred-read';
   if (new RegExp(CMD_POS + '(curl|wget|scp|rsync|ftp|nc|ssh)\\b', 'i').test(cmd)) return 'network-send';
   // [2026-09-20 · 对外不可逆（push / publish）—— 与"外传"同层，理由同 228-233 的封闭性论证]

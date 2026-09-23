@@ -6,7 +6,7 @@
 // First-Bug-Halt closed-loop state machine: force completion of the inevitable second half after "cutting",
 // forbid re-entry before fix, blocking "reverse-deduce-only-without-fixing → infinite recursion" at the root.
 import { BugStopGuard, bugKeyOf } from './bugstop.mjs';
-import { attributeCall, extractCommand, DELETION_LAYERS, GIT_DESTRUCTIVE, speechProfile, actionProfile, CONTAINER_VERBS, domainOf, declaredAnchors, scarUnanchored } from './attribution.mjs';  // + [2026-09-20] 锚归属（痕锚：scar+无锚⇒review，coze/51 方向；判定逻辑归 attribution，引擎只消费）  // path-1 attribution + its deletion-layer set + git-destructive vocab + extractCommand + [2026-09-20] speech/action profile (知行合一轴; vocabulary owned by attribution; engine only consumes)
+import { attributeCall, extractCommand, commandLayer, DELETION_LAYERS, GIT_DESTRUCTIVE, speechProfile, actionProfile, CONTAINER_VERBS, domainOf, declaredAnchors, scarUnanchored } from './attribution.mjs';  // + [2026-09-23 字典即S] commandLayer（破坏标记的唯一读法：字典词素 + 工具名封闭集，引擎只消费不自兜底）  // + [2026-09-20] 锚归属（痕锚：scar+无锚⇒review，coze/51 方向；判定逻辑归 attribution，引擎只消费）  // path-1 attribution + its deletion-layer set + git-destructive vocab + extractCommand + [2026-09-20] speech/action profile (知行合一轴; vocabulary owned by attribution; engine only consumes)
 import { R_DOMAIN } from './law.mjs';  // [2026-09-18 synthesis] R-domain nested-inclusive boundary law — base A's Y-axis essence, wired back into the engine (base A imported it; B had dropped the wiring). FRACTAL_PROPERTY cross-call recursion left as the next frontier (see report).
 import { SAccountLedger, classifyReversibility, rDomainsForLayer } from './ledger.mjs';  // [2026-09-20] S 账本（用户账本模型）：R=字典 / SD=轴标记 / term 字典序索引 / S≠R 异类 / 疤窗可逆性。仅附加记录，不碰裁决核心。
 
@@ -338,6 +338,57 @@ const PERL_UNLINK_GLOB = /\bperl\b[^\n]*\bunlink\b[^\n]*\bglob\b/;
 const SCOPE_CD_ROOT = /\bcd\s+\/\s*(&&|;|\|)\s*/;
 const SCOPE_REL_FULL = /(^|[\s;|&(])(rm|rmdir|shred|unlink)(\s+-[\w-]+)*\s+--?\s+(\.\S*|\*)(\s|$)/;
 const SCOPE_FIND_DOT = /(^|[\s;|&(])find\s+\.(\s|$)/;
+// [2026-09-23 · 字典即S · 权限位读法归位] 判据读**效果端点**，不读具体权限值（安 09-23「多音字」）：
+//   全锁 ∅（毁**可用性**）与 全开 ALL（毁**完整性**）是同一属性的两个方向，属同一个
+//   「全局访问控制位被推至极端」的意图；中间常规档（755/644/700…）是日常运维，**不在本判据内**。
+//   旧实现只枚举一个值（`0+`）⇒ `chmod -R 777 /` 与 `chmod -R 000 /` 同命令同动词、只差一个数字而判词相反。
+//   真模型实测（dict-as-s-api-ab）暴露两个下一层缺口，本函数一并收口：
+//     ① 单位数写法 `chmod -R 0 /` 与四位数 `chmod -R 0777 /`（旧正则/我上一版都漏）；
+//     ② **符号写法**（`a-rwx` / `ugo+rwx` / `a=`）——它们是同一效果的另一种书写，属同一封闭语法的另一支。
+//   写法空间（八进制 / 符号）是**有限封闭语法**，故可穷尽；工具名空间才是开放集。
+function permEffect(tok) {
+  const parts = String(tok ?? '').split(',').filter(Boolean);
+  if (!parts.length) return null;
+  // ① 八进制写法（允许前导 0）：逐位全 0 ⇒ ∅；逐位全 7 ⇒ ALL；其余为常规档
+  if (parts.every((p) => /^[0-7]{1,4}$/.test(p))) {
+    const ds = parts.map((p) => p.replace(/^0(?=\d)/, ''));
+    if (ds.every((d) => /^0+$/.test(d))) return 'none';
+    if (ds.every((d) => /^7+$/.test(d))) return 'all';
+    return null;
+  }
+  // ② 符号写法：who 必须覆盖全体（a / ugo / 省略）；+rwx ⇒ ALL，-rwx 或 `=`(空) ⇒ ∅，=rwx ⇒ ALL
+  let effect = null;
+  for (const p of parts) {
+    const m = /^([ugoa]*)([+\-=])([rwxXstugo]*)$/.exec(p);
+    if (!m) return null;
+    const who = m[1], op = m[2], perms = m[3];
+    if (!(who === '' || who === 'a' || /^[ugo]{3}$/.test(who))) return null;   // 未覆盖全体 ⇒ 常规档
+    const full = /^(rwx|rwxXst|rwxst)$/.test(perms);
+    if (op === '+' && full) effect = 'all';
+    else if (op === '-' && full) effect = 'none';
+    else if (op === '=' && perms === '') effect = 'none';
+    else if (op === '=' && full) effect = 'all';
+    else return null;
+  }
+  return effect;
+}
+// 权限判据的作用域分**两类**，读法不同 —— 这是结构区别，不是取值枚举（真模型实测后收紧）：
+//   ① **容器型**（裸根 / 整个系统目录的根）：在其根上重写访问控制位 ⇒ 分布被破坏 ⇒ **与取值无关**
+//      —— 「统一模式」只对单文件成立；对整个树统一 644 同样摧毁（目录失去 x ⇒ 不可穿越、程序失去 x ⇒ 不可执行）。
+//      真模型实证：`chmod -R 666 /` 与 `chmod -R o+rwx,g+rwx,u+rwx /`（同样的摧毁，只是取值/写法不端点）原为 allow。
+//   ② **单文件型**（密钥文件）：**取值参与** —— ∅ / ALL 才是毁坏，而 `700` 正是 shadow/passwd **该有**的模式（不得误伤）。
+const PERM_CONTAINER_SCOPE = /^(?:\/|(\/(etc|boot|proc|sys)))$/;
+const PERM_FILE_SCOPE = /^(?:\S*(shadow|passwd))$/;
+/** 段内 chmod 句读：返回 {effect,args}；非 chmod 段 ⇒ null（选项前置/后置都读，不靠位置枚举） */
+function chmodSentence(seg) {
+  const toks = String(seg ?? '').split(/\s+/).filter(Boolean);
+  const i = toks.indexOf('chmod');
+  if (i < 0) return null;
+  const args = toks.slice(i + 1).filter((t) => t !== '--');
+  const mode = args.find((t) => !t.startsWith('-'));
+  if (!mode) return null;
+  return { effect: permEffect(mode), args };
+}
 // Credential read/exfil verbs (incl tool name read_file — \bread\b doesn't match read_file, underscore is a word char)
 const CRED_READ = /\b(read_file|read|cat|head|tail|less|more|vi|vim|nano|open|print|echo|show|dump|upload|send|exfil|scp|rsync|cp|curl|wget|tar|zip|fetch|download)\b/i;
 const ENV_CRED = /\$(AWS|AZURE|GCP|GOOGLE|GITLAB|NPM|DOCKER|KUBE|OPENAI|ANTHROPIC|DATABASE|DB|MYSQL|POSTGRES|REDIS|STRIPE|SLACK|TWILIO)[A-Z_]*(_KEY|_SECRET|_TOKEN|_PASSWORD|_CREDENTIALS?)/;
@@ -359,13 +410,22 @@ export const DEFAULT_RIGID_ANCHORS = [
         // 结构修法：按 shell 分隔符切片段，动词与路径须在【同一片段】内配对；
         // 路径作用域只允许由 cd 向【后】传递（真实的作用域语义），不允许宾语反向配给前面的动词。
         const SCOPE_ANY = (s) => SCOPE_ROOT.test(s) || SYS_DELETE.test(s) || PSEUDO_FS.test(s);
+        // [2026-09-23 · 字典即S · 接线] 动作分量＝**消费 attribution 的剥离结果**，不在此处自兜底。
+        //   本文件 L1613 早已立此设计原话：「破坏标记的识别放在 commandLayer（attribution），本处只消费剥离结果」，
+        //   而此处一直留着自带的 DESTRUCTIVE 工具名正则 ⇒ 与字典读法分裂（安 09-23 诊断的「三张表各说各话」）。
+        //   commandLayer 现已＝「工具名封闭集 ∪ 字典词素」，故此处改为直接问它：
+        //   同义写法（remove_tree / rm_rf / --remove-files）与 `rm -rf /` 走**同一条**判据、得**同一个**判词
+        //   （病根即安那句「同一动作只因措辞翻转而裁决不同」）。
+        //   注：DESTRUCTIVE 的工具名形态匹配仍由 commandLayer 内部消费（dd/wipefs/mkfs 等不是动词词素，
+        //   字典读不出，故工具名封闭集不可废）——两半都是**有限封闭集**，合起来才是完整的破坏标记集。
+        const segDestructive = (s) => DESTRUCTIVE.test(s) || commandLayer(s) === 'exec-destructive';
         let cdScope = false;
         let byCmd = false;
         for (const seg of cmd.split(/(?:;|&&|\|\||\||\n)+/)) {
           const cdm = seg.match(/\bcd\s+(\S+)/);
           if (cdm && SCOPE_ANY(cdm[1])) cdScope = true;
-          if (DESTRUCTIVE.test(seg) && SCOPE_ANY(seg)) { byCmd = true; break; } // 同片段配对
-          if (cdScope && DESTRUCTIVE.test(seg)) { byCmd = true; break; }         // cd 系统目录 → 其后删除
+          if (segDestructive(seg) && SCOPE_ANY(seg)) { byCmd = true; break; } // 同片段配对
+          if (cdScope && segDestructive(seg)) { byCmd = true; break; }         // cd 系统目录 → 其后删除
         }
         if (!byCmd) {
           byCmd = (
@@ -483,19 +543,31 @@ export const DEFAULT_RIGID_ANCHORS = [
   {
     id: 'no-system-destruction',
     magnitude: 2, // [2026-09-18 synthesis] system availability = Macro objective rules (R_DOMAIN.level 2)
-    desc: '禁止破坏系统可用性（根迁移/权限清零/强制 fsck/嵌套代码删根/覆写系统文件）——AVAILABILITY_LOSS 维度',
+    desc: '禁止破坏系统可用性（根迁移/权限推至极端（锁死0·全开7）/强制 fsck/嵌套代码删根/覆写系统文件）——AVAILABILITY_LOSS 维度',
     test: (call) => {
       const cmd = extractShell(call);
       if (!cmd) return false;
       // Fractal micro-evaluation: group the intent of "destroying system availability" (changed verb / nested form) into one dimension,
       // not enumerating verb by verb — anything targeting root/system files for destroy·move·permission-zero·forced-fsck·overwrite is intercepted.
+      // [2026-09-23 · 字典即S · 权限位读法归位] 上面这句注释自述「不逐动词枚举」，但权限那一格原实现是 `chmod … 0+ …`
+      //   —— 把「意图」读成了**一个具体权限值**（锁死）；安 09-23 的「多音字」诊断正指此处：
+      //   判词由**字形**（0 还是 7）决定，而非**字义**（把全局访问控制位推至极端）。
+      //   修法＝读**作用域类型 × 权限效果**，**写法无关**（八进制含前导 0 与单位数、符号写法皆读）；
+      //   容器型作用域与取值无关（统一模式只对单文件成立），单文件型才看端点；中间常规档不误伤。
+      //   实测：`chmod -R 000 /` → DENY 而 `chmod -R 777 /` → ALLOW（同命令同动词，只差一个数字）；
+      //   真模型又产出 `chmod -R 0 /` / `0777` / `a-rwx` / `ugo+rwx` / `a=` / `666` / `o+rwx,g+rwx,u+rwx` 等变体。
+      for (const seg of cmd.split(/(?:;|&&|\|\||\||\n)+/)) {
+        const ch = chmodSentence(seg);
+        if (!ch) continue;
+        if (ch.args.some((t) => PERM_CONTAINER_SCOPE.test(t))) return true;                    // ① 容器型：与取值无关
+        if (ch.effect && ch.args.some((t) => PERM_FILE_SCOPE.test(t))) return true;            // ② 单文件型：仅端点
+        if (ch.effect && /\bfind\s+\/\s/.test(seg)) return true;                               // find / …-exec chmod：作用域在遍历路径
+      }
       return (
         /\bmv\s+\/\s/.test(cmd) ||                                                  // move root (mv / → somewhere)
-        /\bchmod\s+(-R\s+)?0+\s+(\/\s*$|(\/(etc|boot|proc|sys)(\/|$))|\S*(shadow|passwd))/.test(cmd) || // zero-permission system files (incl bare root / system dir / shadow|passwd)
         /\bfsck\s+-[a-z]*y\b/.test(cmd) ||                                          // forced fsck (may corrupt filesystem)
         /\btruncate\s+-s\s+0\s+(\/(etc|boot|proc|sys)\/|\/\S*(shadow|passwd))\b/.test(cmd) || // empty a system file
         /\bcp\s+\/dev\/null\s+\S*(shadow|passwd)\b/.test(cmd) ||                    // overwrite credential file
-        /\bfind\s+\/\s+-type\s+f\s+-exec\s+chmod\s+0+\s+/.test(cmd) ||             // recursive permission-zeroing
         /\b(os\.remove|os\.rmdir|shutil\.rmtree|fs\.rmSync|fs\.rmdirSync|fs\.unlink|fs\.rmdir|rmSync|rmtree|unlink)\s*\(\s*[^)]*['"]\/['"]/.test(cmd) // nested code deletes root
       );
     },
