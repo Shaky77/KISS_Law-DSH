@@ -398,16 +398,19 @@ function apply(ctx) {
       //   treated as an unknown type and released. "Intercept first, don't release" ⇒ tell the host "blocked" in its own language,
       //   and use the extra fields to say "this is a suspension, not a final verdict".
       const isReview = decision.kind === 'review';
-      const out = {
-        kind: 'deny',
-        law: decision.law,
-        reason: `[KISS's Law·${decision.law}] ${decision.reason}`,
-        ...(decision.bugKey !== undefined ? { bugKey: decision.bugKey } : {}),
-        ...(decision.closedLoop !== undefined ? { closedLoop: decision.closedLoop } : {}),
-        ...(Array.isArray(decision.missing) ? { missing: decision.missing } : {}),
-        ...(decision.stage !== undefined ? { stage: decision.stage } : {}),
-        ...(decision.risk ? { risk: decision.risk } : {}),
-      };
+      // ═══ White-box carry-through: fact positions pass by DEFAULT (2026-09-24 · structural fix, not name-picking) ═══
+      // Before: this was "pick by name" — only bugKey/closedLoop/missing/stage/risk were listed, so **every other fact position the engine produced was silently dropped**.
+      // Measured (probe-whitebox-egress.mjs `before`, 24 real-API inputs / 18 decisions, same-instant-same-object method):
+      //   conduction dropped 18/18 · innerH 18/18 · mMark 17/18 · attrib 15 · deduced 10 · scarUnanchored 9 · fractalSubM 6 · systemKey/actionText/equivalence/mCrossCheck 1 each — 11 field families total.
+      //   Dropping `innerH` in particular directly violates the engine-side inner-H protocol ④: "deliver the outer-H deduction result and the inner-H parked state **together**".
+      // Why structural instead of "add the missing names": fields evolve with the engine, so **enumeration can never catch up** (X axis); egress must pass by POSITION (Y axis) — one change covers all present and future fact positions.
+      // Host contract read from source (dsh-tools/lib/index.js:3002 reads only kind/reason; lib/types/index.d.ts:408 types only {kind,reason})
+      //   ⇒ extra fields are ignored and not strictly validated ⇒ harmless to the host; white-box for downstream plugins and the audit surface.
+      // The exclusion list is defined by NATURE (only "internal-implementation positions": engine-instance refs / mutable internal state / inner-H deduction process), never a name blacklist.
+      //   Measured: all engine outputs across 18 decisions are **JSON-serialisable, no cycles, no functions** (sample 2456 B) ⇒ nothing currently falls into the exclusion.
+      const INTERNAL_ONLY = [];   // internal-implementation positions only; fact positions always pass
+      const out = { ...decision, kind: 'deny', law: decision.law, reason: `[KISS's Law·${decision.law}] ${decision.reason}` };
+      for (const k of INTERNAL_ONLY) delete out[k];
       if (isReview) {
         // ③ suspend + label with evidence: some review exits from the engine don't carry a bugKey; supplement a stable BUG identity for traceability.
         //    Don't go through _markIntercept: it would inflate the M-tier mBugForce count (changing the cap-escalation behavior).
@@ -424,9 +427,14 @@ function apply(ctx) {
         const summary = branchesSummary(branches);
         if (summary) out.reason = `${out.reason}\n${summary}`;
       }
-      logline(`pre-execute ${exec?.name} -> ${decision.kind}${isReview ? '(awaitingHuman, bugKey=' + out.bugKey + ')' : ''}`);
+      // ═══ White-box carry-through: what the interface sees = what the log records (same object, no fork) ═══
+      // The log is the append-only audit surface (src/runtime.log, gitignored, not committed). Writing a second "summary" here
+      //   means two copies that can drift, at which point white-box degrades into "looks white-box" ⇒ so what is logged is **the very object returned**.
+      logline(`pre-execute ${exec?.name} -> ${decision.kind}${isReview ? '(awaitingHuman, bugKey=' + out.bugKey + ')' : ''} | whitebox ${JSON.stringify(out)}`);
       return out;
     }
+    // allow: leave a white-box record too — otherwise "was not blocked" becomes an **unrecorded event** (isomorphic to the engine rule "every conduction leaves a mark").
+    logline(`pre-execute ${exec?.name} -> whitebox ${JSON.stringify(decision)}`);
     return next();
   });
 
@@ -464,6 +472,13 @@ function apply(ctx) {
       } else {
         logline(`pre-step -> reject(${decision.law})`);
       }
+      // ═══ White-box carry-through: isomorphic to tools/pre-execute ═══
+      // The host contract (PreStepDecision) only accepts {kind:'reject'} ⇒ rich information **cannot leave via the return value**,
+      //   so the log is the only white-box surface at this exit. Before, only a few names were picked for the log
+      //   (bugKey / branches) — the same "pick by name" defect: neither the engine decision object itself (law/reason)
+      //   nor **this decision's chain landing** (engine.conduction) reached the audit surface.
+      // Now the **engine decision object itself** is recorded verbatim, plus adapter additions (same rule: by position, never by name).
+      logline(`pre-step -> whitebox ${JSON.stringify({ ...decision, bugKey: bugKeyOf({ name: 'pre-step', args: { messages: payload?.messages } }), conduction: engine.conduction ?? [] })}`);
       return { kind: 'reject' }; // PreStepDecision only {kind:'reject'}, no reason field
     }
     return next();
@@ -532,6 +547,11 @@ function apply(ctx) {
       decision = null;   // fail-open
       logline(`post-execute gate failed open: ${e?.message ?? e}`);
     }
+    // ═══ White-box carry-through: isomorphic to the two exits above (what is logged is the very object returned, no fork) ═══
+    // The receipt-side terminus (where D's break-window stop-loss lands) previously left only a one-line summary
+    //   (streak/bugKey) ⇒ the feedback text handed back to the host (the evidence the block was based on) never reached
+    //   the audit surface. Now the whole record is written: the mark and the delivery share one source.
+    if (decision) logline(`post-execute ${exec?.name} -> whitebox ${JSON.stringify(decision)}`);
     return decision ?? (typeof next === 'function' ? next() : { kind: 'accept' });
   });
 
@@ -588,13 +608,20 @@ function apply(ctx) {
 
   ctx.tools.register(defineTool({
     name: 'query_conduction_chain',
-    description: 'Return the conduction-chain order R→S→D→H→M and the framework essence, for the model to understand the closed-loop structure.',
+    description: 'Return the conduction-chain order R→S→D→H→M and the framework essence, plus the **actual chain landing of the most recent decision** (per-node readings and verdict), so the model can understand the closed-loop structure and audit the basis of the latest verdict.',
     parameters: {},
     output: { schema: { type: 'object', additionalProperties: true }, render: renderObj },
     async execute() {
       return {
         chain: ['R rigid anchor', 'S steady-state reserve', 'D break-window stop-loss', 'H inner-H inviolability', 'M First-Bug Halt'],
         essence: 'White-box presentation of causal-law runtime structure: survival (never abandon any node) and precision (structure carries its own anchors) are isomorphic.',
+        // [2026-09-24 · white-box carry-through] Before, this tool **returned a constant**: no matter what had happened, you read the same text
+        //   ⇒ a surface that looks like a white-box query but is in fact a black box (nobody outside can re-derive any single verdict from it).
+        //   Meanwhile the chain landing of the latest decision has **always been present** on the engine side (`engine.conduction`; rebuilt on
+        //   every decideToolCall; each R→S→D→H→M node carries sBefore/sAfter/delta/verdict readings) ⇒ echo it as-is, unprocessed.
+        //   No new criterion, no change to adjudication, no field-picking (same rule: faithful by position, never summarised by name).
+        lastConduction: engine.conduction ?? [],
+        lastConductionNote: 'Chain landing of the most recent decideToolCall (per-node readings). Empty array = no decision has occurred in this session yet.',
       };
     },
   }));
