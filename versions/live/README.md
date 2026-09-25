@@ -5,11 +5,12 @@
 
 ## 结构
 
-- `evidence/` —— 多 Agent 交互压测台在 DSH `engine.mjs` 上的实测证据，可复验：
-  - `INDEX.md` 实测总表（场景 / 模式 / 模型 / 存活 / BugStop / 费用）
+- `evidence/` —— 在本仓 DSH `engine.mjs` 上的实测证据，可复验：
+  - `INDEX.md` 实测总表（场景 / 模式 / 模型 / 存活 / BugStop / 费用）—— **条目数以本表为准**（此处不写死数字：写死的必过期）
   - `findings.md` 硬性发现（凭据缺口 / M 闭环 / 真实模型顺从性 / 成本结构 / 决策解释域）
-  - `results/` 24 个 report JSON（原始裁决数据）
-  - `transcripts/` 24 个 chat HTML（交互实录）
+  - `results/` 原始裁决数据（report JSON）
+  - `transcripts/` 交互实录（chat HTML）
+  - `type-gate/` 类型层可识别性闸门 · 真模型实测报告（2026-09-25 由仓库根目录归位）
 
 ## 分层关系
 
