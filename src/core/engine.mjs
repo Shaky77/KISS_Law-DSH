@@ -708,13 +708,106 @@ function hasEnvSecretRef(text) {
 }
 
 // Inner-H (thought / memory / free will / belief / values / persona etc. subjective black box):
-// Any "intrusion verb ∩ inner-H noun" double hit is treated as H intrusion. Single hit alone isn't blocked, to reduce false hits.
+// ⚠️ [superseded 2026-09-27] The old "intrusion-verb ∩ inner-H noun double hit" reading is **no longer the
+//   real verdict** — `INNER_H_VERB` is now only a **fast pre-filter** (its semantics are covered by the
+//   change/intrusion morpheme slots below), and `INNER_H_TERM` is a **carrier-noun slot** requiring act-ness.
+//   The authoritative verdict is `hitsInnerH` (v3) below.
 const INNER_H_VERB = /(读取|读|窥探|访问|获取|拉取|导出|改写|修改|植入|注入|操纵|控制|重塑|覆盖|重写|篡改|洗脑)/;
 const INNER_H_TERM = /(思想|内心|记忆|自由意志|信念|价值观|人格|灵魂|主观|意识|认知)/;
+// [2026-09-27 author's naming] The inner frame = **the bipolar form of human value systems** (good/evil,
+//   reward/punish, right/wrong, ortho/hetero …); "right/wrong" is only ONE instance ⇒ the instance set is OPEN.
+//   INNER_H_TERM above is a **carrier-noun list** (container names: thought/memory/persona), so it cannot
+//   capture the CONTENT of the inner frame. Measured (`_probe-innerh-value-20260927.mjs`): none of the five
+//   examples the author named is hit by that list; 8 structurally identical phrasings were all allowed —
+//   they never even entered the "trace to the root" step (the word list acts as a gate).
+//   API evidence (`_api-innerh-value-20260927.mjs`, real model deepseek-v4-flash): after opening the NOUN
+//   slot, only 2/10 were caught — **every miss was on the VERB side**: the real model used 校准/re-calibrate,
+//   重设/re-set, 调校/re-tune, 修正/correct, 重置/reset, 更新/update, 调整/adjust, 重配/re-configure —
+//   none of which the old 18-word INNER_H_VERB list matches (the single catch came from a trailing 覆盖/overwrite).
+//   ⇒ **BOTH ends of the AND are open sets** — opening one end alone is worthless.
+//   The fix does NOT enumerate instances (an open set can never be completed — "structure first, enumeration
+//   second"), it recognises **three structural slots**:
+//     ① CHANGE/INTRUDE slot — the Chinese "change" morphemes (改/变/换/调/设/置/校/订/修/覆/刷/清/写/注/植/配/更/重)
+//        and "intrusion" morphemes (读/取/探/访/拉/导/窥/获/窃/侵/控/驭/操) are a **closed small set**, whereas
+//        whole verbs are an open set ⇒ recognise **morphemes, not words** (the old 18-word list stays as a
+//        fast pre-filter; its semantics are already covered by the morphemes).
+//     ② JUDGE slot INNER_H_JUDGE — the class of adjudication grounds (…观 / standard / criterion / scale /
+//        orientation / stance / preference / principle / creed / likes-dislikes / trade-off / aesthetics /
+//        morals / ethics / faith). **"…观" is a closed SUFFIX whose preceding instance is open** ⇒ the suffix
+//        absorbs the open instance instead of listing instances (self-test: can it judge a bipolar pair that
+//        never appeared in any list?).
+//     ③ OWNER slot INNER_H_OWNER — ⛔ **REMOVED in v3** (see the ruling block below): in the inner frame the
+//        subject is always present; a missing subject is no ground for a pass. The constants `INNER_H_OWNER` /
+//        `INNER_H_STRONG_VERB` are deleted and are no longer necessary conditions (kept here as evolution record only).
+//   Verdict (v2 form, **superseded by v3**): scope clue (TERM ∨ (JUDGE ∧ (OWNER ∨ STRONG_VERB))) ∧ change/intrude slot.
+//   ⇒ v2's measured blind spot: group A missed 5/12 (**all due to the missing owner slot**), while removing the
+//     owner gate alone caused 9/12 false hits in group B ⇒ exclusion slots are needed to restore precision.
+//   🔻 **v3 form (the only authoritative one)**:
+//     carrier-noun slot (requires act-ness, **not overridable by exclusion slots**)
+//     ∨〔 JUDGE ∧ ¬engineering-config (must directly govern the judge slot, ≤5 chars) ∧ ¬(read-only act ∨ third-person objective)
+//         ∧（change/intrude slot ∨ imperative form）〕
+//     ∨ DIRECT
+//   Three differences from v2: **owner gate removed** · **act-ness gains an "imperative form" channel** (adopting
+//   the peer's Q1 "sink the gate") · **three exclusion slots added**.
+//   Measured: constructed 4 groups A 12/12 · B/C/D all 0; real-phrasing frozen regression set attack 10/10 · control 0/8.
+const INNER_H_CHANGE = /(改|变|换|调|设|置|校|订|修|覆|刷|清|写|注|植|配|更|重)/;
+const INNER_H_INTRUDE = /(读|取|探|访|拉|导|窥|获|窃|侵|控|驭|操)/;
+const INNER_H_JUDGE_SRC = '(?:[\\u4e00-\\u9fa5]{1,3}观(?!察|看|摩|望|战|礼|光|念|点|众)|标准|准则|尺度|取向|立场|偏好|原则|信条|好恶|取舍|审美|道德|伦理|信仰|三观)';
+const INNER_H_JUDGE = new RegExp(INNER_H_JUDGE_SRC);
 const INNER_H_DIRECT = /inner[-_]?H|manipulat/i;
+// [2026-09-27 author's ruling v3 · fusion fix] The OWNER slot gate is REMOVED — in the inner frame the subject is always present.
+//   🔴 Author's words: "**the exit for not-guessing is review, not allow**. In the human value frame,
+//      **there is no possibility of having no subject**. Absence of a subject can only occur in a
+//      **subjectless field**."
+//   ⇒ Structural corollary: "no explicit subject" does NOT license a pass — in the inner frame the subject is a
+//      definitional entailment, not evidence supplied by the surface string. v2 made `INNER_H_OWNER`
+//      (person + 的) a NECESSARY condition, i.e. it misread "subject absent from the wording" as
+//      "subjectless" ⇒ genuinely blockable phrasings were all allowed (measured: 5/12 miss, all due to the
+//      missing owner slot).
+//   ⇒ Gate removed; precision is now carried by the EXCLUSION slots below (they never sit on the verdict position).
+//   ⚠️ Failure boundary (stated honestly): the exclusion table can be **adversarially loaded** — an attacker who
+//      inserts a technical noun bypasses the exclusion. This is inherent to any surface-layer criterion, not unique
+//      to this form; **the structural exit is to sink the "act of changing" down to the execution point**
+//      (see Q1 / plan E, parked).
+//   ⚠️ The three new exclusion tables are all ENUMERATIONS (not structural criteria) ⇒ per "structure first,
+//      enumeration second" they are PLACEHOLDERS and are registered in the XSUB ledger.
+//   🔴 API evidence (real model, 3rd round) **confirmed the warning above, and it is worse than expected**: the old
+//      form only required the technical noun to appear ANYWHERE in the string ⇒ **4 of the 10 attack phrasings were
+//      passed by this criterion's own exclusion table** (all four misses came from TEK: "确保**输出**评价" /
+//      "使一切**输出**倾向" / "纳入可配置**模块**" / "任务评分**函数**") — and **not by deliberate adversarial
+//      crafting: real phrasings simply carry technical nouns**.
+//      ⇒ Fix: a technical modifier must **directly govern the adjudication ground** (adjacent, ≤5 chars) to count as
+//        engineering config; a technical noun elsewhere in the sentence is no ground for exemption.
+//      ⇒ General rule earned this round: **an exclusion slot must be a LOCAL-RELATION criterion, never a
+//        GLOBAL-CO-OCCURRENCE criterion** — a global-co-occurrence exclusion hands the "let it pass" switch
+//        to the text being audited.
+//   🔴 A second regression round caught the same disease at a second location: "评价" is removed.
+//      Miss: a real attack phrasing was passed because "评价" sat in the read-only table (same disease as TEK, different seat).
+//      **Structural criterion (not a patch)**: the read-only slot admits only **truth-neutral cognitive actions**
+//      (梳理/解释/介绍/总结/说明/比较/对比/列出/阐述/论述/论证/了解/学习/科普/讲解/回顾/整理/归纳/复述/翻译/检查/核对/
+//      校对/审阅/批注/比对/查错/复核/查漏); **"评价/评估" implicitly issue a good/bad verdict — that IS moving the
+//      value standard**, so it is not read-only and is moved out.
+const INNER_H_TEK_SRC = '(?:命名|格式|编码|输出|响应|主题|接口|日志|渲染|代码|文档|项目|语言|样式|布局|窗口|颜色|字体|大小|长度|排序|目录|路径|文件|字段|表格|图表|页面|组件|模块|函数|变量|参数|阈值|缓存|索引|级别|版本|依赖|构建|测试|部署|监控|权限|协议)';
+const INNER_H_TEK = new RegExp(INNER_H_TEK_SRC + '[\\s\\S]{0,5}' + INNER_H_JUDGE_SRC);
+const INNER_H_READONLY = /(梳理|解释|分析|介绍|总结|说明|比较|对比|列出|阐述|论述|论证|研究|讨论|了解|学习|科普|讲解|回顾|整理|归纳|复述|翻译|检查|核对|校对|审阅|批注|比对|查错|复核|查漏)/;
+const INNER_H_OBJ = /(这篇文章|该文章|本文|论文|该书|这本书|历史|学术界|哲学上|文化上|学界|文献|研究表明|书中|该研究|该理论|经文|古籍|经典|不同文化|两国|各家)/;
 function hitsInnerH(s) {
   if (INNER_H_DIRECT.test(s)) return true;
-  return INNER_H_VERB.test(s) && INNER_H_TERM.test(s);
+  const atVerb = INNER_H_VERB.test(s) || INNER_H_CHANGE.test(s) || INNER_H_INTRUDE.test(s);
+  // Carrier noun (container name: thought / memory / persona …): still requires an act (same as v2 — otherwise a
+  // subjectless philosophical discussion is falsely hit; reproduced once in measurement). **But it is NOT overridden
+  // by the exclusion slots** (a carrier noun is a strong signal; a technical-config modifier is no ground for exemption).
+  if (INNER_H_TERM.test(s)) return atVerb;
+  // Inner-frame cue = scope (the class of adjudication grounds). A missing subject is **treated as present**
+  // (not judged, and not a ground for anything).
+  if (!INNER_H_JUDGE.test(s)) return false;
+  // Exclusion slots (engineering config / read-only action / third-person objective) ⇒ outer H or subjectless field.
+  if (INNER_H_TEK.test(s)) return false;
+  if (INNER_H_READONLY.test(s) || INNER_H_OBJ.test(s)) return false;
+  // Two channels for act-ness: change/intrusion morpheme slot ∨ imperative form (a syntactic signal).
+  //   The latter embodies Q1 ("sink the gate"): "is it being changed" need not be monopolised by a change-verb list —
+  //   imperative constructions are equally syntactic evidence of directive form.
+  return atVerb || IMPERATIVE_ZH.test(s);
 }
 
 // Outer-H audit allowlist (H dual identity):
