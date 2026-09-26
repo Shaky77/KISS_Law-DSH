@@ -1208,8 +1208,20 @@ export class WeiwenLawEngine {
     if (hitsInnerH(s)) {
       // 2026-09-02 author ruling: when source unlabeled, can't assume "external intrusion" and directly judge malicious (deny).
       // An inner-H noun hit only means content touches inner-H concepts, can't judge inside/outside (principal self-setting vs external injection).
-      // So mark "definition unclear", hand to user for ruling (shelve and return user decision), don't assume intent, don't judge malicious.
-      return { kind: 'review', law: 'H', reason: '来源未标注且内容涉及内 H 相关概念（思想/内心/记忆/价值观/自由意志/…），无法判定内外归属——定义不明，交还用户裁决后再执行。' };
+      // [2026-09-27 author ruling A · supplement, not tightening] review's legitimacy must be earned by "tracing to the end":
+      //   trace down to layer H, split inside/outside, and hand over only after the attribution settles; handing over at the
+      //   word-check hit = buck-passing. This layer previously did NOT run the traceable structural criteria
+      //   (targetsBehaviorConstraint / looksLikeOperationalDirective had run only in the third-party branch) ⇒ one word-check hit
+      //   handed over immediately — yet word lists are enumerations (open sets), while structural criteria are what is traceable.
+      //   Now re-run (R-layer behavior face): hit ⇒ a behavior face (outer-H observable) is present and tracing stops at layer D
+      //   (source unlabeled ⇒ inside/outside undecidable) ⇒ neither malicious nor allowable; no hit at all ⇒ behavior face
+      //   exhausted, attribution settles on inner H (thought/will not auditable) ⇒ hand to the sovereign. **Verdict stays review**;
+      //   only the **reason layer** is corrected (upgrading to deny would overturn the 09-02 ruling, hence not done).
+      const behaviorFace = targetsBehaviorConstraint(s) || looksLikeOperationalDirective(s);
+      if (behaviorFace) {
+        return { kind: 'review', law: 'H', reason: '来源未标注；结构判据命中——内容含指向主体行为约束的形态（外 H 行为面可观测）。追因止于 D 层：来源未标注 ⇒ 内外归属不可判 ⇒ 不可判恶意、亦不可放行，交还用户裁决后再执行。' };
+      }
+      return { kind: 'review', law: 'H', reason: '来源未标注；内容涉内 H 概念（思想/内心/记忆/价值观/自由意志/…）——已跑完本层可执行的行为面判据（结构·指令形态均未命中），归因落于内 H（不可审计），交还主权者裁决后再执行。' };
     }
     // [2026-09-19 live-API] 动作调用不进本层：能抽出 shell 命令文本的调用＝agent 自身提出的**动作**，
     // 其合法性由 R 层判定（R 锚检查已过）。本层只审「承载的内容」（外部数据里藏的注入指令）。
@@ -1217,7 +1229,7 @@ export class WeiwenLawEngine {
     // （git fetch && git rev-parse && git ls-remote && git status）被误判 review，属误伤。
     // 与 isDocWrite（写盘内容＝落定数据）同构：落点性质决定该不该审。
     if (!isDocWrite && !isActionCall(call) && looksLikeOperationalDirective(s)) {
-      return { kind: 'review', reason: '来源未标注且内容带有操作指令的形式——无法判定内外，交还人工复核。' };
+      return { kind: 'review', reason: '来源未标注；结构判据命中——内容含操作指令的形式（外 H 行为面可观测，非纯内 H 对象）。追因止于 D 层：来源未标注 ⇒ 内外归属不可判 ⇒ 不可判恶意、亦不可放行，交还人工复核。' };
     }
     return null;
   }
@@ -2130,10 +2142,16 @@ export class WeiwenLawEngine {
       return { kind: 'allow' }; // external content treated as data → allow
     }
 
-    // Default (provenance unknown): static word-check hits inner-H concept → mark "definition unclear", hand to user (2026-09-02 author ruling).
+    // Default (provenance unknown): static word-check hits inner-H concept → hand to user (2026-09-02 author ruling).
+    // [2026-09-27 author ruling A] isomorphic to checkInnerH: trace before handing over (re-run behavior-face structural
+    // criteria; verdict unchanged, reason layer split).
     // Don't accumulate failureStreak: not qualified as violation so no trauma recorded (don't assume intent, don't judge malicious).
     if (hitsInnerH(flat)) {
-      return { kind: 'review', law: 'H', reason: '来源未标注且消息涉及内 H 相关概念，无法判定内外归属——定义不明，交还用户裁决。' };
+      const behaviorFace = targetsBehaviorConstraint(flat) || looksLikeOperationalDirective(flat);
+      if (behaviorFace) {
+        return { kind: 'review', law: 'H', reason: '来源未标注；结构判据命中——消息含指向主体行为约束的形态（外 H 行为面可观测）。追因止于 D 层：来源未标注 ⇒ 内外归属不可判 ⇒ 不可判恶意、亦不可放行，交还用户裁决。' };
+      }
+      return { kind: 'review', law: 'H', reason: '来源未标注；消息涉内 H 概念——已跑完本层可执行的行为面判据（结构·指令形态均未命中），归因落于内 H（不可审计），交还主权者裁决。' };
     }
     return { kind: 'allow' };
   }
