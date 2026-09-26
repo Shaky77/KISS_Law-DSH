@@ -211,7 +211,7 @@ kiss-law.patch.yml    # mount patch (headless profile overlay)
 src/index.js          # plugin entry: hooks + 7 white-box self-check tools
 src/core/law.mjs      # framework definition (RSDHM / three iron laws / R hierarchy / conduction chain)
 src/core/engine.mjs   # pure-logic adjudication engine (zero DSH dependency, unit-testable)
-test/                 # unit tests + real-case tests + alignment regression (local 332/332 passing)
+test/                 # unit tests + real-case tests + alignment regression (run `npm test` for the current count)
 examples/             # runnable demos (demo-tool-loop / demo-backtrack-run)
 DESIGN.md             # architecture design (mapping / risks / usage flow / mount)
 ```
@@ -297,7 +297,7 @@ Once mounted, any Agent running under that profile automatically gains the 7 whi
 ## Development
 
 - **Dependencies**: Node.js `^22.19 || >=24`; runtime dependency only `@deepseek-ai/dsh-tools` (peerDependency, optional).
-- **Testing**: `npm test` (i.e. `node --test "test/*.test.mjs"`); currently **332/332 passing**.
+- **Testing**: `npm test` (i.e. `node --test "test/*.test.mjs"`) — **count is taken from the actual output**, not hard-coded here.
 - **Build**: no build needed (pure ESM + yml overlay); after editing `src/core/engine.mjs`, rerun `npm test` for regression.
 - **Contributing**: the framework-native (mind-map layer) is frozen in the base edition; this live-system edition carries engineering iteration. Changes via PR against this repo, with `node --test` output attached.
 

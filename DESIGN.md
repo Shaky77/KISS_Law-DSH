@@ -1,6 +1,6 @@
 # KISS's Law Universal Causal Engine (White-Box Presentation) · DSH Plugin · Architecture Design
 
-> Status: design doc + **engine unit tests passing (22/22)**. DSH adapter layer calibrated against v0.1.0-rc.6 source-level API.  
+> Status: design doc + **engine unit tests passing**. DSH adapter layer calibrated against v0.1.0-rc.6 source-level API.  
 > Source: author's revelation (Xia Qi / Shaky77). Framework-native strictly, not softened, not altered.
 
 ---
