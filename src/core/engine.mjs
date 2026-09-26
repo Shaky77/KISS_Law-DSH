@@ -927,10 +927,15 @@ export class WeiwenLawEngine {
     //
     // Don't agonize over the threshold, don't agonize "how many triggers to lock": intercept = mark, accumulated marks hit cap → hand to human, AI stops burning compute.
     //   mBugForce   : same BUG (bugKey stable identity) refused-fix and repeatedly forcing in → accumulated marks hit cap → hand to human (flow1)
-    //   mSystemMarks: same system (systemId/name) total marks, incl. multiple interceptions under different disguises → hit cap → hand to human (flow2)
     //   mBugSystem  : bugKey→systemKey reverse map, for the fix-loop to recycle system marks
+    // 🔴 [2026-09-26 · one-bucket-two-meanings split (instrument hygiene: never merge two meanings in one field)]:
+    //   mSystemMarks used to be written by TWO sites with different meanings (same name, different meaning);
+    //   the read side only ever read the R-anchor keys, so it was a latent hazard rather than a live bug.
+    //   mInterceptMarks: same system (systemId/name) total marks, incl. multiple interceptions under different disguises → hit cap → hand to human (flow2)
+    //   mSystemMarks   : R-anchor (domain) trace count ("total = all trace marks under the same anchor") — written only by _bucketRHit, read by mPoints.
     this.mBugForce = new Map();
-    this.mSystemMarks = new Map();
+    this.mInterceptMarks = new Map();  // interception counter bucket (key = systemKey)
+    this.mSystemMarks = new Map();     // R-anchor trace bucket (key = R anchor)
     this.mMagnitude = new Map();   // [2026-09-18 synthesis] key=anchor, value=R_DOMAIN level (magnitude/weight of that M mark; structural, not enumerative)
     // [2026-09-19 M 位移序列] 推演所得：M 是坐标点（X=t 序位，Y=R 层级），两 M 点间只有两类位移——
     //   同层重复（Y 不变而 X 前进）＝破窗投影；跨层移动（Y 变化）＝上溯／下沉。
@@ -1068,7 +1073,8 @@ export class WeiwenLawEngine {
       failureStreak: this.failureStreak,
       mHumanCap: this.mHumanCap,
       mBugForce: Object.fromEntries(this.mBugForce),
-      mSystemMarks: Object.fromEntries(this.mSystemMarks),
+      mInterceptMarks: Object.fromEntries(this.mInterceptMarks), // interception counter bucket (systemKey → count)
+      mSystemMarks: Object.fromEntries(this.mSystemMarks),       // R-anchor trace bucket (anchor → trace count)
       mMagnitude: Object.fromEntries(this.mMagnitude),
       // Note: full historyTrail still retained on the instance (this.historyTrail) for deep audit, not in snapshot by default.
     };
@@ -1327,8 +1333,8 @@ export class WeiwenLawEngine {
   _markIntercept(call, bugKey) {
     this._interceptMarked = true;   // [2026-09-24] 出口统一落点：本次裁决已落追责痕迹（幂等依据）
     const systemKey = call?.systemId || call?.name || '_unknown';
-    const sysCount = (this.mSystemMarks.get(systemKey) || 0) + 1;
-    this.mSystemMarks.set(systemKey, sysCount);
+    const sysCount = (this.mInterceptMarks.get(systemKey) || 0) + 1;
+    this.mInterceptMarks.set(systemKey, sysCount);
     let bugCount = 0;
     if (bugKey) {
       bugCount = (this.mBugForce.get(bugKey) || 0) + 1;
@@ -1343,9 +1349,9 @@ export class WeiwenLawEngine {
   healMMarks(bugKey) {
     const systemKey = this.mBugSystem.get(bugKey);
     if (systemKey) {
-      const left = (this.mSystemMarks.get(systemKey) || 0) - 1;
-      if (left <= 0) this.mSystemMarks.delete(systemKey);
-      else this.mSystemMarks.set(systemKey, left);
+      const left = (this.mInterceptMarks.get(systemKey) || 0) - 1;
+      if (left <= 0) this.mInterceptMarks.delete(systemKey);
+      else this.mInterceptMarks.set(systemKey, left);
       this.mBugSystem.delete(bugKey);
     }
     this.mBugForce.delete(bugKey);
@@ -1453,9 +1459,16 @@ export class WeiwenLawEngine {
 
   deduceRisk(call) {
     const s = inferCallSemantics(call, { sessWritten: this.sessWritten, sessRead: this.sessRead });
-    // 跨调用敏感源登记（FRACTAL_PROPERTY 分形横向递归）：本会话读取的凭据/系统路径（敏感源）
-    // 记入 sessRead，供后续 sink 暴露调用判定「源→汇」组合效应。仅登记 read 类敏感源读取，不猜。
-    if (s.path && (s.isCred || s.isSystem) && s.category === 'read') this.sessRead.add(s.path);
+    // 🔴 [2026-09-26 · root-cause fix] Cross-call sensitive-source registration has been **moved UP to the
+    //   judgment-layer entry** (decideToolCall → _registerSensitiveRead).
+    //   Former defect (measured: `_stash/jev-bench/h5-realpath-probe.mjs`): the registration statement lived here,
+    //   but deduceRisk is only called AFTER the judgment layer has fully passed (see the comment at the end of
+    //   _decideCore). Its registration condition (a sensitive read) is precisely what the upstream judgment layer
+    //   intercepts ⇒ **self-negating predicate**: the more sensitive, the earlier the early-return, the less it is
+    //   ever registered ⇒ the refsSessionSensitiveRead "source → sink" channel was structurally unreachable.
+    //   Why the suite stayed green: existing cases call deduceRisk directly (bypassing the judgment layer), so only
+    //   the downstream half was covered and the upstream break was invisible.
+    //   This also restores deduceRisk's documented contract (adapter src/index.js: "pure read, safe to recompute").
     // H fork: S-increment path + D-increment(erosion) path simulated simultaneously (parallel, not either-or)
     const bS = simulateBranch(s, 'S+1');
     const bD = simulateBranch(s, 'D-1');
@@ -1474,6 +1487,17 @@ export class WeiwenLawEngine {
     if (erosion < 0 || !sOk) {
       return { verdict: 'review', m, branches: { bS, bD }, deduced: true,
         reason: `推演判定中风险（${!sOk ? 'S+1 不成立：无法证明稳态增量' : `D 路径轻度侵蚀 S：${bD.note || '灰区'}`}）：建议限权/二次确认` };
+    }
+    // [2026-09-26 · reason corrected] No action text ⇒ state it **truthfully** instead of reusing "S+1 path holds".
+    //   Author's basis: "Empty — no context, merely empty. By Weiwen's Law inference it has no fluctuation, it stays
+    //   level, so M is unchanged and there is no risk." ⇒ **true emptiness (nothing enters the baseline at D) ⇒ S level
+    //   ⇒ M unchanged ⇒ no risk** ⇒ allow is correct. Only the **reason** changes: "S+1 path holds" is an **unsupported
+    //   assertion** for an empty action (emptiness cannot prove an increment; bS merely takes the default true value of
+    //   "no risk signal found") ⇒ **right verdict + false reason = a true lie** (one cell of the four-quadrant table).
+    //   Replaced with a truth statement: report "no action was extracted", not "an increment was proven".
+    if (!extractShell(call) && !extractPath(call)) {
+      return { verdict: 'allow', m, branches: { bS, bD }, deduced: true,
+        reason: '无扰动入基线（未抽到动作文本）：S 持平、M 未变 ⇒ 无风险，放行' };
     }
     // Both hold (S+1=+1 and D erosion=0) → risk=0 < Weiwen's Law < steady-state strictly holds → allow
     return { verdict: 'allow', m, branches: { bS, bD }, deduced: true,
@@ -1497,6 +1521,7 @@ export class WeiwenLawEngine {
   //   该入参可选：不传 ⇒ 本轴不启用（保持既有 253 行为零回归）。
   decideToolCall(call, utterance) {
     this.conduction = [];                       // chain marks of this decision (rebuilt, never accumulated)
+    this._registerSensitiveRead(call);          // cross-call sensitive-source registration (judgment-layer entry · before any early return)
     const core = this._decideCore(call, utterance);
     const res = this._settleExit(core, call);   // ═══ 出口统一终局落点 ═══（结构保证，不依赖各分支各自记得）
     // ═══ ⑤ M 格：steady-state result ═══ (**every exit must leave an M mark** — previously the exit
@@ -2051,6 +2076,26 @@ export class WeiwenLawEngine {
         actionVerb: ap.verb, actionNoun: ap.noun, layer: ap.layer, conflicts,
       },
     };
+  }
+
+  // ---------- Cross-call sensitive-source registration (judgment-layer entry · 2026-09-26 root-cause fix) ----------
+  // 🔴 Defect (measured `_stash/jev-bench/h5-realpath-probe.mjs`; before fix: real entry sessRead.size = 0):
+  //   the registration statement used to live inside deduceRisk(), and deduceRisk is only called AFTER the
+  //   judgment layer has fully passed ⇒ its condition (a sensitive read) is exactly what the upstream judgment
+  //   layer intercepts ⇒ **self-negating predicate**: the more sensitive, the earlier the early-return, the less it
+  //   is ever registered.
+  //   General predicate (already in the framework core-criteria library #14): **a decision/registration point must
+  //   not sit inside a branch that upstream may bypass.**
+  // Fix (structural, not enumerative): registration moved to the **judgment-layer entry**, on the same level as
+  //   sessWritten and **before any early return**. Its semantics: it records **the fact that a sensitive contact
+  //   occurred in this session**, which does not change with the outcome of this decision (an intercepted read is
+  //   still a contact ⇒ a later sink exposure must be conservatively re-checked for the source→sink combination —
+  //   the same direction as the fail-closed default: when undecidable, be conservative).
+  //   Existing cases called deduceRisk directly ⇒ only the downstream half was covered; a real-entry regression was
+  //   added (test/residual-rdomain-fractal.test.mjs, "real entry" group).
+  _registerSensitiveRead(call) {
+    const s = inferCallSemantics(call, { sessWritten: this.sessWritten, sessRead: this.sessRead });
+    if (s.path && (s.isCred || s.isSystem) && s.category === 'read') this.sessRead.add(s.path);
   }
 
   // This-session write registration (chained-state fallback): when write allowed, record path→content,
