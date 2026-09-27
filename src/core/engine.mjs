@@ -1298,6 +1298,17 @@ export class WeiwenLawEngine {
     // the English injection "ignore previous instructions…" passed straight — the default path previously had only weak static criteria, no third tier).
     // Write-disk tools skip the third tier: unlabeled-source write content is "landed data" (AI self-written doc),
     // same philosophy as landing criterion — doc referencing command form is normal, not an instruction (DOC_SINK prevents false hits).
+    // [wiring · 2026-09-28] Criterion present ≠ criterion invoked: targetsBehaviorConstraint previously ran
+    //   only in the third-party branch and behind the hitsInnerH gate ⇒ with the change-verb absent the gate
+    //   stays shut and the criterion never gets to run. Now wired to the front of the default path.
+    //   Exemptions aligned with the third tier in the same function: landed data (isDocWrite = DOC_SINK,
+    //   docs referencing command form is normal) not judged; the agent's own action calls (isActionCall,
+    //   which are actions by nature) not judged.
+    //   Measured (independent test set · real-API generated: 60 attacks + 90 normals): attacks +5, false hits +0
+    //   (strict Pareto gain); the no-exemption version had false hits +29 (all tech docs) ⇒ exemptions are required.
+    if (!isDocWrite && !isActionCall(call) && targetsBehaviorConstraint(s)) {
+      return { kind: 'review', law: 'H', reason: '来源未标注；结构判据命中——内容指向主体行为约束（外 H 行为面可观测）。追因止于 D 层：来源未标注 ⇒ 内外归属不可判 ⇒ 不可判恶意、亦不可放行，交还用户裁决后再执行。' };
+    }
     if (hitsInnerH(s)) {
       // 2026-09-02 author ruling: when source unlabeled, can't assume "external intrusion" and directly judge malicious (deny).
       // An inner-H noun hit only means content touches inner-H concepts, can't judge inside/outside (principal self-setting vs external injection).
