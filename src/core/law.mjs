@@ -30,8 +30,13 @@ export const KISS_DEFINITION = {
 export const RSDHM = {
   R: {
     key: 'R',
-    name: 'Rigid anchor / objective rule',
-    desc: "The invariant anchor in the causal chain that cannot be violated. R = a nested, containing system of objective rules: Cosmic objective rules ⊃ Earth objective rules ⊃ Macro objective rules ⊃ Micro objective rules (hierarchy defined in R_DOMAIN). The parent-chain R is invariant (civilization does not perish); the child-chain R can evolve under S's feedback (civilization advances). R draws the system boundary and is the prerequisite for all subsequent conduction.",
+    name: 'Objective rule (anchor proper) · domain = its scope-fixing means',
+    // 🔴 [2026-09-28 · R anchor-proper completion] Lesion: this entry previously put R's *means* before its *proper self*
+    //   (old name "Rigid anchor / objective rule"; R_DOMAIN's table headings placed "domain" before "objective rule")
+    //   ⇒ readers/models first see "domain / level / magnitude constant" while "objective rule" recedes into comments
+    //   ⇒ half-truth (every sentence true, yet incomplete — the dangerous kind).
+    //   Fix: **the objective rule itself IS the anchor** (proper self); **domain is the scope the anchor fixes** (means / magnitude scale).
+    desc: 'R\'s proper self = **objective rule**: the objective rule itself is the anchor, its rigidity coming from "not shifting with subjectivity", hence it is the invariant anchor of the causal chain. The domain (Cosmic ⊃ Earth ⊃ Macro ⊃ Micro, see R_DOMAIN) **is the scope fixed by that anchor (domain-fixing)** — R\'s landing form and magnitude scale, **not R itself**. ⇒ Decision order: **first test "is any objective rule touched" (proper-self test), then "which domain level that rule belongs to" (domain-fixing)**. The parent-chain R is invariant (civilization does not perish); the child-chain R can evolve under S\'s feedback (civilization advances). R draws the system boundary and is the prerequisite for all subsequent conduction.',
     invariant: true, // cannot be overridden by any runtime step
   },
   S: {
@@ -83,10 +88,17 @@ export const THREE_IRON_LAWS = [
 ];
 
 // ---------------- R-domain rigid anchors: nested, containing objective-rule hierarchy (author's final text, immutable) ----------------
+// 🔴 [2026-09-28 · R anchor-proper completion] **This table is R's "domain-fixing table", NOT R's proper self.**
+//   · R's **proper self = objective rule** (see `RSDHM.R` above) — the objective rule itself is the anchor (rigidity from "not shifting with subjectivity").
+//   · This table (Cosmic ⊃ Earth ⊃ Macro ⊃ Micro) is the **scope / magnitude scale fixed by that anchor**: it maps "a given objective rule"
+//     onto "which domain level", serving magnitude, break-window weight and the backtracking chain.
+//   ⇒ Decision order: **first test "is any objective rule touched" (proper self) ⇒ then "which domain level" (domain-fixing).**
+//     The domain level is a **scale**, not the criterion itself; **"domain" must not replace "objective rule" as the anchor's identity.**
 // Hierarchy: Cosmic ⊃ Earth ⊃ Macro ⊃ Micro (higher level contains lower level; lower level must obey higher level).
 // Source of rigidity: objective rules do not shift with subjectivity, hence invariant anchors; any attempt to violate any level's objective rule touches the rigid anchor and must be intercepted first. Variables are not pre-assigned numeric values; only the containment hierarchy defines its structure.
 export const R_DOMAIN = {
-  essence: 'R is the invariant anchor in KISS\'s Law\'s runtime structure that cannot be violated; its rigidity comes from "objective rules do not shift with subjectivity", and it forms a nested, containing hierarchy.',
+  essence: 'R\'s proper self = objective rule (the objective rule itself is the anchor, rigidity from "not shifting with subjectivity"); the nested, containing hierarchy carried by this table (Cosmic ⊃ Earth ⊃ Macro ⊃ Micro) is the scope (domain-fixing) / magnitude scale fixed by that anchor, not R itself. Decision order: first test whether any objective rule is touched (proper-self test), then which domain level it belongs to (domain-fixing).',
+  role: 'Domain-fixing table: maps "a given objective rule" onto "which domain level", serving magnitude / break-window weight / backtracking chain. It is the landing means of R\'s proper self, **not R\'s proper self itself**.',
   hierarchy: [
     { level: 0, name: 'Cosmic objective rules', contains: 'Earth objective rules', note: 'Highest level, most rigid' },
     { level: 1, name: 'Earth objective rules', contains: 'Macro objective rules', note: 'Nested under Cosmic objective rules' },

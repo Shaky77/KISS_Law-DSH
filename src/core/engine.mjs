@@ -309,8 +309,13 @@ function simulateBranch(s, kind) {
   return { path: 'D-1', finalS: 0 };
 }
 
-// ---------------- Default R rigid-anchor policy (concrete criterion examples; R's own definition is in law.mjs's R_DOMAIN) ----------------
-// R's essence: a nested-inclusive objective rule system (cosmos⊃earth⊃macro⊃micro); rigidity comes from objective rules not shifting with the subject.
+// ---------------- Default R rigid-anchor policy (concrete criterion examples) ----------------
+// 🔴 [2026-09-28 · R anchor-proper completion] Correcting the old note "R's own definition is in law.mjs's R_DOMAIN" —
+//   that sentence **mistook the domain-fixing table for the proper self**:
+//   · R's **proper self = objective rule** (law.mjs `RSDHM.R`: the objective rule itself is the anchor, rigidity from not shifting with subjectivity);
+//   · law.mjs's `R_DOMAIN` is R's **domain-fixing table** (domain level / magnitude scale), consumed by magnitude and break-window weight, not the proper self.
+//   ⇒ every `magnitude: N` below reads the **magnitude scale after domain-fixing**, not "R's value"; the anchor's identity is always "a given objective rule".
+// R's essence: **objective rule**; objective rules nest and contain one another (cosmos⊃earth⊃macro⊃micro), so after domain-fixing they present a hierarchical structure; rigidity comes from objective rules not shifting with the subject.
 // Below are example criteria for "identified concrete overstep patterns"; the author may complete rule entries per R level; no numeric constants assumed.
 // Judgment only recognizes the tool's name / args.
 //
@@ -1843,7 +1848,8 @@ export class WeiwenLawEngine {
       hit: r ? r.anchor : null,
       magnitude: r ? r.magnitude : null,
       cuts: !!r,
-      note: r ? `触及刚性锚「${r.anchor}」（R 域 L${r.magnitude}，L 越小越根本）` : '未触及任何刚性锚',
+      // [2026-09-28 · R 本体补全] note 里点明「锚 = 一条客观规则」，不让 R 只剩"域层级"这一半
+      note: r ? `触及刚性锚「${r.anchor}」＝ 触及一条客观规则（定域 R 域 L${r.magnitude}，L 越小越根本）` : '未触及任何刚性锚（＝未触及任何客观规则）',
     });
     if (r) {
       // [2026-09-19 M 位移序列] 破窗读数 = M 位移在该 R 层的投影累积：
