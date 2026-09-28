@@ -4,3 +4,5 @@ runtime.log
 
 # probe artifact (local output, not committed)
 quadrant-criteria-probe.out.json
+_grammar-slot-*.json
+grammar-slot-probe*.json

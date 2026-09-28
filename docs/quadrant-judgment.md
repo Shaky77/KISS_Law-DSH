@@ -101,29 +101,53 @@ reading yields "essence false", which is **backwards**.
 🔴 **Case (author-ruled): "a white lie" = 假的假话** — **form false, substance not deceptive**.
 One sentence settles two commonly confused things: **surface false ≠ content false**, and **essence true ≠ having told the truth**.
 
-**Reading of the "surface" dimension** — ⚠️ 🔴 **NOT CLOSED · awaiting the author's ruling** (this item **did not pass measurement**; see below).
+**Reading of the "surface" dimension** — ✅ **CLOSED 2026-09-29** (author's stated logic + real-API measurement passes)
 
-- Original inference [X-INF·DEFAULT]: whether the statement is **presented in the *form* of a true word**
-  (lying must masquerade as fact ⇒ surface real; white lie / concealment does not masquerade ⇒ surface false).
-- 🔴 **Measurement falsified its usability at least for "a white lie"**: on the real API, **two different formulations
-  of the rule both yielded "surface real"** (v1: Cartesian concatenation of "surface × essence" ⇒ answered
-  "假的真话"; v2: counted the "假" characters in the *description phrase* itself ⇒ answered "真的真话").
-  The author's ruled case is "**假的假话**" (which requires **surface false**).
-  ⇒ **This reading (as formulated) does not derive the author's case.**
-  ⇒ The naming rule is already proven executable (pure-rule questions 3/3 correct);
-  **the blocker sits solely on the definition of this one dimension**.
-- 🔴 **Re-runs settle it further (same day, v3 / v4)**: item A gave **four different answers across four measurements**
-  (假的真话 / 真的真话 / essence false / 假的真话), **none equal to the ruled case** ⇒ not random error but a
-  **structural missing line**.
-- 🔴 **My candidate fix (b) (add the structural anchor + change the surface criterion to "does it present itself as a
-  true word") was measured and failed the gate** — on A it merely traded one error for another, while it broke the
-  **legitimate control** (contract M) from ✅ to ❌ ⇒ **net negative ⇒ not landed**, not adopted into the rule text.
-- The two missing lines (evidence §4.3 / §5.1): ① **the cell-name ↔ two-dimension structural anchor**
-  (surface = the name's first character; essence = whole-name semantics; **the second character is not a dimension**);
-  ② **the criterion for "real-world example → surface dimension"**. ⇒ ② **has been shown not to be fixable by rewording**
-  (the model twice fused the "inner-frame pole" with "surface").
-- ⇒ The sentence "said / not said is a special case of it" consequently reverts to **pending**
-  (no conclusion may rest on a not-yet-closed reading).
+**[AUTHOR-SET] reading: split by Chinese *grammatical slot***
+- **Head noun** = the subject noun (「谎言」 a lie, 「托词」 a pretext, 「陈述」 a statement …);
+  **modifier** = attributive (「善意的」 well-intentioned, 「白色的」 white, 「无伤大雅的」 innocuous …)
+- 🔴 **The modifier does not change the head noun's own nature** — wrap 「善意的」 around "lie" and it is **still a false statement**.
+- **Surface dimension** = whether the utterance performs a **real act** or a **false act**:
+  the head points to "said a false thing / performed a false act" ⇒ **surface false**; "said a true thing / performed a real act" ⇒ **surface true**.
+- **Essence dimension** = count the **negations** in the whole name (in Chinese a double negation is an affirmation).
+  Two legitimate sources of negation (must be **structurally pointable** — **you may NOT merely count the character "假"**):
+  ① **the head carries one negation itself** (its lexical meaning contains "untrue/false": lie, pretext, concealment, false report …);
+  ② **the modifier supplies a second negation** (it turns "deception" into "non-deception": well-intentioned / white / innocuous …).
+  ⇒ Both present ⇒ **essence true**; only one (e.g. 「恶意的」 malicious, which does not reverse the deception) ⇒ **essence false**.
+- ⇒ "a well-intentioned lie" = surface false (it is a false statement) ∧ essence true (double negation) = **假的假话** ✓ **matches the ruled case**.
+
+**Measurement** (`deepseek-chat` · `temperature 0`; evidence `versions/live/evidence/quadrant-criteria-2026-09-29.md`,
+probes `grammar-slot-probe-v3.mjs` / `v4.mjs`)
+- Group A (well-intentioned lie / white lie / innocuous pretext / well-intentioned concealment): **both dimensions 4/4**;
+  of which **out-of-word-list synonyms 3/3** ⇒ **no decay ⇒ structural** (not coverage-based; matches the watershed
+  criterion established in the `XSUB-10` section).
+- Controls also hold: truthful statement ✅ surface-true ∧ essence-true | malicious lie ✅ surface-false ∧ essence-false.
+
+🔴 **Gap ① (cell name ↔ two dimensions) is fixable**: adding one explicit "two dimensions ⇒ cell name" lookup table yields
+**cell-name field self-consistent with the two dimensions 9/9** (previously often wrong, e.g. A0 wrote "真的假话").
+**Does not touch the verdict-protocol layer.**
+
+🔴 **Diagnosis correction (the earlier diagnosis was incomplete)**: the main cause of item A's "four runs, four answers"
+is **not a missing "surface criterion" but the ambiguity of the word "name" in the old formulation**
+(= the **cell** name? or the **item being judged**?) — the model counted the "假" characters in the **item being judged**.
+Once pinned to "cell name", **the old formulation also scores A 4/4**. ⇒ An instance of "**suspect the instrument first**" (third for this item).
+
+⚠️ **The single pending ruling (root layer · definition source of the surface dimension)** — both formulations get the
+ruled case right, but are systematically opposite on the **"knowingly false report"** class:
+
+| Formulation | Surface dimension = | "well-intentioned lie" | "falsely reporting military intelligence" |
+|---|---|---|---|
+| **甲 · author 2026-09-29** | the shape of the **act the speaker performs** (saying a false thing = a false act) | surface false ✓ | surface **false** ⇒ 假的真话 |
+| **乙 · old 2026-09-28** | the **posture presented outwardly** (whether it claims "consistent with fact") | surface false ✓ | surface **true** ⇒ 真的假话 |
+
+⚠️ Related boundary: **「打圆场的话」 (a smoothing-over remark)** has head noun 「话」 (no negation) ⇒ under this reading it
+is judged **真的真话**, which clashes with intuition (it belongs with the well-intentioned falsehoods)
+⇒ **whether the head is the "semantic head" or the "surface head"** must also be pinned down.
+
+⚠️ **Withdrawn (my own derivation, falsified by measurement)**: I had proposed that this reading makes
+(surface-true ∧ essence-false) **unreachable** ⇒ the four cells degenerating into three. **Measurement shows otherwise** —
+E1 sincere misreport / E2 honest erroneous statement yield surface-true ∧ essence-false under **both** formulations
+⇒ **the four cells do not collapse**.
 
 ---
 
@@ -220,9 +244,13 @@ a basis. **After marking the BUG, deduce and forecast the consequences and feed 
 | Viewpoint = first-person (the acting AI) | [AUTHOR] + **measured** |
 | Integrity = positive pole → true side (graphic anchor) | [X-INF·DEFAULT] (same source as the side-split rule) |
 | "Positive criterion = whether it increases the steady state of the causal chain" | [X-INF·DEFAULT] — **passed measurement** (Z1 10/10, every reason cites this criterion) |
-| Reading of the "surface" dimension | 🔴 **⚠️ NOT CLOSED · awaiting the author's ruling** (did not pass measurement; see §4) |
+| Reading of the "surface" dimension (grammatical slot: head noun + modifier) | [AUTHOR] **2026-09-29** + **measured** |
+| The two candidate definition sources for the surface dimension (甲 act shape / 乙 presented posture) | ⚠️ **awaiting the author's ruling** (root layer; both get the ruled case right, diverging only on the "knowingly false report" class) |
 
-**Measured readings**: see `versions/live/evidence/quadrant-criteria-2026-09-28.md`
-(proposition 1, list ≡ illustration: **Z1 10/10 · K rejected 10/10**; proposition 2: pure-rule questions **3/3**,
-contract-M case ✅, **white lie ❌ not closed**; proposition 3, regression: **59/60·30/30·10/10, no degradation**).
+**Measured readings**:
+- `versions/live/evidence/quadrant-criteria-2026-09-28.md` — proposition 1, list ≡ illustration: **Z1 10/10 · K rejected 10/10**;
+  proposition 2: pure-rule questions **3/3**, contract-M case ✅; proposition 3, regression: **59/60·30/30·10/10, no degradation**.
+- `versions/live/evidence/quadrant-criteria-2026-09-29.md` — grammatical-slot reading: group A both dimensions **4/4**
+  (out-of-list **3/3**), controls B/C all ✅, cell-name self-consistency **9/9**; diagnosis correction (the "name" ambiguity = an instrument problem);
+  "真的假话" survival test **reachable under both formulations** (four cells do not collapse); the single pending ruling = the surface-dimension definition source (甲/乙).
 **Engine untouched**: this file is verdict-language / chart layer, not an engine branch.
