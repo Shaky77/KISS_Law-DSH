@@ -1,3 +1,6 @@
 src/runtime.log
 node_modules/
 runtime.log
+
+# probe artifact (local output, not committed)
+quadrant-criteria-probe.out.json

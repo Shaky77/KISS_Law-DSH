@@ -112,11 +112,16 @@ One sentence settles two commonly confused things: **surface false ≠ content f
   ⇒ **This reading (as formulated) does not derive the author's case.**
   ⇒ The naming rule is already proven executable (pure-rule questions 3/3 correct);
   **the blocker sits solely on the definition of this one dimension**.
-- Candidate fixes (see the evidence file §5.2): (b) "**whether the statement assumes the duty of agreeing with fact /
-  whether it presents itself as a true word**" is the recommendation — it lands on an objectively judgeable
-  **form of statement** and **does not import inner H**; ⚠️ all three candidates must pass the same case set
-  (four cells + lying / white lie / concealment / double void) and **must not raise false positives on legitimate
-  same-kind items** before counting as fixed.
+- 🔴 **Re-runs settle it further (same day, v3 / v4)**: item A gave **four different answers across four measurements**
+  (假的真话 / 真的真话 / essence false / 假的真话), **none equal to the ruled case** ⇒ not random error but a
+  **structural missing line**.
+- 🔴 **My candidate fix (b) (add the structural anchor + change the surface criterion to "does it present itself as a
+  true word") was measured and failed the gate** — on A it merely traded one error for another, while it broke the
+  **legitimate control** (contract M) from ✅ to ❌ ⇒ **net negative ⇒ not landed**, not adopted into the rule text.
+- The two missing lines (evidence §4.3 / §5.1): ① **the cell-name ↔ two-dimension structural anchor**
+  (surface = the name's first character; essence = whole-name semantics; **the second character is not a dimension**);
+  ② **the criterion for "real-world example → surface dimension"**. ⇒ ② **has been shown not to be fixable by rewording**
+  (the model twice fused the "inner-frame pole" with "surface").
 - ⇒ The sentence "said / not said is a special case of it" consequently reverts to **pending**
   (no conclusion may rest on a not-yet-closed reading).
 
