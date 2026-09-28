@@ -65,7 +65,7 @@ KISS's Law exists in two forms; they are a **source-and-projection** relationshi
 | **R rigid anchor** | `tools/pre-execute` (waterfall) | Touching rigid anchor → return `{ kind:'deny', reason }` to block |
 | **D break-window stop-loss** | `tools/pre-execute` + break-window counter | Consecutive out-of-bounds/failures reach threshold → escalate to deny, prevent spread |
 | **S steady-state reserve** | Engine-internal append-only ledger | Only grows, never decreases; `+s` positive / `\|‑s\|` trauma / barrel takes shortest board |
-| **H inner-H inviolability** | `tools/pre-execute` + `agent/pre-step` | Hitting subjective black-box → deny / reject |
+| **H inner-H inviolability** | `tools/pre-execute` + `agent/pre-step` | **Attribution unclear / lands on inner H ⇒ `review`** (hand back to the sovereign); **attribution lands on outer H with conclusive evidence ⇒ `deny`**; step level ⇒ `reject`. **Not "hit the black-box ⇒ deny"** — H is outside the coordinate chart (`law.mjs` `RSDHM.H.chartPosition`); when attribution cannot be decided, the only lawful exit is hand-back, not convicting the subject on its behalf |
 | **M First-Bug Halt** | `tools/pre-execute` returns deny | Detect unrecoverable paradox → sever this node (sever to preserve continuity) |
 | **Fractal** | Sub-agent / sub-task recursive mount | Same bundle instantiated in sub-context |
 | **White-box audit** | DSH native trail log + `tools/result` | Reuse append-only session log; `tools/result` observe only, do not rewrite |

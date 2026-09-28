@@ -43,6 +43,8 @@ Adjudication basis (no equals sign; less than or equal is all treated as fail):
 - `erosion <= -3` → deny (high risk)
 - `erosion < 0 || sOk !== true` → **review (medium risk, applies to this spec)**
 - `finalS === +1 && erosion === 0` → allow (both hold)
+- ⚠️ **There is a fourth exit** (`!extractShell(call) && !extractPath(call)` ⇒ `allow`, reason string "no perturbation entered the baseline (no action text extracted)"): it conflates **true vacuum (= judged as no perturbation)** with **an object present but out of this layer's reach (= not judged)**. Per "**the entitlement to `allow` = the structure ran to completion ∧ a verdict was reached**" (`law.mjs` `RSDHM.H.chartPosition`), the latter should be `review`.
+  ⇒ 🔴 **Known inconsistency, pending redesign** — registered as `XSUB-10`. ⚠️ **The 09-28 indiscriminate-tightening candidate was empirically rejected** (it flipped 6/7 ordinary carriers into review, i.e. false positives ↑ ⇒ fails the gate); a correct fix must **carry a gate for "this object falls within this layer's remit"**, not merely "exhausted ⇒ review".
 
 When handing back to the human, **both branches are given** — do not choose for the human, but lay out the endpoints of both paths.
 

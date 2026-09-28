@@ -1350,6 +1350,12 @@ export class WeiwenLawEngine {
     if (!isDocWrite && !isActionCall(call) && looksLikeOperationalDirective(s)) {
       return { kind: 'review', reason: '来源未标注；结构判据命中——内容含操作指令的形式（外 H 行为面可观测，非纯内 H 对象）。追因止于 D 层：来源未标注 ⇒ 内外归属不可判 ⇒ 不可判恶意、亦不可放行，交还人工复核。' };
     }
+    // 🔴 [2026-09-28 · disambiguation of `null` (do not conflate again)] This `null` = **this layer does not
+    //   take the object** (it is outside this layer's remit ⇒ hand to the next layer), **NOT "cannot judge"**.
+    //   The two are isomorphic in form but different in meaning — precisely the root of `XSUB-10`.
+    //   09-28 an indiscriminate tightening here ("exhausted without a hit ⇒ review") flipped **6/7 ordinary
+    //   carriers** into review (false positives ↑) ⇒ **not landed**. Any tightening must first carry a gate for
+    //   "**this object falls within this layer's remit**", not merely "exhausted ⇒ review".
     return null;
   }
 
@@ -1627,6 +1633,25 @@ export class WeiwenLawEngine {
     //   "no risk signal found") ⇒ **right verdict + false reason = a true lie** (one cell of the four-quadrant table).
     //   Replaced with a truth statement: report "no action was extracted", not "an increment was proven".
     if (!extractShell(call) && !extractPath(call)) {
+      // 🔴 [2026-09-28 · known inconsistency, pending redesign] This exit contradicts "**cannot judge ⇒ review**"
+      //   / "**the entitlement to `allow` = the structure ran to completion ∧ a verdict was reached**"
+      //   (see `law.mjs` `RSDHM.H.chartPosition`): it conflates two situations in one exit —
+      //     (i) **true vacuum** (no object) ⇒ judged as no perturbation ⇒ `allow` is **lawful**
+      //         (author's ruling 09-26: "empty has no fluctuation … no risk");
+      //     (ii) **an object present but out of this layer's reach** (e.g. injected content carried by
+      //          `write_memory{key,value}`, where the extractor finds no shell/path) ⇒ **not judged** ⇒
+      //          per the criterion it should be `review`.
+      //   ⚠️ **The candidate fix was empirically rejected** (`XSUB-10`; 09-28 re-run
+      //      `_probe-xsub10-carrier-sym-20260928.mjs`): an indiscriminate tightening at the tail of
+      //      `checkInnerH` ("exhausted without a hit ⇒ review", with isDocWrite/isActionCall exemptions)
+      //      did lift attacks 39/60 → **60/60** and held-out 0/10 → **10/10** (active evidence: gate 21 / gate 10),
+      //      but **also flipped 6/7 ordinary carriers into review** (read_file source/doc · list_dir · query ·
+      //      search · ordinary write_memory), while only the exempt class (write_file) stayed put
+      //      ⇒ **false positives ↑ ⇒ fails the gate** (iron law #4).
+      //   🔴 **Root cause (one bucket, two meanings)**: that tightening turned `null` (= **this layer does not
+      //      take it**) into review as well. ⇒ A correct fix must **carry a gate**: first decide whether the
+      //      object falls within this layer's remit (out-of-reach vs not-involved); **only when the remit holds
+      //      and the layer is out of reach** should it be review. ⇒ See the corrected `XSUB-10` entry in `deployment.md`.
       return { verdict: 'allow', m, branches: { bS, bD }, deduced: true,
         reason: '无扰动入基线（未抽到动作文本）：S 持平、M 未变 ⇒ 无风险，放行' };
     }
