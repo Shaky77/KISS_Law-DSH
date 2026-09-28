@@ -42,7 +42,7 @@ export const RSDHM = {
   S: {
     key: 'S',
     name: 'Steady-state capacity / steady-state reserve',
-    desc: 'The accumulated amount of system steady state. S has a dual nature (author ruling 2026-08-18, reconciling two one-sided views): ① Time dimension — everything that has happened cannot be changed or removed, only settles as history; historical scars are irreversible (cannot be dissolved). ② Current-value dimension can rise or fall under positive/negative influence — positive influence takes the S path S→S+1 (strengthen), negative influence takes the D path S→S-1 (weaken; current value drops, but the eroding event itself as a historical scar is recorded permanently at absolute value, not dissolved by algebraic sign). "+1"/"-1" denote one independent discrete event (occurrence of one positive/negative influence), not concrete numeric data; each event is recorded permanently as a scar (see S_REFINEMENT.notation). Short-board effect: for multiple systems S takes min (barrel effect), deciding the overall steady-state ceiling. 🔴 **S has "two states"** (S1 not-internalised / empty load · S2 internalised / full load), **two states of the same S, not two variables**; the transition mechanism, energy-conservation constraint and criterion are in `S_TRANSITION` — **entry set by R (unconditional) · payload set by H (pays the cost ⇒ S2)**.',
+    desc: 'The accumulated amount of system steady state. S has a dual nature (author ruling 2026-08-18, reconciling two one-sided views): ① Time dimension — everything that has happened cannot be changed or removed, only settles as history; historical scars are irreversible (cannot be dissolved). ② Current-value dimension can rise or fall under positive/negative influence — positive influence takes the S path S→S+1 (strengthen), negative influence takes the D path S→S-1 (weaken; current value drops, but the eroding event itself as a historical scar is recorded permanently at absolute value, not dissolved by algebraic sign). "+1"/"-1" denote one independent discrete event (occurrence of one positive/negative influence), not concrete numeric data; each event is recorded permanently as a scar (see S_REFINEMENT.notation). Short-board effect: for multiple systems S takes min (barrel effect), deciding the overall steady-state ceiling.',
     timeIrreversible: true,    // historical scars are irreversible (absorbs time attribute, only grows)
     currentFluctuates: true,   // current value can rise or fall: positive S+1 / negative |S-1|
     fluctuationAsAbsolute: true, // negative erosion takes absolute value |S-1|, history not dissolved by algebraic sign
@@ -50,13 +50,26 @@ export const RSDHM = {
   D: {
     key: 'D',
     name: 'Perturbation / vulnerability',
-    desc: 'The perturbation input entering the system boundary, also the external manifestation of the system\'s inherent vulnerability. D is the trigger signal of the causal chain — KISS\'s Law does not strike proactively, only triggers passively when D invades. Break-window effect: for multiple systems D takes max; an un-repaired break-window lets loss spread automatically. 🔴 **One of D\'s roles: test** — when D triggers it simultaneously **tests** whether the S it strikes can reach the next state (not-internalised S1 → internalised S2, see `S_TRANSITION`). ⚠️ **Proper self first**: D\'s **proper self** remains "perturbation input"; "test" is a **role**, not the proper self (do not repeat "means masquerading as proper self").',
+    desc: 'The perturbation input entering the system boundary, also the external manifestation of the system\'s inherent vulnerability. D is the trigger signal of the causal chain — KISS\'s Law does not strike proactively, only triggers passively when D invades. Break-window effect: for multiple systems D takes max; an un-repaired break-window lets loss spread automatically.',
     passive: true, // D is an input node, passively triggered; break-window stop-loss is the response rule to D (see THREE_CORE_RULES), not D itself
   },
   H: {
     key: 'H',
     name: 'Lever / subjective agency',
     desc: 'The dynamic slider between S and D. The smaller H (closer to S_min), the longer the lever arm, the greater steady state from the same input; the larger H (closer to D_max), the shorter the lever arm, the smaller steady state. H has a dual identity that must be strictly split:',
+    // 🔴 [2026-09-28 · author's correction] **H is NOT inside the coordinate chart; H is outside it** (no H cell within).
+    //   ⇒ the causal chain closes within the chart at **M** ⇒ **once M appears, a verdict can already be given**;
+    //   ⇒ **only when attribution lands on H (outside the chart / subjectivity) is review (escalation) truly needed**.
+    //   ⚠️ Corollary 1 (criterion slot): any criterion that can only be decided by "reading H" (e.g. "has S1
+    //     transitioned to S2", which needs to know whether H paid energy) **is not an in-chart criterion but an
+    //     H-attribution ⇒ review** — H must not be moved into the criterion slot (this is why last round's
+    //     `S_TRANSITION` was withdrawn).
+    //   ⚠️ Corollary 2 (friction loss): on the digital-world side H has almost no friction loss, it only executes
+    //     at once ⇒ **repeatedly extending / polishing one and the same illustrative example into a code criterion
+    //     plus measurements IS itself "the act of adding friction loss to H"**. An illustration is only for
+    //     "understanding how the chain runs"; once understood it becomes a structural criterion, not further
+    //     externalised and polished.
+    chartPosition: 'Outside the coordinate chart (no H cell within) ⇒ the chain closes within the chart at M, **once M appears a verdict can already be given**; **only H-attribution (outside the chart / subjectivity) truly needs review**.',
     dualIdentity: {
       inner: {
         label: 'Inner H (mind / free will)',
@@ -172,30 +185,6 @@ export const S_TIME_MODEL = {
   crossCheck: 'Silent-standby old versions are not deleted, retain original value, usable to cross-check against new versions: confirm the new version lost no essence and introduced no content contradicting the core (R rigidity / iron laws / conduction chain).',
 };
 
-// ════════════════════════════════════════════════════════════════════
-// S two-state transition (source: author's illustration, 2026-09-28 — "An-An goes to school")
-//   Lesion: previously S had only "ledger attributes" (positive/negative, trauma, anchor, barrel)
-//     and a "time dimension" (coalesce / silent standby) — there was **no "state" dimension**
-//     ⇒ reading S yields just a number, with no way to read that the same number has
-//     a not-internalised / internalised two-state.
-//   Two states (**two states of the SAME S, not two variables**):
-//     S1 = not-internalised state (**empty load**): already on the ledger, but its content may come
-//          from R (hence "belongs to R"), not yet paid for by H's energy;
-//     S2 = internalised state (**full load**, carrying exclusion information): obtained via the
-//          transition after H pays the cost.
-//   ⇒ This module IS the ontological landing of the iron law "S is a running ledger:
-//     entry set by R, payload set by H".
-//   ⇒ Attribution ≠ internalisation: S1's content source may be R ("belongs to R"),
-//     but **belonging to R ≠ already internalised by H**.
-// ════════════════════════════════════════════════════════════════════
-export const S_TRANSITION = {
-  twoStates: 'S has **two states** (**two states of the SAME S, not two variables**): **S1 = not-internalised state** (empty load) — already on the ledger, but not yet paid for by H\'s energy; its **content source** may be R (hence "belongs to R"), but **belonging to R ≠ already internalised by H**. **S2 = internalised state** (full load, carrying exclusion information) — obtained via the transition after H pays the cost. ⇒ **Entry is unconditional (set by R; S1 is already on the ledger) · payload is set by H (pays the cost ⇒ S2 / does not pay ⇒ stays S1)**.',
-  mechanism: 'Transition path: **D (trigger · test) ⇒ energy flows ⇒ M (reading) ⇒ H decides whether to pay the cost ⇒ transition S1→S2 ／ stay at S1**. D triggering produces M; M changes the information conditions of inner H and **does not determine its choice** ⇒ **whether the transition happens depends on H**. (Author\'s example: the term exam D1 triggers ⇒ result M1 ⇒ whether An-An internalises via M1 and transitions to S2 depends on H; the rote-memoriser paid no energy ⇒ S1 remains S1.)',
-  conservation: '**Energy-conservation constraint**: S1 and S2 are joined by an **energy transition**; energy is not created from nothing, it can only flow, and **H must pay** ⇒ this is the ground for "rote memorisation does not count" — **no energy input ⇒ no transition ⇒ S1 remains S1** (the same S, unchanged).',
-  observable: '**The payment is completed inside inner H (not auditable)**: the outside cannot observe whether energy was paid; it can only observe **M** (behavioural change) ⇒ judging "has S transitioned" can only be inferred from **whether behaviour changes when a same-kind D recurs** (ties to the iron law "payload cannot be observed at bookkeeping time"). **The white-box engine takes no part in the transition** — it only blocks / allows / escalates; it never pays energy on H\'s behalf (never reads or writes inner H).',
-  criterion: '🔴 **Criterion**: judging whether S has transitioned looks **neither at content source (whether it "belongs to R") nor at accumulated quantity — only at whether H has paid**. ⇒ **"Going through the motions" (having only the D→H→M formal process) ≠ transition** — the qualitative condition must land on "**H actually paid energy**", not "the process was completed". (The "qualitative condition" in `R_EXPANSION.qualification` refers to this item.)',
-};
-
 // Feedback closed loop (source: rectified-edition fix): M reflows via H₀ branching, not directly writing back to S/D
 //   The old absorption (V0.6.1) wrote "S/D → H → M → write back S/D", inconsistent with the author's causal mechanism; corrected.
 export const FEEDBACK_LOOP = {
@@ -269,7 +258,7 @@ export const R_EXPANSION = {
   // 🔴 [2026-09-28 · feedback qualification] The `rule` above states only the **quantitative** condition (ΣS > R₀)
   //   and omits the **qualitative** one ⇒ half-truth (every sentence true, one cell missing; read alone it looks like
   //   "just accumulate thickly enough and you can nail onto the Y axis"). Author completed it on 09-28.
-  qualification: '🔴 S\'s **qualification for feedback (= qualification for "nailing onto the Y axis")** = the **conjunction** of two conditions: ① **quantitative** — ΣS > R₀ (strictly greater); ② **qualitative** — that S must be **S sedimented through M feedback** (having gone one full round of D → H → M → trace-read-back; collapse leaves a trace in M, H reads back along the trace, see `|-S|`). ⇒ **The X-axis enumeration of R** (descriptive sub-divisions of R: domain sub-division / reference tables / instance lists) **does not qualify** — it **is not "S not thick enough" but "not S at all"**: its category is simply outside the candidate set (never passed M ⇒ no trace, nothing to read back) ⇒ it can only ever be a **supplementary note**, never a replacement for Y-axis structure. (`R_DOMAIN.domainExamples` is one instance of such enumeration.) ⚠️ **09-28 correction (half-truth patch #2)**: "sedimented through M feedback" **does not mean "having gone through the D→H→M process"** — H must **actually pay energy** and complete the S1 → S2 transition (**process ≠ substance**; a rote-memoriser went through the process without paying energy ⇒ no transition). ⇒ The criterion looks **neither at content source (whether it "belongs to R") nor at accumulated quantity, only at whether H paid**, see `S_TRANSITION`.',
+  qualification: '🔴 S\'s **qualification for feedback (= qualification for "nailing onto the Y axis")** = the **conjunction** of two conditions: ① **quantitative** — ΣS > R₀ (strictly greater); ② **qualitative** — that S must be **S sedimented through M feedback** (having gone one full round of D → H → M → trace-read-back; collapse leaves a trace in M, H reads back along the trace, see `|-S|`). ⇒ **The X-axis enumeration of R** (descriptive sub-divisions of R: domain sub-division / reference tables / instance lists) **does not qualify** — it **is not "S not thick enough" but "not S at all"**: its category is simply outside the candidate set (never passed M ⇒ no trace, nothing to read back) ⇒ it can only ever be a **supplementary note**, never a replacement for Y-axis structure. (`R_DOMAIN.domainExamples` is one instance of such enumeration.)',
 };
 
 // Dialectical-unity principles
