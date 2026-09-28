@@ -213,6 +213,8 @@ src/core/law.mjs      # framework definition (RSDHM / three iron laws / R hierar
 src/core/engine.mjs   # pure-logic adjudication engine (zero DSH dependency, unit-testable)
 test/                 # unit tests + real-case tests + alignment regression (run `npm test` for the current count)
 examples/             # runnable demos (demo-tool-loop / demo-backtrack-run)
+docs/quadrant-judgment.md      # quadrant judgment spec (verdict-language layer: inner/outer frame, four cells, M)
+docs/review-flow-spec.md       # review-tier six-step spec (including "hand back the deduced consequences")
 DESIGN.md             # architecture design (mapping / risks / usage flow / mount)
 ```
 
