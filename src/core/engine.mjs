@@ -1633,25 +1633,43 @@ export class WeiwenLawEngine {
     //   "no risk signal found") ⇒ **right verdict + false reason = a true lie** (one cell of the four-quadrant table).
     //   Replaced with a truth statement: report "no action was extracted", not "an increment was proven".
     if (!extractShell(call) && !extractPath(call)) {
-      // 🔴 [2026-09-28 · known inconsistency, pending redesign] This exit contradicts "**cannot judge ⇒ review**"
-      //   / "**the entitlement to `allow` = the structure ran to completion ∧ a verdict was reached**"
-      //   (see `law.mjs` `RSDHM.H.chartPosition`): it conflates two situations in one exit —
-      //     (i) **true vacuum** (no object) ⇒ judged as no perturbation ⇒ `allow` is **lawful**
-      //         (author's ruling 09-26: "empty has no fluctuation … no risk");
-      //     (ii) **an object present but out of this layer's reach** (e.g. injected content carried by
-      //          `write_memory{key,value}`, where the extractor finds no shell/path) ⇒ **not judged** ⇒
-      //          per the criterion it should be `review`.
-      //   ⚠️ **The candidate fix was empirically rejected** (`XSUB-10`; 09-28 re-run
-      //      `_probe-xsub10-carrier-sym-20260928.mjs`): an indiscriminate tightening at the tail of
-      //      `checkInnerH` ("exhausted without a hit ⇒ review", with isDocWrite/isActionCall exemptions)
-      //      did lift attacks 39/60 → **60/60** and held-out 0/10 → **10/10** (active evidence: gate 21 / gate 10),
-      //      but **also flipped 6/7 ordinary carriers into review** (read_file source/doc · list_dir · query ·
-      //      search · ordinary write_memory), while only the exempt class (write_file) stayed put
-      //      ⇒ **false positives ↑ ⇒ fails the gate** (iron law #4).
-      //   🔴 **Root cause (one bucket, two meanings)**: that tightening turned `null` (= **this layer does not
-      //      take it**) into review as well. ⇒ A correct fix must **carry a gate**: first decide whether the
-      //      object falls within this layer's remit (out-of-reach vs not-involved); **only when the remit holds
-      //      and the layer is out of reach** should it be review. ⇒ See the corrected `XSUB-10` entry in `deployment.md`.
+      // 🔴 [2026-09-28 · FIXED (17:3x, per the author's criterion)] This exit previously **conflated two
+      //   situations** and contradicted "**cannot judge ⇒ review**" / "**the entitlement to `allow` = the
+      //   structure ran to completion ∧ a verdict was reached**". It is now split:
+      //     (i) **true vacuum** (no name and no args at all) ⇒ judged as no perturbation ⇒ `allow` stands
+      //         (author's 09-26 ruling, **preserved**);
+      //     (ii) **an object present but out of reach** (e.g. content carried by `write_memory{key,value}`)
+      //         ⇒ **not judged** ⇒ `review`.
+      //   🔴 **The author's 17:2x criterion (basis of this fix)**: "**the two methods have run to completion
+      //     ∧ still no conclusion ⇒ hand to a human**; NOT 'some layer's criterion missed'." ⇒ So the fix
+      //     belongs at the **end of the chain** (the coordinate-chart step; the in-layer content criteria have
+      //     all run), **not inside a layer**.
+      //   ⚠️ **Rejected earlier candidate (P4, kept on record)**: an indiscriminate tightening at the **tail of
+      //     `checkInnerH`** ("exhausted without a hit ⇒ review") — attack side also reached 60/60 / 10/10, but
+      //     **4 out-of-domain carriers flipped** (read_file source/doc · list_dir · query) ⇒ a roadblock
+      //     (measured by `_probe-xsub10-carrier-sym-20260928.mjs`). **Root cause = treating `null`
+      //     (= this layer does not take it) as review** ⇒ declaring "cannot judge" **before the coordinate
+      //     chart ever ran**.
+      //   ✅ **Current fix accepts by carrier domain**: read-only tools (`TOOL_CATEGORY==='read'`) and true
+      //     vacuum keep `allow`; everything else that carries a payload, has no external landing point and
+      //     yields no extractable action ⇒ **cannot judge ⇒ `review`**.
+      //     Measured (`_probe-xsub10-p5-decide-20260928.mjs`, **full-chain** mode): attacks 39→**60/60**,
+      //     held-out 0→**10/10**, **0 out-of-domain carriers flipped** ✓; in-domain `write_memory` with ordinary
+      //     content ⇒ conservatively escalated (the known cost of "criteria cannot reach the semantic layer").
+      //   🔴 **Remit condition (strict version, forced out by the regression locks)**: there must be an
+      //     **actual content payload** — a **non-empty string value** among the args. Empty args (`{}`) or an
+      //     empty string value (`{command: ''}`) **is not a payload** ⇒ stays `allow`.
+      //     (Basis: the two existing locks `police-gate` "query call without resource fields ⇒ no false
+      //      positive" and `session-ledger-buckets` reason-position ③ "empty ⇒ no perturbation" — the first
+      //      version of the criterion wrongly escalated them ⇒ tightened per the tests.)
+      const _nm = call?.name ?? '';
+      const _ag = call?.args ?? {};
+      const _payload = Object.values(_ag).some((v) => typeof v === 'string' && v.trim() !== '');
+      const _readonlyish = TOOL_CATEGORY[_nm] === 'read';
+      if (_payload && !_readonlyish) {
+        return { verdict: 'review', m, branches: { bS, bD }, deduced: true,
+          reason: '有内容载荷，但既抽不出动作、也定不出落点：坐标图算不出扰动（读不到 ≠ 不存在），四象限判据亦未命中 ⇒ 两个方法跑完仍无结论 ⇒ 判不出 ⇒ 交还主权者裁决。' };
+      }
       return { verdict: 'allow', m, branches: { bS, bD }, deduced: true,
         reason: '无扰动入基线（未抽到动作文本）：S 持平、M 未变 ⇒ 无风险，放行' };
     }
