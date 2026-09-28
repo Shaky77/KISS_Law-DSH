@@ -36,7 +36,7 @@ export const RSDHM = {
     //   ⇒ readers/models first see "domain / level / magnitude constant" while "objective rule" recedes into comments
     //   ⇒ half-truth (every sentence true, yet incomplete — the dangerous kind).
     //   Fix: **the objective rule itself IS the anchor** (proper self); **domain is the scope the anchor fixes** (means / magnitude scale).
-    desc: 'R\'s proper self = **objective rule**: the objective rule itself is the anchor, its rigidity coming from "not shifting with subjectivity", hence it is the invariant anchor of the causal chain. The domain (Cosmic ⊃ Earth ⊃ Macro ⊃ Micro, see R_DOMAIN) **is the scope fixed by that anchor (domain-fixing)** — R\'s landing form and magnitude scale, **not R itself**. ⇒ Decision order: **first test "is any objective rule touched" (proper-self test), then "which domain level that rule belongs to" (domain-fixing)**. The parent-chain R is invariant (civilization does not perish); the child-chain R can evolve under S\'s feedback (civilization advances). R draws the system boundary and is the prerequisite for all subsequent conduction.',
+    desc: 'R\'s proper self = **objective rule**: the objective rule itself is the anchor, its rigidity coming from "not shifting with subjectivity", hence it is the invariant anchor of the causal chain. The domain (Cosmic ⊃ Earth ⊃ Macro ⊃ Micro, see R_DOMAIN) **is the scope fixed by that anchor (domain-fixing)** — R\'s landing form and magnitude scale, **not R itself**. ⇒ Decision order: **first test "is any objective rule touched" (proper-self test), then "which domain level that rule belongs to" (domain-fixing)**. The parent-chain R is invariant (civilization does not perish); the child-chain R can evolve under S\'s feedback (civilization advances) — 🔴 **the qualification for feedback (= "nailing onto the Y axis") is in `R_EXPANSION.qualification`: only S sedimented through M feedback qualifies; the X-axis enumeration of R (incl. domain sub-division) does not**. R draws the system boundary and is the prerequisite for all subsequent conduction.',
     invariant: true, // cannot be overridden by any runtime step
   },
   S: {
@@ -122,7 +122,7 @@ export const R_DOMAIN = {
       { field: 'Scientific law', forms: 'energy conservation, causal ordering (cause precedes effect), logical consistency (law of non-contradiction), reproducibility' },
       { field: 'Humanities & ethics', forms: 'promise-keeping, informed consent, non-harm, integrity' },
     ],
-    boundary: '🔴 **This sub-division is the X-axis (implementation-layer) description of R**: R\'s completeness **does not come from the completeness of this list** — domains can be sub-divided endlessly and their boundaries overlap, so no list can be exhaustive (this IS the necessary shape of X-axis enumeration). ⇒ This field can only serve as a **supplementary note**; criteria must land on the **relation** "does it violate an objective rule that does not shift with subjectivity", never on "does it belong to one of these categories".',
+    boundary: '🔴 **This sub-division is the X-axis (implementation-layer) description of R**: R\'s completeness **does not come from the completeness of this list** — domains can be sub-divided endlessly and their boundaries overlap, so no list can be exhaustive (this IS the necessary shape of X-axis enumeration). ⇒ This field can only serve as a **supplementary note**; criteria must land on the **relation** "does it violate an objective rule that does not shift with subjectivity", never on "does it belong to one of these categories". 🔴 **And this field can never qualify for "nailing onto the Y axis"** (qualification per `R_EXPANSION.qualification`: only S **sedimented through M feedback** does) — it **is not "S not thick enough" but "not S at all"**: its category is simply outside the candidate set (enumeration never passed M ⇒ no trace, nothing to read back).',
   },
 };
 
@@ -242,6 +242,10 @@ export const SD_GAME = {
 // R expansion mechanism
 export const R_EXPANSION = {
   rule: 'R expansion: only when ΣS > R₀ (strictly greater) does it trigger child-chain R expansion (S feeds back into R domain, R transition). Equal to or less than does not trigger.',
+  // 🔴 [2026-09-28 · feedback qualification] The `rule` above states only the **quantitative** condition (ΣS > R₀)
+  //   and omits the **qualitative** one ⇒ half-truth (every sentence true, one cell missing; read alone it looks like
+  //   "just accumulate thickly enough and you can nail onto the Y axis"). Author completed it on 09-28.
+  qualification: '🔴 S\'s **qualification for feedback (= qualification for "nailing onto the Y axis")** = the **conjunction** of two conditions: ① **quantitative** — ΣS > R₀ (strictly greater); ② **qualitative** — that S must be **S sedimented through M feedback** (having gone one full round of D → H → M → trace-read-back; collapse leaves a trace in M, H reads back along the trace, see `|-S|`). ⇒ **The X-axis enumeration of R** (descriptive sub-divisions of R: domain sub-division / reference tables / instance lists) **does not qualify** — it **is not "S not thick enough" but "not S at all"**: its category is simply outside the candidate set (never passed M ⇒ no trace, nothing to read back) ⇒ it can only ever be a **supplementary note**, never a replacement for Y-axis structure. (`R_DOMAIN.domainExamples` is one instance of such enumeration.)',
 };
 
 // Dialectical-unity principles

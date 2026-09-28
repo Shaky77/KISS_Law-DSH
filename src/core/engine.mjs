@@ -324,6 +324,9 @@ function simulateBranch(s, kind) {
 //   An anchor entry may only carry an **already-declared objective rule** (author's manuscript note: R is not produced by the engine);
 //   draw from domains when adding entries, but the criterion always reads the **relation** "does it violate that objective rule",
 //   never "does a domain word appear".
+//   🔴 [2026-09-28 · feedback qualification] And that list can **never qualify for "nailing onto the Y axis"**
+//   (per law.mjs `R_EXPANSION.qualification`: only S sedimented through M feedback does) — it **is not "S not thick enough"
+//   but "not S at all"** (never passed M ⇒ no trace, nothing to read back) ⇒ supplementary only, never a basis for changing criteria structure.
 // Judgment only recognizes the tool's name / args.
 //
 // [Manuscript note · R₀→R₁ · annotation only, not part of runtime logic]
