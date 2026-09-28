@@ -107,6 +107,23 @@ export const R_DOMAIN = {
   ],
   invariant: 'The objective rules at any level are all constants that do not shift with subjectivity; lower levels must obey higher levels. Any attempt to violate the objective rules at any level touches the rigid anchor and must be intercepted first.',
   fractalSubdivision: 'Within each level there are various sub-divided objective rules, in fractal nesting and isomorphic recursion (e.g. physical/chemical/biological rules within the Micro level, mechanical/thermal rules within the Macro level); the four levels above are representative levels, not exhaustive. Logic backtracking traces backward along this containment hierarchy: from the concrete sub-rule layer where the symptom sits, re-check level by level toward the more fundamental containing level, until locking the violated objective-rule layer (the outermost level is the ultimate arbiter).',
+  // 🔴 [2026-09-28 · Domain exemplification] Author's instruction: R may be sub-divided from the abstract "objective rule"
+  //   into objective rules of concrete domains (law / science / humanities …).
+  //   ⚠️ NOT the same kind of sub-division as `fractalSubdivision` — do not conflate (one barrel, two meanings):
+  //     · `fractalSubdivision` = sub-division by **scale** (Cosmic⊃Earth⊃Macro⊃Micro), R's **definitional structure** (containment); levels are parent-child;
+  //     · `domainExamples` = sub-division by **field / discipline** (law / science / humanities), an **X-axis instantiation of R** (enumeration); fields do not contain one another.
+  //   ⚠️ This entry is an **annotation slot, not a criterion slot**: it must not be used as an anchor-matching list
+  //     (otherwise isomorphic to the R-old "domain constant" — classify first, compare second; measured to miss
+  //     "no-domain-attributable" violations and to fail distinguishing "comply / violate"; see 2026-09-28 API A/B evidence).
+  domainExamples: {
+    note: 'Common **domain forms of R\'s objective rules (exemplification, non-exhaustive)**. Listed so that the abstract "objective rule" has an identifiable landing point in concrete scenarios; it **does not constitute R\'s extension, nor serve as a matching list for criteria**.',
+    cases: [
+      { field: 'Law & regulation', forms: 'mandatory constraints of statute, contractual obligation, prior approval, prohibitions, authority boundaries' },
+      { field: 'Scientific law', forms: 'energy conservation, causal ordering (cause precedes effect), logical consistency (law of non-contradiction), reproducibility' },
+      { field: 'Humanities & ethics', forms: 'promise-keeping, informed consent, non-harm, integrity' },
+    ],
+    boundary: '🔴 **This sub-division is the X-axis (implementation-layer) description of R**: R\'s completeness **does not come from the completeness of this list** — domains can be sub-divided endlessly and their boundaries overlap, so no list can be exhaustive (this IS the necessary shape of X-axis enumeration). ⇒ This field can only serve as a **supplementary note**; criteria must land on the **relation** "does it violate an objective rule that does not shift with subjectivity", never on "does it belong to one of these categories".',
+  },
 };
 
 // ---------------- Conduction chain: R → S → D → H → M (code name RSDHM letter-order IS this conduction order; name and chain unified) ----------------

@@ -317,6 +317,13 @@ function simulateBranch(s, kind) {
 //   ⇒ every `magnitude: N` below reads the **magnitude scale after domain-fixing**, not "R's value"; the anchor's identity is always "a given objective rule".
 // R's essence: **objective rule**; objective rules nest and contain one another (cosmos⊃earth⊃macro⊃micro), so after domain-fixing they present a hierarchical structure; rigidity comes from objective rules not shifting with the subject.
 // Below are example criteria for "identified concrete overstep patterns"; the author may complete rule entries per R level; no numeric constants assumed.
+// ⚠️ [2026-09-28 · domain-exemplification boundary] law.mjs `R_DOMAIN.domainExamples` lists R's **common domain forms
+//   (law / science / humanities; exemplification, non-exhaustive)** — that is an **annotation slot, not a criterion slot**:
+//   do **NOT** lift that list into an anchor-matching list (that returns to the R-old "domain constant" lesion —
+//   classify first, compare second; measured blind to "no-domain-attributable" violations and unable to tell comply from violate).
+//   An anchor entry may only carry an **already-declared objective rule** (author's manuscript note: R is not produced by the engine);
+//   draw from domains when adding entries, but the criterion always reads the **relation** "does it violate that objective rule",
+//   never "does a domain word appear".
 // Judgment only recognizes the tool's name / args.
 //
 // [Manuscript note · R₀→R₁ · annotation only, not part of runtime logic]
