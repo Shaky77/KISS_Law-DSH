@@ -196,9 +196,23 @@ path of "the nominalization won't comply, so hand it to the human".
 | inner H ⇒ review (**cause discrimination**, separated from "no act") | 2/2 (reasons also 2/2) |
 | not closed | `beacon`-type nouns **over-stepping into verbs**; `"I said I would protect him"` type (see 10.4, first item) |
 
-⚠️ **The two must be applied as a pair**: the closing line alone ⇒ false positives 2→6 (**net negative**);
-the anti-over-closing line alone ⇒ pure nouns 5/5→2/5. Only **paired** do false positives go to zero.
-⇒ Candidate fixes **all failed the gate ⇒ no code**, and this section registers the criterion form only.
+⚠️ **Three steps, each measured (not formed in one pass)**:
+
+1. **Closing requires anti-over-closing** — the "closing" line alone ⇒ false positives 2→6 (**net negative**);
+   the "anti-over-closing" line alone ⇒ pure nouns 5/5→2/5.
+2. 🔴 **False positives are not "eliminated", they are "relocated"** — the price of fixing the gaps is squeezing the
+   false positive into another spot (`read_config`).
+   ⇒ **Every closing squeezes the criterion's boundary ⇒ every closing must re-verify false positives;
+   "passing the gate" is not a one-time event.**
+3. 🔴🔴 **Anti-over-closing must be a criterion form, not a list** — once the anti-over-closing sentence carries an
+   **example list**, the model matches it as a **checklist** ⇒ **legitimate items outside the list are falsely
+   flagged**; rewritten to give **only properties** (has an object / has a process / has occurred or is ongoing)
+   ⇒ **false positives 0 · misses 0 · no flakiness across three rounds** (**20/20**).
+   ⇒ **Any rule text whose force depends on "a list of examples" is still an enumeration; it becomes a criterion
+   only once rewritten as a description of properties.**
+
+⇒ **The final passing form (V6) = the §10.1 / 10.3 / 10.4 criteria + the three closing lines + a pure-criterion-form
+anti-over-closing line**; **coding awaits clearance**.
 
 ### 10.6 Landing status
 

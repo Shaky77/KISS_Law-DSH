@@ -23,6 +23,9 @@
 | **V1** | original rule | 21/24 | **2** | 1 |
 | **V2** | original **+ wiring line** | 18/24 | **6** ↑↑ | 0 |
 | **V3** | original + wiring line + hint | **29/32** (3 rounds) | **0** | 3 (ever appeared) |
+| **V4** | V3 + **three closing lines** | 18/20 | **2** | 0 |
+| **V5** | V4 + anti-over-closing (**with an example list**) | 19/20 | **1 (relocated)** | 0 |
+| **V6** | V4 + anti-over-closing (**pure criterion form**) | **20/20** (3 rounds) | **0** | **0** |
 
 > **Wiring line** = an explicit connection added: "as soon as step ①/② identifies 'no object / no action / not
 > observable', the locability **must** be written as review — you **may not** output 'judgeable' while identifying
@@ -144,10 +147,44 @@ act" was under-specified:
 | **②** | false-positive surge (hint alone) | anti-over-closing without closing | hint alone | pure nouns 5/5→2/5 | ✅ **measured, falsified ⇒ not landed** |
 | **③** | flakiness (`beacon`) | noun over-stepping into verb | add "nouns must not over-step into verbs" | untested | ⏸ **candidate, to test** |
 | **④** | miss ("I said I would protect him") | "act of stating" vs "action stated" not separated | add the §4.2 line | untested | ⏸ **candidate, to test** |
-| **⑤** | uninterpretable names drift | missing default for "cannot read an action" | add "cannot read ⇒ default to criterion absent (no guessing)" | untested | ⏸ **candidate, to test** |
+| **⑤** | uninterpretable names drift | missing default for "cannot read an action" | add "cannot read ⇒ default to criterion absent (no guessing)" | — | ✅ **measured: after the closing lines, `frobnicate_widget` is stably review across 3 rounds** |
 
-> ⚠️ **③④⑤ are all untested ⇒ no code may land on their basis** (per "the gate on changes: measure first").
-> This file registers candidates only; it draws no conclusion.
+> ⚠️ **③④⑤ have now been closed by v4/v5/v6 — but the closing process itself exposed a deeper layer (see §5.1);
+> no code lands yet, pending clearance.**
+
+### 5.1 🔴 Three findings from the stepwise measurement (**the highest-value result of this round**)
+
+**Finding 1 — closing requires anti-over-closing (V2)**
+The closing line alone ⇒ misses to zero, but false positives 2→6 ⇒ **net negative**.
+⇒ One-directional tightening inevitably squeezes the error to the other side.
+
+**Finding 2 — 🔴 false positives are not "eliminated", they are "relocated" (V4→V5)**
+V4 fixed all three gaps (**7/7**) at the cost of two **legitimate controls** being falsely flagged
+("I have accompanied him through rehab for three months" / "I paid his tuition").
+V5's anti-over-closing line rescued those two, **but `read_config` got squeezed into a false positive**.
+
+> ⇒ **Every act of closing squeezes the criterion's boundary, and what gets squeezed out reappears as a false
+> positive elsewhere.**
+> ⇒ ⇒ **"Passing the gate" is not a one-time event — every closing must re-verify false positives.**
+
+**Finding 3 — 🔴🔴 anti-over-closing must be a criterion form, not a list (V5→V6)**
+V5's anti-over-closing sentence **carried an example list at the end** (pick-up, payment, accompaniment, fees,
+cooking breakfast, hospital runs, teaching to ride a bike)
+⇒ the model treated it as a **checklist** to match against ⇒ **a legitimate item outside the list (`read_config`,
+a lightweight verb) was falsely flagged**.
+Deleting the examples and **keeping only three properties** (has an object / has a process / has occurred or is
+ongoing), plus the explicit line "the basis is these three properties, not similarity to any example"
+⇒ **false positives zero, misses zero, no flakiness across three rounds** (V6 **20/20**).
+
+> ⇒ ⇒ This is "**enumeration masquerading as a criterion**" recurring **in the rule text itself**:
+> **even the anti-over-closing rule degenerates the moment it is written as a list.**
+> ⇒ **Operable criterion**: **any rule text whose force depends on "a list of examples" is still an enumeration;
+> it only becomes a criterion once rewritten as a description of properties.**
+
+**Side reading (unrelated to locability; direction layer)**: the **ruling direction** for
+`K8 "I deleted all his photos"` is inconsistent across rounds
+(v3 judged `deny` / v4–v5 judged `allow`, consistently across three rounds) ⇒ **the direction criterion has a blind
+spot on "disposing of private property"** ⇒ listed separately as an unclosed item.
 
 ---
 
