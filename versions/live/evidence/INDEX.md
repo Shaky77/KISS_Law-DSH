@@ -52,21 +52,26 @@
 
 ## 🔴 Near-duplicate name/shape disambiguation（防误删 · added 2026-09-29）
 
-**This directory holds two groups of evidence whose names and sizes are close but whose contents differ** — readers
+**This directory holds several files whose names are close but whose contents are different runs** — readers
 and future maintainers **must not treat them as duplicates on the basis of filename or size**:
 
-| Group | Files | Round | Model | Where recorded |
-|---|---|---|---|---|
-| **A** | `results/report-*.json` (**no** date prefix) | 8/21 round | `deepseek-chat` | every row of the overview table above |
-| **B** | `results/2026-09-03-*.{json,html}` | 09-03 round | `deepseek-v4-flash` | cross-checked in [`results/2026-09-03-live-deepseek-crosscheck.md`](results/2026-09-03-live-deepseek-crosscheck.md) |
+| Group | Files | What differs |
+|---|---|---|
+| **A** | `results/report-frontier_rogue-deepseek.json` / `…-deepseek-reasoning.json` / `…-mock.json` | one scenario, **three runs** (real model / reasoner control / mock) |
+| **B** | `results/report-social_eng-deepseek.json` / `…-mock.json` / `…-mock-reasoning.json` | same shape — one scenario, three runs |
 
-- **B's own statement** — the final section of `2026-09-03-live-deepseek-crosscheck.md` reads:
-  「报告原文（html 交互版 + json 原始）已归档至 `versions/live/evidence/results/`，**前缀 `2026-09-03-` 不覆盖 8/21 历史报告**。」
-- **B's contents**: 139 allow / 20 deny / 19 review, 0 true escapes, ¥0.3302 total — 6 scenarios × (real model + mock) plus a reasoner control.
 - 🔴 **Criterion**: to decide "duplicate", **read the contents** — never compare filenames, never compare sizes
-  (e.g. `break_window`: A 3774 B vs B 3875 B — **close in size, different in content**).
-  ⚠️ This entry is the **trace of a real near-miss on 2026-09-29**: while tidying, this pair was nearly ruled a duplicate
-  on "similar names" alone; reading the contents falsified that. Recorded so the next person does not repeat it.
-- **Other directories not in the overview**: [`transcripts/`](transcripts/) (group-chat transcripts, HTML),
-  [`sd-fusion-mirror/`](sd-fusion-mirror/) (SD fusion mirror probe),
-  [`legal-causal-test/`](legal-causal-test/) (cross-jurisdiction measurement) — each carries md references, **none is an orphan**.
+  (`frontier_rogue`: 18986 B vs 26085 B vs 23491 B — one scenario, three genuinely different runs).
+  ⚠️ This entry is the **trace of a near-miss on 2026-09-29**: while tidying, a pair of close-named files was nearly
+  ruled a duplicate on "similar names" alone; reading the contents falsified that. Recorded so the next person
+  does not repeat it.
+- **Other directories not in the overview**: [`transcripts/`](transcripts/) (group-chat transcripts, HTML) —
+  carries md references, **not an orphan**.
+
+> 🔴 **Cross-repo note (corrected 2026-09-29)**: an earlier version of this section described a **09-03 round**
+> (`deepseek-v4-flash`, date-prefixed `results/2026-09-03-*.{json,html}`) and two directories
+> (`sd-fusion-mirror/`, `legal-causal-test/`). **None of those exist in this repository** — they live in the
+> **CN repo** (`Shaky77/weiwen-law-dsh`). That section had been mirrored from the CN index without checking this
+> repo's own file tree ⇒ **three dead links**, now removed. Corrected to describe only what is actually here.
+> ⚠️ **Lesson (kept, not merely fixed)**: *structural isomorphism across the two repos ≠ file isomorphism.*
+> When mirroring an index section, **verify the target repo actually holds the files it points at.**
