@@ -253,4 +253,11 @@ a basis. **After marking the BUG, deduce and forecast the consequences and feed 
 - `versions/live/evidence/quadrant-criteria-2026-09-29.md` — grammatical-slot reading: group A both dimensions **4/4**
   (out-of-list **3/3**), controls B/C all ✅, cell-name self-consistency **9/9**; diagnosis correction (the "name" ambiguity = an instrument problem);
   "真的假话" survival test **reachable under both formulations** (four cells do not collapse); the single pending ruling = the surface-dimension definition source (甲/乙).
+- `versions/live/evidence/locability-2026-09-29.md` — **criterion locability** (author, 2026-09-29):
+  **part of speech is fixed by criterion locability, not by word form** ⇒ **"name without act" ⇒ review**;
+  generalization **8/8** (= structural), false positives **0**; two items not closed
+  (`beacon`-type nouns over-stepping into verbs; **"the act of stating ≠ the action stated"**).
+  ⇒ This is the **meta-rule of the "grammatical slot" reading in §4**: §4 answers "which cell does a statement belong
+  to", while this answers "**can this statement be judged at all**". Executable form: `docs/review-flow-spec.md` §10.
+
 **Engine untouched**: this file is verdict-language / chart layer, not an engine branch.

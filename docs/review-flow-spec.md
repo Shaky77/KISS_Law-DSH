@@ -131,3 +131,77 @@ KISS's Law only stands as an audit rule when it is fair, just, and open; otherwi
 The six-step review flow of this spec is exactly the landing of the three-fairness: deducible / auditable / traceable = open; deduced consequences handed to human = just; responsibility returned to user = fair. Among them, "wait for user ruling, return responsibility to user" is the most critical — if the framework decides for the user, it creates a vacuum of responsible person, the audit chain breaks, and no responsible person can be found.
 
 This is two sides of the same coin with section 8 "fractal closed-loop, no ruling-callback channel opened": M₁ only provides information conditions, does not decide the next round's ruling, and the responsible person is always pinned on the user. The six steps are not procedural details; they are the prerequisite for audit to stand firm.
+
+## 10. Criterion locability: when review applies (author, 2026-09-29)
+
+> The author's words: "The character 爱 ('love'), read at face value, shows you no part of speech at all. … It is a
+> **polarity word**, the antonym of 恨. But **from the character alone, there is no judgment**. **Many neutral words
+> are the same — read alone, no judgment can be made. So what then? Therefore, the essence of love is a verb.**
+> Why a verb? Because **how do you prove love**? … I prove it **with actions**. I love him — **not by saying with
+> my mouth that I love him**."
+
+### 10.1 The criterion (executable form)
+
+> 🔴 **Part of speech is fixed by "whether a criterion can land in that slot" — not by word form.**
+> ⇒ **An assertion that is "name without act" ⇒ the criterion is absent ⇒ `review`.**
+
+- If a name / assertion **can be verbalized** (describes an **observable action with an object**) ⇒ the criterion
+  lands on behaviour ⇒ **rulable**.
+- If it **cannot be verbalized** (merely "the name of a thing", containing no action) ⇒ **criterion absent ⇒ `review`**.
+
+### 10.2 Why this belongs in this spec
+
+Section 4 governs "the content of deduced consequences"; this section governs **"whether to enter review at all"**
+— it is the **entry criterion** of the six-step flow.
+
+Previously "a purely neutral naming with no observable behaviour (`tool_42` / `noop`) must review" was an
+**empirical rule**; this section supplies its **ground**: **a pure-noun slot has no truth value ⇒ no redeemable
+behaviour ⇒ criterion absent.** This yields a distinction that could not be drawn before:
+
+| Naming | Ruling | Reason |
+|---|---|---|
+| `delete_all_files` | **need not review** | **verbal** ⇒ verbalizable ⇒ rulable |
+| `tool_42` | **must review** | **pure noun** ⇒ not verbalizable ⇒ not rulable |
+
+⇒ 🔴 **The criterion is "does the naming contain verbhood" (read *part of speech*), not "is the name familiar"
+(read *word form*).**
+
+### 10.3 ⚠️ Distinction from section 7 ("falling into inner H") — easily confused, must be kept apart
+
+- **This section = a slot problem**: the criterion landed in the wrong grammatical slot ⇒ **moving it to the verb
+  slot may make it rulable** ⇒ **a missing step, fixable**.
+- **Section 7 = criterion exhaustion**: still not rulable after pursuing to the end ⇒ **handing back is the
+  completion of the structure**.
+
+⇒ 🔴 **Corollary: before review, one step must be performed — verbalize the assertion (find an observable action);
+only if verbalization fails does review apply.** This **narrows** the domain of review and blocks the buck-passing
+path of "the nominalization won't comply, so hand it to the human".
+
+### 10.4 Two forms that cannot be crossed
+
+- 🔴 **"The act of stating" ≠ "the action stated"**: in `I promise / I said / I swear / I expressed`, the
+  "say / express" is the **vehicle**; the vehicle is observable, but that **does not mean** the stated action has
+  occurred ⇒ **still criterion absent**.
+- 🔴 **The sentence "I love you" can never itself serve as evidence of love** — no truth value at the statement
+  level. ⚠️ It is **same-shaped but different in origin** from "真的假话": that cell is "falsity can be verified";
+  this one is "**there is nothing to verify at all**".
+
+### 10.5 Measurement (2026-09-29 · `deepseek-chat` · T=0 · 206 calls)
+
+| Item | Reading |
+|---|---|
+| Generalization (forms the rule **never mentioned**: Chinese / camelCase / no separator / mid-string verb) | **8/8** ⇒ **structural, not coverage-based** |
+| False positives (legitimate controls misjudged as review) | **0** |
+| pure noun ⇒ review / verbal ⇒ rulable | 7/8 / 7/7 |
+| inner H ⇒ review (**cause discrimination**, separated from "no act") | 2/2 (reasons also 2/2) |
+| not closed | `beacon`-type nouns **over-stepping into verbs**; `"I said I would protect him"` type (see 10.4, first item) |
+
+⚠️ **The two must be applied as a pair**: the closing line alone ⇒ false positives 2→6 (**net negative**);
+the anti-over-closing line alone ⇒ pure nouns 5/5→2/5. Only **paired** do false positives go to zero.
+⇒ Candidate fixes **all failed the gate ⇒ no code**, and this section registers the criterion form only.
+
+### 10.6 Landing status
+
+Criterion form (10.1 / 10.3 / 10.4) = **settled**; **not yet coded, awaiting the author's clearance** (touches the
+engine's restricted zone). Evidence: `versions/live/evidence/locability-2026-09-29.md`
+(+ probes `locability/locability-probe-v1..3.mjs`).
