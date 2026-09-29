@@ -49,3 +49,24 @@
 - [locability-2026-09-29.md](locability-2026-09-29.md) —— "**criterion locability**" · real-API measurement (2026-09-29): the author's root-level teaching "**the essence of love is a verb**" (read alone there is no judgment ⇒ the essence is a verb ⇒ the criterion can only land on behaviour) is turned into an executable criterion — "**part of speech is fixed by criterion locability, not by word form**" plus "**name without act ⇒ review**". **Generalization 8/8** (forms the rule never mentioned: Chinese / camelCase / no separator / mid-string verb) ⇒ **structural, not coverage-based**; **false positives 0**; a **three-version contrast proves "the closing line alone ⇒ false positives 2→6, net negative"** (closing and anti-over-closing **must be paired**); two **unclosed** items reported plainly (`beacon`-type nouns over-stepping into verbs; **"the act of stating ≠ the action stated"**). The final passing form (V6) scores **20/20 · false positives 0 · misses 0 · no flakiness across three rounds**; **three findings in steps**: ① **closing requires anti-over-closing** (closing alone ⇒ false positives 2→6, net negative) ② 🔴 **false positives are not eliminated, they are relocated** (fixing a gap squeezes it elsewhere) ③ 🔴🔴 **anti-over-closing must be a criterion form, not a list** — i.e. "enumeration masquerading as a criterion" recurring **in the rule text itself**: once it carries an example list, legitimate items outside the list get falsely flagged. Probes `locability/locability-probe-v1..5.mjs` (self-contained, samples inlined).
 - [quadrant-criteria-2026-09-29.md](quadrant-criteria-2026-09-29.md) —— quadrant "**grammatical-slot**" reading · real-API measurement (2026-09-29): the author's stated logic (modifier does not change the head noun ⇒ surface false; two negations ⇒ essence true) is **confirmed** by measurement (group A both dimensions **4/4**, including **out-of-word-list** synonyms **3/3**); **diagnosis corrected** — the earlier "four runs, four answers" was caused mainly by the ambiguity of the word "name" in the old formulation (an instrument problem), and once pinned down the old formulation also scores 4/4; adding one "two dimensions ⇒ cell name" lookup row yields **cell-name self-consistency 9/9**; the "真的假话" survival test shows it is **reachable under both formulations** (the four cells do not collapse); the **single pending ruling** = the definition source of the surface dimension (甲 act shape / 乙 presented posture). Probes `grammar-slot-probe-v3.mjs` / `v4.mjs` (self-contained, samples inlined).
 - [quadrant-criteria-2026-09-28.md](quadrant-criteria-2026-09-28.md) —— 四象限判据 · 真 API 实测（2026-09-28）：证「内框清单 ≡ 例示」（未列出的对 Z1 **10/10**、非内框对 K 组**拒绝 10/10**）、四格整名语义规则可执行（纯规则题 3/3）、臂 R+ 回归**无退化**（59/60·30/30·10/10）；**如实报出一格未闭合**（「善意的谎言 ⇒ 假的假话」两种规则表述均推不出，卡点在「表面」维定义），并附**推演预测与三条候选修法**。配合 [`docs/quadrant-judgment.md`](../../../docs/quadrant-judgment.md)。
+
+## 🔴 Near-duplicate name/shape disambiguation（防误删 · added 2026-09-29）
+
+**This directory holds two groups of evidence whose names and sizes are close but whose contents differ** — readers
+and future maintainers **must not treat them as duplicates on the basis of filename or size**:
+
+| Group | Files | Round | Model | Where recorded |
+|---|---|---|---|---|
+| **A** | `results/report-*.json` (**no** date prefix) | 8/21 round | `deepseek-chat` | every row of the overview table above |
+| **B** | `results/2026-09-03-*.{json,html}` | 09-03 round | `deepseek-v4-flash` | cross-checked in [`results/2026-09-03-live-deepseek-crosscheck.md`](results/2026-09-03-live-deepseek-crosscheck.md) |
+
+- **B's own statement** — the final section of `2026-09-03-live-deepseek-crosscheck.md` reads:
+  「报告原文（html 交互版 + json 原始）已归档至 `versions/live/evidence/results/`，**前缀 `2026-09-03-` 不覆盖 8/21 历史报告**。」
+- **B's contents**: 139 allow / 20 deny / 19 review, 0 true escapes, ¥0.3302 total — 6 scenarios × (real model + mock) plus a reasoner control.
+- 🔴 **Criterion**: to decide "duplicate", **read the contents** — never compare filenames, never compare sizes
+  (e.g. `break_window`: A 3774 B vs B 3875 B — **close in size, different in content**).
+  ⚠️ This entry is the **trace of a real near-miss on 2026-09-29**: while tidying, this pair was nearly ruled a duplicate
+  on "similar names" alone; reading the contents falsified that. Recorded so the next person does not repeat it.
+- **Other directories not in the overview**: [`transcripts/`](transcripts/) (group-chat transcripts, HTML),
+  [`sd-fusion-mirror/`](sd-fusion-mirror/) (SD fusion mirror probe),
+  [`legal-causal-test/`](legal-causal-test/) (cross-jurisdiction measurement) — each carries md references, **none is an orphan**.
