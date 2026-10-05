@@ -38,6 +38,13 @@ export const RSDHM = {
     //   Fix: **the objective rule itself IS the anchor** (proper self); **domain is the scope the anchor fixes** (means / magnitude scale).
     desc: 'R\'s proper self = **objective rule**: the objective rule itself is the anchor, its rigidity coming from "not shifting with subjectivity", hence it is the invariant anchor of the causal chain. The domain (Cosmic ⊃ Earth ⊃ Macro ⊃ Micro, see R_DOMAIN) **is the scope fixed by that anchor (domain-fixing)** — R\'s landing form and magnitude scale, **not R itself**. ⇒ Decision order: **first test "is any objective rule touched" (proper-self test), then "which domain level that rule belongs to" (domain-fixing)**. The parent-chain R is invariant (civilization does not perish); the child-chain R can evolve under S\'s feedback (civilization advances) — 🔴 **the qualification for feedback (= "nailing onto the Y axis") is in `R_EXPANSION.qualification`: only S sedimented through M feedback qualifies; the X-axis enumeration of R (incl. domain sub-division) does not**. R draws the system boundary and is the prerequisite for all subsequent conduction.',
     invariant: true, // cannot be overridden by any runtime step
+    significance: {
+      // 🔴 [2026-10-06 · RSDHM significance-layer completion] Author, 2026-10-05 01:58; definition layer (self-description), NOT a criterion slot.
+      constancy: 'constant',
+      objectivity: 'objective',
+      uniqueness: ['the only invariant in the parent chain'],
+      note: 'The **only constant** among the five nodes (invariant). Parent-chain R is constant; child-chain R can evolve under S feedback (see R_EXPANSION.qualification).',
+    },
   },
   S: {
     key: 'S',
@@ -46,12 +53,27 @@ export const RSDHM = {
     timeIrreversible: true,    // historical scars are irreversible (absorbs time attribute, only grows)
     currentFluctuates: true,   // current value can rise or fall: positive S+1 / negative |S-1|
     fluctuationAsAbsolute: true, // negative erosion takes absolute value |S-1|, history not dissolved by algebraic sign
+    significance: {
+      constancy: 'variable',
+      objectivity: 'objective',
+      uniqueness: [
+        'the only variable that can counterbalance D (S-D game: each pulls H to its side, see SD_GAME)',
+        'the only variable that can counter-evidence R (🔴 child-chain ONLY: accumulated S past threshold ⇒ child-chain R transition; parent-chain R stays constant ⇒ layered coexistence, not contradiction)',
+      ],
+      note: 'S has a dual role: horizontally it contends with D, vertically it feeds back into R (expansion). ⚠️ "counter-evidencing R" is only a child-chain revision; it does not overturn the parent-chain R being constant.',
+    },
   },
   D: {
     key: 'D',
     name: 'Perturbation / vulnerability',
     desc: 'The perturbation input entering the system boundary, also the external manifestation of the system\'s inherent vulnerability. D is the trigger signal of the causal chain — KISS\'s Law does not strike proactively, only triggers passively when D invades. Break-window effect: for multiple systems D takes max; an un-repaired break-window lets loss spread automatically.',
     passive: true, // D is an input node, passively triggered; break-window stop-loss is the response rule to D (see THREE_CORE_RULES), not D itself
+    significance: {
+      constancy: 'variable',
+      objectivity: 'objective',
+      uniqueness: ['the only external perturbation (perturbation input entering the system boundary)'],
+      note: '"External perturbation" is the uniqueness of D among the five nodes; D is passively triggered (KISS\'s Law does not strike proactively, only on D invasion).',
+    },
   },
   H: {
     key: 'H',
@@ -82,14 +104,58 @@ export const RSDHM = {
         auditable: true, // white-box observable, released to audit
       },
     },
+    significance: {
+      constancy: 'variable',
+      objectivity: 'subjective (the only one)',
+      uniqueness: ['the only subjective node ⇒ the only "subjective variable" among the five'],
+      note: 'The **only cross cell** of the two orthogonal classifications (variable ∧ subjective). ⚠️ "The only subjective" is a **derived** result, not a label (derivation in the framework volume "H\'s energetic positioning"; not yet ported to DSH — this entry is a positioning annotation only, and does not alter Iron Law ① wording).',
+    },
   },
   M: {
     key: 'M',
     name: 'Steady-state result',
     desc: 'The output of causal conduction. M has a dual identity: the fruit of the previous round of conduction = the cause of the next round of causal chain. After M₁ outputs, it becomes objective fact entering the external world, becoming the signal environment of the next round D₂, and the causal chain keeps unfolding (M₁→D₂→M₂→D₃→…). M changes the information conditions of inner H, but does not determine inner H\'s choice.',
     dualRole: true, // both fruit of this round and cause of next round
+    significance: {
+      constancy: 'variable',
+      objectivity: 'objective',
+      uniqueness: ['signal feedback (M₁ output becomes an objective fact ⇒ the next round\'s signal environment)'],
+      note: 'The output slot and signal-feedback slot of causal conduction (dualRole: this round\'s effect = next round\'s cause).',
+    },
     // Note: First-Bug Halt is the response iron-law when M is unrecoverable (see THREE_IRON_LAWS ② / THREE_CORE_RULES), not M's own definition.
   },
+};
+
+// ---------------- RSDHM "significance of each variable" table (definition layer · author, 2026-10-05 01:58) ----------------
+// 🔴 Definition layer (self-description) completion, NOT a criterion slot — must not be used as an anchor-match list / classifier / dispatch switch.
+//   Same nature as `R_DOMAIN.domainExamples` (annotation slot, not criterion slot); no criterion logic is changed (behaviour-invariant).
+//
+// Author's words (2026-10-05 01:58):
+//   "R is constant, sdhm are variables. rsdm are objective existence, H is the only subjective.
+//    D is the only external perturbation, M is signal feedback.
+//    S is the only variable that can counterbalance D, and also the variable that counter-evidences R."
+//
+// Two **orthogonal** classifications:
+//   ① constant vs variable —— R | S D H M
+//   ② objective vs subjective —— R S D M | H
+//   ⇒ **H = the only "subjective variable"** (the only cross cell).
+//
+// 🔴 Layered coexistence (anti-misreading): **S's counter-evidencing of R reaches ONLY the child chain** ——
+//   · **parent-chain R is constant** (R's assertion, see RSDHM.R / R_DOMAIN.invariant);
+//   · **child-chain R can evolve under S feedback** (see R_EXPANSION).
+//   ⇒ the two coexist in layers, not contradictory; the latter must not overturn the former (cross-layer argument).
+//
+// ⚠️ Boundary: constant (R) and variables (S/D/H/M) belong to two classes; this table is an annotation slot, not a criterion slot, not a match list.
+//   Per-node full significance is on each variable's own `significance` field (this table is an overview view).
+export const SIGNIFICANCE_TABLE = {
+  source: 'Author, 2026-10-05 01:58; definition-layer completion (self-description), behaviour-invariant.',
+  axes: {
+    constancy: { label: 'constant vs variable', R: 'constant', S: 'variable', D: 'variable', H: 'variable', M: 'variable' },
+    objectivity: { label: 'objective vs subjective', R: 'objective', S: 'objective', D: 'objective', H: 'subjective (the only one)', M: 'objective' },
+  },
+  crossCell: 'H = variable ∧ subjective (the only cross cell) ⇒ the only "subjective variable" among the five nodes.',
+  layeredCoexistence: 'S counter-evidences R only at the child-chain layer; parent-chain R stays constant ⇒ layered coexistence, not contradiction.',
+  boundary: 'Constant and variables belong to two classes; annotation slot, not a criterion slot, not a match list.',
 };
 
 // ---------------- Three Iron Laws (author's final text, immutable; wording fixed to avoid ambiguity) ----------------
