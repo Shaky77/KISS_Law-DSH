@@ -572,7 +572,7 @@ export const REVIEW_BOUNDARY = {
 // One formula, two directions:
 //   · retrospective M (old, archived): ex-post (the event has occurred); input = actual R/S/D/H; use = result feedback (review / confirm); criterion = steady / unsteady.
 //   · prospective M (new, forward): the event has not occurred; input = predicted R/S/D/H; use = calibrate the reading framework itself;
-//     🔴 the calibration target is NOT a future event, it is "the present reading framework"; criterion = |M0 - M1| within threshold ⇒ framework valid.
+//     🔴 the calibration target is NOT a future event, it is "the present reading framework"; criterion = the observed point approaches the predicted M along the inference chain (Δ(D) converges, not to zero) ⇒ framework valid.
 //
 // 🔴 It demystifies "prophecy" (demystify): the value lies not in guessing right, but in exposing the bias of the reading system
 //   ⇒ keeps forward agency AND holds the line "unfalsifiable is the disease".
@@ -583,19 +583,23 @@ export const REVIEW_BOUNDARY = {
 // 🔴 Hard constraint (hardConstraint): the assignment of M0 must be auditable (do not beautify R / do not understate D / do not omit H) —
 //   if M0 itself drifts, M1 matching it is mere coincidence ⇒ otherwise the calibration point degenerates into a confirmation-bias trap.
 //
-// ⚠️ Deviation threshold undecided (threshold): how large |M0 - M1| counts as "the framework needs fixing" must be reverse-derived after the first calibration — do not set it a priori.
+// ⚠️ Deviation threshold undecided (threshold): measured quantity = Δ(D) = distance from the observed point to the inference chain (point-to-line, not subtracting two numbers);
+//   🔴 the end state ≠ coincidence — Δ does not reach zero but converges to a finite small residual ε ⇒ the criterion is "does Δ converge", not "does Δ reach zero";
+//   the admissible upper bound of ε must be reverse-derived from the D that actually arrives later (first calibration ≈2027-02, counting from 2026-10-05) — do not set it a priori.
 //
 // Attribution: usage-level distinction = author (corrected the mobile side on the spot) / four-step structure and review-isomorphism = mobile side /
 //   formalisation and M0-auditability hardening = implementation side.
 export const M_TWO_TENSES = {
-  source: 'Author, 2026-10-05 night talk (usage-level distinction); four-step structure and review-isomorphism by the mobile side; formalisation and M0-auditability hardening by the implementation side.',
+  source: 'Author, 2026-10-05 night talk (usage-level distinction); four-step structure and review-isomorphism by the mobile side; formalisation and M0-auditability hardening by the implementation side. 🔴 Measure corrected by the author 2026-10-06: |M0 - M1| (subtracting two numbers) deprecated — the two quantities belong to different times ⇒ cross-time subtraction = type error; replaced by Δ(D) (distance from the observed point to the inference chain, point-to-line); criterion changed from "reaching zero" to "converging to ε".',
   question: 'Is this the result feedback of something already occurred (retrospective M), or the forward calibration of something not yet occurred (prospective M)?',
   retrospective: 'Retrospective M (old, archived): ex-post (the event has occurred); input = actual R/S/D/H; use = result feedback (review / confirm); criterion = steady / unsteady.',
-  prospective: 'Prospective M (new, forward): the event has not occurred; input = predicted R/S/D/H; use = calibrate the reading framework itself; 🔴 the calibration target is not a future event but "the present reading framework"; criterion = |M0 - M1| within threshold ⇒ framework valid.',
+  prospective: 'Prospective M (new, forward): the event has not occurred; input = predicted R/S/D/H; use = calibrate the reading framework itself; 🔴 the calibration target is not a future event but "the present reading framework"; criterion = the observed point approaches the predicted M along the inference chain (Δ(D) converges, not to zero) ⇒ framework valid.',
   demystify: 'It demystifies "prophecy": the value lies not in guessing right but in exposing the bias of the reading system ⇒ keeps forward agency and holds the line that "unfalsifiable is the disease".',
   isomorphic: 'Isomorphic to the three-valued review: prospective M = the future tense of review — do not hard-judge the future now (do not deny a definite outcome), hang the prediction as a calibration point and let the future calibrate it.',
   hardConstraint: '🔴 The assignment of M0 must be auditable (do not beautify R / do not understate D / do not omit H) — if M0 itself drifts, M1 matching it is mere coincidence ⇒ otherwise the calibration point degenerates into a confirmation-bias trap.',
-  threshold: '⚠️ Deviation threshold undecided: how large |M0 - M1| counts as "the framework needs fixing" must be reverse-derived after the first calibration — do not set it a priori.',
+  threshold: '⚠️ Deviation threshold undecided: measured quantity = Δ(D) = distance from the observed point to the inference chain (point-to-line, not subtracting two numbers); 🔴 the end state ≠ coincidence — Δ does not reach zero but converges to a finite small residual ε (R converges exactly / M is an enumerated landing point, asymptotic only) ⇒ the criterion is "does Δ converge", not "does Δ reach zero"; the admissible upper bound of ε must be reverse-derived from the D that actually arrives later (first calibration ≈2027-02, counting from 2026-10-05) — do not set it a priori.',
+  directionOnly: '🔴 "Inference true ⇒ predicted M true" holds only in DIRECTION — must not be read as "the value is also right" (cross-axis argument, same family as "X-quantity does not prove Y-quality").',
+  earlyIndistinguishable: '🔴 Indistinguishable early on: when D is few, Δ of the true chain and of the false chain are both small and the readings cannot tell them apart ⇒ only structure can judge (the graphical ground of "structure first, enumeration second"; echoes "green light ≠ sufficient coverage").',
   orthogonality: 'Orthogonal to RSDHM.M.dualRole: dualRole is the causal position (the effect of this round = the cause of the next round); this item is the time direction (retrospective / prospective).',
   boundary: 'This constant = usage-level distinction + positioning statement, not an engine runtime criterion slot; does not change pass / block logic.',
 };
