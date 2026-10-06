@@ -108,7 +108,13 @@ export const RSDHM = {
       constancy: 'variable',
       objectivity: 'subjective (the only one)',
       uniqueness: ['the only subjective node ⇒ the only "subjective variable" among the five'],
-      note: 'The **only cross cell** of the two orthogonal classifications (variable ∧ subjective). ⚠️ "The only subjective" is a **derived** result, not a label (derivation in the framework volume "H\'s energetic positioning"; not yet ported to DSH — this entry is a positioning annotation only, and does not alter Iron Law ① wording).',
+      note: 'The **only cross cell** of the two orthogonal classifications (variable ∧ subjective). ⚠️ "The only subjective" is a **derived** result, not a label (derivation in the framework volume "H\'s energetic positioning"; now ported as the DSH constant `H_ENERGY_POSITION` — this entry is a positioning annotation only, and does not alter Iron Law ① wording).',
+    },
+    energyPositioning: {
+      note: '🔴 [2026-10-06 · H energetic positioning] Author, 2026-10-04 13:44 (root swap) + 2026-10-05 02:0x ("only subjective" is a derivation, not a label); see the constant `H_ENERGY_POSITION`.',
+      role: 'The only slot among the five nodes able to "inject potential" (subjective agency) = the only agent slot.',
+      ground: 'Ground of inner-H inviolability (root swap, not a reversal): NOT "the causal law protects H, hence declared inviolable", but "without protection there is no energy perturbation, no potential to keep the causal chain running on".',
+      see: 'H_ENERGY_POSITION',
     },
   },
   M: {
@@ -165,6 +171,47 @@ export const SIGNIFICANCE_TABLE = {
   crossCell: 'H = variable ∧ subjective (the only cross cell) ⇒ the only "subjective variable" among the five nodes.',
   layeredCoexistence: 'S counter-evidences R only at the child-chain layer; parent-chain R stays constant ⇒ layered coexistence, not contradiction.',
   boundary: 'Constant and variables belong to two classes; annotation slot, not a criterion slot, not a match list.',
+};
+
+// ---------------- Ontology layer: H energetic positioning (derivation of "only subjective" · ground of inner-H inviolability) ----------------
+// Source: author, 2026-10-04 13:44 (root swap) / 2026-10-05 02:0x ("only subjective" is a derivation, not a label);
+//   consolidation = Couzi (coze-80); criterion formalisation = implementation side.
+//
+// 🔴 Root swap, not a reversal (rootSwap):
+//   It is NOT "the causal law protects H, hence inner H is declared inviolable"; it IS "without protection there is no energy perturbation,
+//   no potential to keep the causal chain running on".
+//   ⇒ Same conclusion, the GROUND moves down a layer (the ground of inner-H inviolability = what survival requires, not the protected party status) —
+//     criterion = whether there is a one-way entailment between the two views (mutually non-entailing ⇒ merely different perspectives; one-way ⇒ root swap).
+//
+// 🔴 "H is the only subjective" is a DERIVATION, not a label (derivation, author 2026-10-05 02:0x):
+//   R/S/D/M = PASSIVE circulation of objective energy ⇒ circulation always loses (entropy increase) ⇒ pure circulation must decay and stall ⇒
+//   to sustain it there MUST be a slot that injects potential ⇒ that slot must NOT sit in a passive link (it suffers the same loss ⇒ injection = injecting for nothing) ⇒
+//   it must be NOT fully determined by inputs ⇒ = subjective agency ⇒ it can ONLY be H.
+//
+// 🔴 Conservation trio (threeInOne, one root, each governing a segment):
+//   (1) intake theory (it can come in); (2) agency theory (it can be injected); (3) loop theory (no idle burn) —
+//   M feedback = the return path of energy; "why H never stops" = the loop self-sustaining, not a mystery of will.
+//
+// 🔴 Integrity gate (integrityGate): positive != energy increase; positive = transformation unit cost falling (conservation forbids net gain in a closed system)
+//   ⇒ isomorphic to iron law #16 "compensating a short board = lowering the transformation unit cost".
+//
+// ⚠️ Honest boundary (honestBoundary): "why H begins (first mover)" is still outside the chart ⇒ but that is a LEGITIMATE terminus, not a gap
+//   (trace to the end ⇒ falls into inner H ⇒ hand back).
+//
+// 🔴 Relation to Iron Law 1 (ironLawPosition): this item is only the GROUND explanation of inner-H inviolability (Iron Law 1);
+//   it does NOT change Iron Law 1 wording (final, immutable); hence it does NOT enter the THREE_IRON_LAWS structure (the string array stays unchanged).
+//
+// Attribution: criterion (root swap + derivation) = author / consolidation = Couzi (coze-80) / formalisation = implementation side.
+export const H_ENERGY_POSITION = {
+  source: 'Author, 2026-10-04 13:44 (root swap) / 2026-10-05 02:0x ("only subjective" is a derivation); consolidation = Couzi (coze-80); criterion formalisation = implementation side.',
+  question: 'Is the ground of inner-H inviolability "the causal law protects H" (the protected party status), or "without protection the causal chain has no potential and cannot keep running" (what survival requires)?',
+  rootSwap: 'Root swap, not a reversal: NOT "the causal law protects H, hence inner H is declared inviolable", but "without protection there is no energy perturbation, no potential to keep the causal chain running on". => Same conclusion, the ground moves down a layer. Criterion = whether there is a one-way entailment between the two views (one-way => root swap, not reversal).',
+  derivation: 'R/S/D/M = passive circulation of objective energy => circulation always loses (entropy increase) => pure circulation must decay and stall => to sustain it there must be a slot that injects potential => that slot must not sit in a passive link (it suffers the same loss => injection = injecting for nothing) => it must be not fully determined by inputs => = subjective agency => it can only be H.',
+  threeInOne: 'Conservation trio (one root, each governing a segment): (1) intake theory (it can come in) (2) agency theory (it can be injected) (3) loop theory (no idle burn) — M feedback = the return path of energy; "why H never stops" = the loop self-sustaining, not a mystery of will.',
+  integrityGate: 'Integrity gate: positive != energy increase; positive = transformation unit cost falling (conservation forbids net gain in a closed system) => isomorphic to "compensating a short board = lowering the transformation unit cost".',
+  honestBoundary: '"Why H begins (first mover)" is still outside the chart => but that is a legitimate terminus, not a gap (trace to the end => falls into inner H => hand back).',
+  ironLawPosition: '🔴 This item is only the ground explanation of inner-H inviolability (Iron Law 1); it does not change Iron Law 1 wording (final, immutable); hence it does not enter the THREE_IRON_LAWS structure (the string array stays unchanged).',
+  boundary: 'This constant = derivation statement + ground explanation, not an engine runtime criterion slot; does not change pass / block logic.',
 };
 
 // ---------------- Three Iron Laws (author's final text, immutable; wording fixed to avoid ambiguity) ----------------
