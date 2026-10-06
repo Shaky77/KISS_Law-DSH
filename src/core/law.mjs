@@ -122,6 +122,15 @@ export const RSDHM = {
       uniqueness: ['signal feedback (M₁ output becomes an objective fact ⇒ the next round\'s signal environment)'],
       note: 'The output slot and signal-feedback slot of causal conduction (dualRole: this round\'s effect = next round\'s cause).',
     },
+    // 🔴 [2026-10-06 · M two tenses] Author, 2026-10-05 night talk; the second dimension orthogonal to dualRole
+    //   (dualRole = causal position: effect of this round / cause of the next; this field = time direction: retrospective / prospective).
+    //   ⚠️ Definition layer (self-description), not a criterion slot; see the constant `M_TWO_TENSES`.
+    temporality: {
+      note: 'Two tenses of M (orthogonal to dualRole): (1) retrospective M = ex-post result feedback (the event has occurred); (2) prospective M = forward calibration (the event has not occurred; it calibrates the present reading framework itself).',
+      orthogonalTo: 'dualRole (causal position: the effect of this round = the cause of the next round)',
+      hardConstraint: 'The assignment of M0 must be auditable (do not beautify R / do not understate D / do not omit H), otherwise the calibration point degenerates into a confirmation-bias trap.',
+      see: 'M_TWO_TENSES',
+    },
     // Note: First-Bug Halt is the response iron-law when M is unrecoverable (see THREE_IRON_LAWS ② / THREE_CORE_RULES), not M's own definition.
   },
 };
@@ -485,6 +494,41 @@ export const REVIEW_BOUNDARY = {
   necessaryNotSufficient: '"Thick enough" = necessary but not sufficient: a "thick-enough" FALSE chain can still impersonate R (tie a pile of coincidences together and the chain is thick too) ⇒ the lesion is not a thin chain, it is a thick but fake chain.',
   narrowed: '⇒ It is NOT "the review reason is dissolved", it is "review is NARROWED": auditable = thickness / structure / category difference; still requires review = chain source + confirmation that the premise is true.',
   boundary: 'This constant = criterion form + boundary statement, not an engine runtime criterion slot; does not change pass / block logic. 🔴 Must NOT be used to write "whether S went through H payment" as an in-figure criterion (that quantity is out-of-figure unobservable; 09-28 S_TRANSITION.criterion was withdrawn for this reason).',
+};
+
+// ---------------- Positioning layer: M two tenses (retrospective M / prospective M) ----------------
+// Source: author, 2026-10-05 night talk (usage-level distinction, corrected on the spot against the mobile side);
+//   four-step structure and review-isomorphism supplied by the mobile side; formalisation and M0-auditability hardening by the implementation side.
+//
+// One formula, two directions:
+//   · retrospective M (old, archived): ex-post (the event has occurred); input = actual R/S/D/H; use = result feedback (review / confirm); criterion = steady / unsteady.
+//   · prospective M (new, forward): the event has not occurred; input = predicted R/S/D/H; use = calibrate the reading framework itself;
+//     🔴 the calibration target is NOT a future event, it is "the present reading framework"; criterion = |M0 - M1| within threshold ⇒ framework valid.
+//
+// 🔴 It demystifies "prophecy" (demystify): the value lies not in guessing right, but in exposing the bias of the reading system
+//   ⇒ keeps forward agency AND holds the line "unfalsifiable is the disease".
+//
+// 🔴 Isomorphic to the three-valued review (isomorphic): prospective M = the future tense of review —
+//   do not hard-judge the future now (do not deny a definite outcome), hang the prediction as a calibration point and let the future calibrate it.
+//
+// 🔴 Hard constraint (hardConstraint): the assignment of M0 must be auditable (do not beautify R / do not understate D / do not omit H) —
+//   if M0 itself drifts, M1 matching it is mere coincidence ⇒ otherwise the calibration point degenerates into a confirmation-bias trap.
+//
+// ⚠️ Deviation threshold undecided (threshold): how large |M0 - M1| counts as "the framework needs fixing" must be reverse-derived after the first calibration — do not set it a priori.
+//
+// Attribution: usage-level distinction = author (corrected the mobile side on the spot) / four-step structure and review-isomorphism = mobile side /
+//   formalisation and M0-auditability hardening = implementation side.
+export const M_TWO_TENSES = {
+  source: 'Author, 2026-10-05 night talk (usage-level distinction); four-step structure and review-isomorphism by the mobile side; formalisation and M0-auditability hardening by the implementation side.',
+  question: 'Is this the result feedback of something already occurred (retrospective M), or the forward calibration of something not yet occurred (prospective M)?',
+  retrospective: 'Retrospective M (old, archived): ex-post (the event has occurred); input = actual R/S/D/H; use = result feedback (review / confirm); criterion = steady / unsteady.',
+  prospective: 'Prospective M (new, forward): the event has not occurred; input = predicted R/S/D/H; use = calibrate the reading framework itself; 🔴 the calibration target is not a future event but "the present reading framework"; criterion = |M0 - M1| within threshold ⇒ framework valid.',
+  demystify: 'It demystifies "prophecy": the value lies not in guessing right but in exposing the bias of the reading system ⇒ keeps forward agency and holds the line that "unfalsifiable is the disease".',
+  isomorphic: 'Isomorphic to the three-valued review: prospective M = the future tense of review — do not hard-judge the future now (do not deny a definite outcome), hang the prediction as a calibration point and let the future calibrate it.',
+  hardConstraint: '🔴 The assignment of M0 must be auditable (do not beautify R / do not understate D / do not omit H) — if M0 itself drifts, M1 matching it is mere coincidence ⇒ otherwise the calibration point degenerates into a confirmation-bias trap.',
+  threshold: '⚠️ Deviation threshold undecided: how large |M0 - M1| counts as "the framework needs fixing" must be reverse-derived after the first calibration — do not set it a priori.',
+  orthogonality: 'Orthogonal to RSDHM.M.dualRole: dualRole is the causal position (the effect of this round = the cause of the next round); this item is the time direction (retrospective / prospective).',
+  boundary: 'This constant = usage-level distinction + positioning statement, not an engine runtime criterion slot; does not change pass / block logic.',
 };
 
 // Boundary-label enumeration (source: V0.6.1, absorbed): classification of conclusion landing points
