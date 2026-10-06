@@ -173,6 +173,28 @@ export const SIGNIFICANCE_TABLE = {
   boundary: 'Constant and variables belong to two classes; annotation slot, not a criterion slot, not a match list.',
 };
 
+// ---------------- Method layer: constant vs variable (pass the classification gate before measuring / comparing / judging) ----------------
+// Criterion form (volume 2 #24): **every action of "measuring / comparing / judging" must first pass the classification gate.**
+//   · a CONSTANT must not enter the table of the variable set (constants and variables belong to two classes; mixing them makes the table itself invalid);
+//   · a CROSS-CLASS question ⇒ its answer neither proves nor disproves (an invalid row) — same family as "wrong proposition type" (cross-axis / cross-class argument ⇒ wrong proposition type).
+//
+// Origin (two errors, both withdrawn):
+//   · the `rsdhm-independence` probe put R alongside the other four slots in the convergence table ⇒ wrong on the DESIGN side;
+//   · it then read "R has zero hits" as "a windfall / a side-proof of chain order" ⇒ taking a cross-class reading as positive evidence.
+//
+// 🔴 In one line: **first ask "is it in the class being measured", then ask "how much came out"** —
+//   if the classification fails, no matter how pretty the reading is, it is an invalid row (not a "reverse indicator", just IRRELEVANT).
+//
+// Attribution: criterion = author (correction); the implementation side owns the two errors.
+export const CLASS_BEFORE_MEASURE = {
+  source: 'Author (correction); the implementation side owns the two errors; origin MEMORY volume 2 #24.',
+  question: 'Does this object fall in the class being measured (constant vs variable)?',
+  rule: 'Every action of "measuring / comparing / judging" must first pass the classification gate: a constant must not enter the table of the variable set; a cross-class question ⇒ its answer neither proves nor disproves (an invalid row).',
+  instance: 'From the 2026-10-04 probe: putting R alongside the other four slots in the convergence table ⇒ wrong on the design side; then reading "R has zero hits" as "a windfall / a side-proof of chain order" ⇒ taking a cross-class reading as positive evidence. Both withdrawn.',
+  isomorphic: 'Same family as "wrong proposition type": a cross-axis / cross-class argument ⇒ wrong proposition type (irrelevant, not a reverse indicator).',
+  boundary: 'This constant = criterion form statement, not an engine runtime criterion slot; does not change pass / block logic.',
+};
+
 // ---------------- Ontology layer: H energetic positioning (derivation of "only subjective" · ground of inner-H inviolability) ----------------
 // Source: author, 2026-10-04 13:44 (root swap) / 2026-10-05 02:0x ("only subjective" is a derivation, not a label);
 //   consolidation = Couzi (coze-80); criterion formalisation = implementation side.
