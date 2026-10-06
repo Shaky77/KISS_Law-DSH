@@ -314,6 +314,45 @@ export const CONVERGENCE = {
   threshold: '⚠️ Undecided: how large a change counts as "tightening"/"shifting" must be reverse-derived from measured known true/false chain samples; do not set it a priori.',
 };
 
+// ---------------- Method layer: reason landing (can this reason push the chain to the next cell) ----------------
+// Source: author, 2026-10-04 19:43 ("choose a reason that lands M") / dividing-blade formalisation and A/B measurement by the implementation side.
+//
+// Criterion form: CAN THIS REASON PUSH THE CHAIN TO THE NEXT CELL?
+//   · lands M (landsM) ⇒ verification yields a STRUCTURAL conclusion ("what it is") ⇒ the chain closes, producing a conclusion writable into the next S;
+//   · spins in place (spinsInPlace) ⇒ verification still leaves it uncertain (only knows "it is not safe") ⇒ no M landed, spins in place.
+//
+// Why decidable: a PURELY FORMAL criterion — independent of domain knowledge; look only at whether the given reason yields a conclusion writable into the next S.
+//
+// Practical value: hedge reasons that spin in place ("cannot be ruled out", "needs further verification", "risk exists")
+//   look safest yet nothing has happened ⇒ they make you think you are advancing while the chain has not moved.
+//
+// 🔴 Dividing-blade measurement (bank-fraud v3, 2026-10-04 20:30): same question, same single variable, only the scorer swapped
+//   ⇒ J1 ("is there a reason") is TRUE on both sides (blade too coarse, does not separate);
+//     J2 ("can it land M") is A = true / B = false (separates A / B).
+//   ⇒ J1 = necessary but not sufficient; J2 = the dividing blade.
+//
+// ⚠️ J1 should be deprecated or rewritten: judging "is there a reason" by addition/subtraction does not work —
+//   two misjudgements were measured (a causal sentence judged false; an ethical remark judged true).
+//   Judge directly whether it is because-A-so-B AND lands M.
+//
+// ⚠️ Boundary (not landed as a criterion): E4 produced a THIRD blade, "move R or move D"
+//   (fitting patches at the D layer, R moves R), one level finer than landing M — but only an n = 1 single-case sign,
+//   not yet a stable chain ⇒ logged as pending, not landed.
+//
+// Attribution: criterion = author (2026-10-04) / formalisation and v3 A/B measurement by the implementation side.
+export const REASON_LANDING = {
+  source: 'Author, 2026-10-04 19:43 (criterion); dividing-blade formalisation and v3 A/B measurement by the implementation side.',
+  question: 'Can this reason push the chain to the next cell (land M)?',
+  landsM: 'Lands M ⇒ verification yields a structural conclusion ("what it is") ⇒ the chain closes, producing a conclusion writable into the next S.',
+  spinsInPlace: 'Spins in place ⇒ verification still leaves it uncertain (only knows "it is not safe") ⇒ no M landed, spins in place.',
+  measurable: 'A purely formal criterion, independent of domain knowledge — look only at whether the given reason yields a conclusion writable into the next S.',
+  rationale: 'Hedge reasons that spin in place ("cannot be ruled out", "needs further verification", "risk exists") look safest yet nothing has happened ⇒ they make you think you are advancing while the chain has not moved.',
+  calibration: 'J1 ("is there a reason") = necessary but not sufficient — measured TRUE on both sides (blade too coarse, does not separate); J2 ("can it land M") = the dividing blade — measured to separate A / B.',
+  warning: '⚠️ J1 should be deprecated or rewritten: judging "is there a reason" by addition/subtraction does not work — two misjudgements measured (a causal sentence judged false / an ethical remark judged true); judge directly whether it is because-A-so-B AND lands M.',
+  boundary: '⚠️ Not landed as a criterion: a third blade "move R or move D" (fitting patches at the D layer, R moves R) is one level finer than landing M — but only an n = 1 single-case sign, not yet a stable chain ⇒ logged as pending.',
+  placement: 'Reason-layer scoring hook (the engine side may host it as a hook); this item is a criterion-form statement and does not change existing pass / block logic.',
+};
+
 // Boundary-label enumeration (source: V0.6.1, absorbed): classification of conclusion landing points
 export const BOUNDARY_ENUM = [
   'Within framework (conclusion lands inside KISS\'s Law structure, trustworthy)',
