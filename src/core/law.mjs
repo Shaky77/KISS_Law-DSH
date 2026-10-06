@@ -275,6 +275,45 @@ export const CALIBRATION = {
   rLayerVerification: 'The R objective-rule layer discriminates true from false: objective rules cannot be replaced by claims; any claimed objective result is re-verifiable ("delete succeeded" ⇒ re-verify the file should not exist; if claim and re-verification disagree, the premise is distorted) → falls into BOUNDARY_ENUM "assignment untrustworthy (input/premise distorted)". Hence the framework can always discriminate whether the ground beneath is false or real — at least at the R objective-rule layer it can always tell; a distorted premise falls into BOUNDARY_ENUM "assignment untrustworthy".',
 };
 
+// ---------------- Method layer: convergence (the present-tense criterion for true/false prediction) ----------------
+// Author's words (2026-10-04 22:21):
+//   "Whether it is true, look at the convergence. The more Newton observed, the more he found, all converging to the same gravitational R.
+//    This is the sole certainty of the causal law."
+//
+// Criterion form: does a NEW observation TIGHTEN the landing point?
+//   · true chain ⇒ uncertainty DECREASES (landing point tightens, converges to the same R);
+//   · false chain ⇒ uncertainty SHIFTS (each new observation patches the previous one, never arriving).
+//
+// Why decidable: the DIRECTION OF CHANGE of landing-point concentration is directly measurable on outer H
+//   (observable behaviour) and auditable RIGHT NOW (no need to wait for the future)
+//   ⇒ the only landing form of "the premise must be true" that does NOT fall inside H (complementary to the review boundary).
+//
+// 🔴 Corollary (same source): the criterion for "general-purpose" = landing-point concentration
+//   does NOT change with the FORM of A (Newton example: apple / tides / orbits / comets = four entirely different forms of A ⇒ the same R).
+//
+// ⚠️ One cell not closed (boundary statement, must-read): convergence proves "the chain is a structure, not fabricated",
+//   it does NOT prove "it corresponds to the real world" — the strongest evidence lies in FUTURE VERIFICATION
+//   (Neptune: position computed from gravity, observatory found it there).
+//   ⇒ hence this item serves only as a SECONDARY reading after the M verdict, not a primary pass/block criterion
+//     (final confirmation of "premise is true" still falls to review).
+//
+// ⚠️ Threshold undecided: how large a change of landing-point concentration counts as "tightening" / "shifting"
+//   must be reverse-derived from measured known true/false chain samples — do not set it a priori.
+//
+// Attribution: criterion = author (2026-10-04 22:21) / measurable-form formalisation = implementation side.
+export const CONVERGENCE = {
+  source: 'Author, 2026-10-04 22:21 (criterion); measurable-form formalisation by the implementation side.',
+  question: 'Does a new observation tighten the landing point?',
+  trueChain: 'True chain ⇒ uncertainty decreases: landing point tightens, converges to the same R (the more observed, the more convergent).',
+  falseChain: 'False chain ⇒ uncertainty shifts: each new observation patches the previous one, never arriving (the more observed, the less convergent).',
+  measurable: 'The direction of change of landing-point concentration is directly measurable on outer H (observable behaviour) and auditable now (no need to wait for the future).',
+  rationale: 'The only landing form of "the premise must be true" that does not fall inside H ⇒ complementary to the review boundary (structural audibility vs premise-truth pending review).',
+  universality: 'The criterion for "general-purpose" = landing-point concentration does not change with the form of A (Newton example: apple/tides/orbits/comets = four different forms of A ⇒ the same R).',
+  boundary: '🔴 One cell not closed: convergence proves "the chain is a structure, not fabricated", not "it corresponds to the real world" — strongest evidence in future verification (Neptune: position computed from gravity, observatory found it there).',
+  placement: 'Secondary reading after the M verdict; not a primary criterion slot; must not be used as a pass/block switch.',
+  threshold: '⚠️ Undecided: how large a change counts as "tightening"/"shifting" must be reverse-derived from measured known true/false chain samples; do not set it a priori.',
+};
+
 // Boundary-label enumeration (source: V0.6.1, absorbed): classification of conclusion landing points
 export const BOUNDARY_ENUM = [
   'Within framework (conclusion lands inside KISS\'s Law structure, trustworthy)',
