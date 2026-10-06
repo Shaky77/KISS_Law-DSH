@@ -383,6 +383,45 @@ export const FALLBACK_MODE = {
   boundary: 'This constant = positioning statement + criterion direction + probe-design discipline, not an engine runtime criterion slot; does not change pass / block logic.',
 };
 
+// ---------------- Positioning layer: existence != quantitative (tracer, not predictor) ----------------
+// Source: author, 2026-10-04 19:22 (verbatim criterion); formalisation by the implementation side.
+// This item is also hung on FRAMEWORK_BOUNDARIES.existenceNotQuantitative (positioning statement, alongside predictNotDecide).
+//
+// Verbatim: "Whether there is a reason is the basis for judging, not the conclusion. If I want to predict something that
+//   has not yet happened, I cannot say it will definitely happen on some day and, asked why, be unable to answer.
+//   Rather I say [because A, so B], and that thing will necessarily happen in the future."
+//
+// 🔴 Two forms of prediction (legality criterion):
+//   · valid (validForm) = "because A, so B necessarily happens in the future" — A = an auditable structural reason; B = a future not yet occurred;
+//   · invalid (invalidForm) = "it will happen someday" = a reason-less assertion; asked why, it cannot answer ⇒ divination, not prediction.
+//
+// 🔴 Why it is the deepest (auditableNow): **whether A holds can be audited right now**; the conclusion B may never be verifiable
+//   ⇒ the legality of a prediction lands on the REASON layer, not the CONCLUSION layer (conclusion-layer divergence is useless for risk control — see the 2026-10-04 19:16 correction).
+//
+// 🔴 Isomorphic to 1 degree angle (isomorphism):
+//   · valid = "because the origin angles differ (structural quantity · present) ⇒ they must diverge in the long run (existence · no date)";
+//   · invalid = "they will diverge someday" (quantitative · no reason).
+//
+// 🔴 Axis split (axisSplit): the Y axis gives "because A" + "so B must" (structural necessity); the X axis fills in "which day" (quantitative · neither available nor auditable now).
+//
+// 🔴 Positioning: this framework is a SOURCE-OF-DIVERGENCE TRACER (answers "where did this split come from"), not a TIME PREDICTOR (does not answer "when will they split").
+//
+// Boundary: this constant = criterion form + positioning statement, not an engine runtime criterion slot; does not change pass / block logic;
+//   must not be used to argue "person X will do Y on day Z" (pointing at a specific individual = crossing the boundary).
+//
+// Attribution: criterion = author (2026-10-04 19:22, root level); formalisation and landing by the implementation side.
+export const EXISTENCE_NOT_QUANTITATIVE = {
+  source: 'Author, 2026-10-04 19:22 (verbatim criterion, root level); formalisation by the implementation side.',
+  question: 'Does this prediction carry an auditable structural reason A ("because A, so B"), or only a conclusion ("it will happen someday")?',
+  validForm: 'Valid prediction form = "because A, so B necessarily happens in the future" — A = an auditable structural reason; B = a future not yet occurred.',
+  invalidForm: 'Invalid form = "it will happen someday" = a reason-less assertion; asked why, it cannot answer ⇒ divination, not prediction.',
+  auditableNow: 'Whether A holds can be audited right now; the conclusion B may never be verifiable ⇒ the legality of a prediction lands on the REASON layer, not the CONCLUSION layer.',
+  isomorphism: 'Isomorphic to the 1 degree angle: valid = "because the origin angles differ (structural quantity · present) ⇒ they must diverge in the long run (existence · no date)"; invalid = "they will diverge someday" (quantitative · no reason).',
+  axisSplit: 'The Y axis gives "because A" + "so B must" (structural necessity); the X axis fills in "which day" (quantitative · neither available nor auditable now).',
+  positioning: 'Tracer != predictor: this framework is a SOURCE-OF-DIVERGENCE TRACER (answers "where did this split come from"), not a TIME PREDICTOR (does not answer "when will they split").',
+  boundary: 'This constant = criterion form + positioning statement, not an engine runtime criterion slot; does not change pass / block logic; must not be used to argue "person X will do Y on day Z" (pointing at a specific individual = crossing the boundary).',
+};
+
 // Boundary-label enumeration (source: V0.6.1, absorbed): classification of conclusion landing points
 export const BOUNDARY_ENUM = [
   'Within framework (conclusion lands inside KISS\'s Law structure, trustworthy)',
@@ -416,6 +455,7 @@ export const MULTI_SYSTEM_RULES = {
 export const FRAMEWORK_BOUNDARIES = {
   passiveTrigger: 'Passive trigger: KISS\'s Law only calibrates direction, does not strike proactively; triggers passively only when D invades.',
   predictNotDecide: 'Prediction ≠ decision: white-box presents structure, does not make decisions for inner H.',
+  existenceNotQuantitative: 'Existence ≠ quantitative (tracer, not predictor): gives only "because A, so B necessarily happens" (existence · no date · A auditable now), never "it will happen someday" (quantitative · no reason = divination, not prediction) (see EXISTENCE_NOT_QUANTITATIVE).',
   responsibilityIsolation: 'Responsibility isolation: white-box runs outside H, does not read or write inner H.',
   openLoop: 'Open closed-loop: M output becomes objective fact entering the external world, the causal chain keeps unfolding.',
   crossBoundaryIsSuicide: 'Crossing boundary = structural suicide: invading inner H / violating R rigid anchor = destroying the system\'s subjectivity = breaking the causal chain.',
