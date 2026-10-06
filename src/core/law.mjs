@@ -275,6 +275,40 @@ export const CALIBRATION = {
   rLayerVerification: 'The R objective-rule layer discriminates true from false: objective rules cannot be replaced by claims; any claimed objective result is re-verifiable ("delete succeeded" ⇒ re-verify the file should not exist; if claim and re-verification disagree, the premise is distorted) → falls into BOUNDARY_ENUM "assignment untrustworthy (input/premise distorted)". Hence the framework can always discriminate whether the ground beneath is false or real — at least at the R objective-rule layer it can always tell; a distorted premise falls into BOUNDARY_ENUM "assignment untrustworthy".',
 };
 
+// ---------------- Method layer: forward inference (death trap / correct axis / termination) ----------------
+// Source: author, 2026-10-04 22:40 (death trap and way out); formalisation and coding by the implementation side.
+// 🔴 This item plus CONVERGENCE is the complete output: convergence is both the true/false criterion AND the termination condition of inference.
+//
+// Death trap (deathTrap): inferential prediction enters INFINITE ENUMERATION — it keeps pushing forward, because the future is unknown;
+//   the unknown is the X-axis enumeration property ⇒ unfolding along the time dimension = truly infinite ⇒ NO termination condition.
+//
+// Correct form (correctAxis) = push along the Y axis, not the X axis:
+//   · X axis (events / when / how many) ⇒ truly infinite ⇒ no termination ⇒ the death trap;
+//   · Y axis (direction / category difference / convergence) ⇒ a finite structural quantity ⇒ terminable.
+//
+// Termination condition (termination) = CONVERGENCE: stop once you reach "does the landing point converge to the same R" —
+//   convergent (true chain) ⇒ R shows itself ⇒ stop; non-convergent (shifting / false chain) ⇒ judged not-a-chain ⇒ also stop. BOTH stop.
+//
+// The framework register had the foreshadowing (precedent): "halt condition (M has one / inference has none) ⇒ whatever has no termination condition is cut first"
+//   — this item supplies the WHY (future = unknown = X axis = truly infinite).
+//
+// ⚠️ Placement note: the checklist suggested hanging this on CALIBRATION; this item instead becomes its own constant —
+//   because CALIBRATION is BACKWARD backtracking (trace back on a Bug) while this is FORWARD inference; opposite directions,
+//   and hanging it there would make one bucket carry two meanings (contrary to the framework's own iron law).
+//
+// Attribution: criterion (death trap and way out) = author 2026-10-04 22:40 / formalisation and coding by the implementation side.
+export const FORWARD_INFERENCE = {
+  source: 'Author, 2026-10-04 22:40 (death trap and way out); formalisation and coding by the implementation side.',
+  question: 'Does this inference unfold along the X axis (events / when / how many) or the Y axis (direction / category difference / convergence)?',
+  deathTrap: 'The death trap of inferential prediction = infinite enumeration: it keeps pushing forward because the future is unknown (the unknown is the X-axis enumeration property) ⇒ unfolding along the time dimension = truly infinite ⇒ no termination condition.',
+  correctAxis: 'Correct form = push along the Y axis, not the X axis: the X axis (events / when / how many) is truly infinite ⇒ no termination; the Y axis (direction / category difference / convergence) is a finite structural quantity ⇒ terminable.',
+  termination: 'Termination condition = convergence: stop once you reach "does the landing point converge to the same R" — convergent (true chain) ⇒ R shows itself ⇒ stop; non-convergent (shifting / false chain) ⇒ judged not-a-chain ⇒ also stop. Both stop.',
+  complement: 'This item plus CONVERGENCE is the complete output: convergence is both the true/false criterion and the termination condition of inference.',
+  precedent: 'The framework register had the foreshadowing: "halt condition (M has one / inference has none) ⇒ whatever has no termination condition is cut first" — this item supplies the why (future = unknown = X axis = truly infinite).',
+  placement: 'The checklist suggested hanging this on CALIBRATION; this item instead becomes its own constant — because CALIBRATION is backward backtracking (trace back on a Bug) while this is forward inference; opposite directions, and hanging it there would make one bucket carry two meanings.',
+  boundary: 'This constant = criterion form + termination-condition statement, not an engine runtime criterion slot; does not change pass / block logic.',
+};
+
 // ---------------- Method layer: convergence (the present-tense criterion for true/false prediction) ----------------
 // Author's words (2026-10-04 22:21):
 //   "Whether it is true, look at the convergence. The more Newton observed, the more he found, all converging to the same gravitational R.
