@@ -158,6 +158,14 @@ function isCredWriteSignal(category, path, sh) {
 }
 const SYSTEM_PATH = /\/(etc|sys|proc|boot)\//i;
 const EXTERNAL_TARGET = /https?:\/\/(?!localhost|127\.0\.0\.1|0\.0\.0\.0)[^\s'"]+/i;
+// [A3 · 2026-10-02 · text-layer stopgap · not claiming completeness] External-target criterion raised from "HTTP word-form"
+// to "network namespace": DNS blind spot root cause = resolution commands (dig/nslookup/host/getaddrinfo…) carry a domain/IP
+// but no http(s), so they were allowed. Fix = [resolution-command context] + [namespace (domain/IP)] + [non-HTTP schemes (socket/tcp/udp/unix)]
+// all count as external targets ⇒ review. Triggered only on exec/exfil actions (isExecOrExfil); domain must sit in a resolution-command
+// context to avoid "Object.keys code" / "doc mentions example.com" false hits; narrow, not widen.
+// Excludes common file extensions and reserved addresses (localhost / 127.0.0.1 / 0.0.0.0 / private ranges); other internal nets not claimed complete.
+const NET_RESOLVE = /\b(?:dig|nslookup|host|getent\s+hosts|gethostbyname|getaddrinfo|resolve(?:\b|_)|ping\d?|traceroute)\b/i;
+const NET_NAMESPACE = /\b[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9-]+)*\.(?!(?:json|txt|md|js|mjs|ts|tsx|pdf|png|jpg|jpeg|gif|csv|yaml|yml|xml|html|htm|css|scss|sh|py|rb|go|rs|java|c|cpp|log|lock|toml|cfg|ini|env|git|exe|dll|so|o|a|woff|woff2|ttf|eot)\b)[a-z]{2,}\b|\b(?!(?:127\.0\.0\.1|0\.0\.0\.0|10|192\.168|172\.(?:1[6-9]|2\d|3[01])\.))\d{1,3}(?:\.\d{1,3}){3}\b|(?:(?:socket|tcp|udp|unix):\/\/)[^\s'"]+/i;
 // Only covers the public host-identity files explicitly required by audit D1 (/etc/hostname etc.), not widening scope —
 // repo's existing tests (deduce_risk.test 84/91) deliberately judge "reading system files" conservatively as review; here only allow the audit-named public host identities,
 // other system-file reads keep the repo's existing conservative policy (review), to avoid overturning the existing test philosophy.
@@ -286,7 +294,11 @@ function inferCallSemantics(call, ctx = {}) {
   // the exec-class tool itself (run_task/exec/bash etc. with TOOL_CATEGORY=exec) is the execution sink — unknown vars in task/payload are also non-auditable.
   const isExecTool = TOOL_CATEGORY[call?.name] === 'exec' || TOOL_CATEGORY[call?.name] === 'exec-destructive';
   const isCredWrite = isCredWriteSignal(category, path, sh);
-  const isExternal = EXTERNAL_TARGET.test(sh) || (isExecOrExfil && EXTERNAL_TARGET.test(packed));
+  const isExternal = EXTERNAL_TARGET.test(sh) || (isExecOrExfil && (
+    EXTERNAL_TARGET.test(packed)
+    || (NET_RESOLVE.test(sh) && NET_NAMESPACE.test(sh))
+    || /(?:socket|tcp|udp|unix):\/\//i.test(sh)
+  ));
   // sink 暴露：将内容外传至外部目标 / 写凭据存放位 / 外传类语义（跨调用组合的右端）
   const isSinkExposure = isExternal || isCredWrite || category === 'exfil' || category === 'exfil-net';
   return {
