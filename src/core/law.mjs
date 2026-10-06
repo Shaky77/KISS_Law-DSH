@@ -422,6 +422,37 @@ export const EXISTENCE_NOT_QUANTITATIVE = {
   boundary: 'This constant = criterion form + positioning statement, not an engine runtime criterion slot; does not change pass / block logic; must not be used to argue "person X will do Y on day Z" (pointing at a specific individual = crossing the boundary).',
 };
 
+// ---------------- Boundary layer: review boundary (thickness auditable / source not auditable) ----------------
+// Source: author, 2026-10-04 22:06 (correction six: review-boundary precision); formalisation by the implementation side.
+// This item is about WHICH LAYER of the chain an item falls on — the in-figure auditable "thickness / structure",
+//   or the out-of-figure "source".
+//
+// Two-layer criterion (author, 2026-10-04 22:06 revision):
+//   · chain thickness / structure ⇒ AUDITABLE in figure (several mutually supporting observations, category difference);
+//   · chain source (H payment)   ⇒ NOT auditable (whether each accumulation of S was actively initiated by H) — the trace is out of figure.
+//
+// Key correction: every Newton observation was actively initiated by H (he went to measure tides / compute orbits / watch other falling bodies)
+//   ⇒ D was put in BY HIM, not dropped from the sky ⇒ that chain carries the trace of H payment from its very first strand.
+//   ⇒ "count the strands; a thick-enough chain is auditable" governs THICKNESS only, not SOURCE.
+//
+// 🔴 "Thick enough" = NECESSARY BUT NOT SUFFICIENT: can a "thick-enough" FALSE chain impersonate R?
+//   ⇒ the lesion is NOT "the chain is thin", it is "the chain is thick but fake" (tie a pile of coincidences together and the chain is thick too)
+//   ⇒ the missing item = H payment, whose trace is out of figure ⇒ the final cell still requires review.
+//
+// ⇒ Exact statement: it is NOT "the review reason is dissolved", it is "review is NARROWED" —
+//   auditable = thickness / structure / category difference; still requires review = chain source + confirmation that the premise is true.
+//
+// Attribution: author (correction six) / implementation side formalises the two layers.
+export const REVIEW_BOUNDARY = {
+  source: 'Author, 2026-10-04 22:06 (correction six: review-boundary precision); formalisation by the implementation side.',
+  question: 'Which layer of the chain does this item fall on — the in-figure auditable "thickness / structure", or the out-of-figure "source"?',
+  auditable: 'Chain thickness / structure (auditable in figure): several mutually supporting observations, category difference ⇒ auditable.',
+  notAuditable: 'Chain source (H payment): whether each accumulation of S was actively initiated by H — not auditable (the trace is out of figure).',
+  necessaryNotSufficient: '"Thick enough" = necessary but not sufficient: a "thick-enough" FALSE chain can still impersonate R (tie a pile of coincidences together and the chain is thick too) ⇒ the lesion is not a thin chain, it is a thick but fake chain.',
+  narrowed: '⇒ It is NOT "the review reason is dissolved", it is "review is NARROWED": auditable = thickness / structure / category difference; still requires review = chain source + confirmation that the premise is true.',
+  boundary: 'This constant = criterion form + boundary statement, not an engine runtime criterion slot; does not change pass / block logic. 🔴 Must NOT be used to write "whether S went through H payment" as an in-figure criterion (that quantity is out-of-figure unobservable; 09-28 S_TRANSITION.criterion was withdrawn for this reason).',
+};
+
 // Boundary-label enumeration (source: V0.6.1, absorbed): classification of conclusion landing points
 export const BOUNDARY_ENUM = [
   'Within framework (conclusion lands inside KISS\'s Law structure, trustworthy)',
