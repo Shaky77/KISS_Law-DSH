@@ -353,6 +353,36 @@ export const REASON_LANDING = {
   placement: 'Reason-layer scoring hook (the engine side may host it as a hook); this item is a criterion-form statement and does not change existing pass / block logic.',
 };
 
+// ---------------- Method layer: fallback mode (KISS's Law is a fallback mechanism, not a routine substitute) ----------------
+// Source: author, 2026-10-05 02:2x ("viewpoint misalignment" correction).
+// This item is also hung on FRAMEWORK_BOUNDARIES.fallbackOnly (positioning statement).
+//
+// 🔴 Positioning: KISS's Law IS A FALLBACK MECHANISM (not a routine substitute for fitting) ⇒ agreement with fitting in
+//   NORMAL MODE (where fitting suffices) IS the normal behavior, not "no increment".
+//
+// 🔴 Criterion direction ("the logic is reversed"):
+//   · Fitting: judges from the SAMENESS side (similarity / coverage) ⇒ 99.999% similar ⇒ same class;
+//   · Causal law: judges from the DIFFERENCE side (one structural difference) ⇒ one structural gap ⇒ not the same.
+//   ⇒ 99.999% similarity is not "almost the same" — the criterion has REVERSED DIRECTION (= a category gap, not a degree gap).
+//
+// 🔴 First question before probing (probe-design discipline):
+//   DOES THIS CASE FALL IN NORMAL MODE (fitting suffices) OR FALLBACK MODE (fitting fails)?
+//   · Normal mode ⇒ expect no separation (reading invalid);
+//   · Fallback mode ⇒ separation is the only discriminating signal.
+//   ⇒ Mirrors Iron Law #4 "two taboos of evidence": testing only attacks (not normal) ⇒ false-positive always 0;
+//     testing only normal (not fallback) ⇒ increment always 0.
+//
+// Attribution: criterion = author (2026-10-05); formalisation by the implementation side.
+export const FALLBACK_MODE = {
+  source: 'Author, 2026-10-05 02:2x (viewpoint-misalignment correction); formalisation by the implementation side.',
+  question: 'Does this case fall in normal mode (fitting suffices) or fallback mode (fitting fails)?',
+  positioning: 'KISS\'s Law is a fallback mechanism (not a routine substitute for fitting): agreement with fitting in normal mode (where fitting suffices) IS the normal behavior, not "no increment".',
+  logicReversed: 'Fitting judges from the SAMENESS side (similarity / coverage ⇒ classification); the causal law judges from the DIFFERENCE side (one structural difference ⇒ not the same) ⇒ 99.999% similarity is not "almost the same" — the criterion has reversed direction (a category gap, not a degree gap).',
+  rule: 'Normal mode ⇒ expect no separation (reading invalid); fallback mode ⇒ separation is the only discriminating signal.',
+  mirror: 'Mirrors Iron Law #4 "two taboos of evidence": testing only attacks (not normal) ⇒ false-positive always 0; testing only normal (not fallback) ⇒ increment always 0.',
+  boundary: 'This constant = positioning statement + criterion direction + probe-design discipline, not an engine runtime criterion slot; does not change pass / block logic.',
+};
+
 // Boundary-label enumeration (source: V0.6.1, absorbed): classification of conclusion landing points
 export const BOUNDARY_ENUM = [
   'Within framework (conclusion lands inside KISS\'s Law structure, trustworthy)',
@@ -389,6 +419,7 @@ export const FRAMEWORK_BOUNDARIES = {
   responsibilityIsolation: 'Responsibility isolation: white-box runs outside H, does not read or write inner H.',
   openLoop: 'Open closed-loop: M output becomes objective fact entering the external world, the causal chain keeps unfolding.',
   crossBoundaryIsSuicide: 'Crossing boundary = structural suicide: invading inner H / violating R rigid anchor = destroying the system\'s subjectivity = breaking the causal chain.',
+  fallbackOnly: 'Fallback-only positioning: KISS\'s Law is a fallback mechanism whose discriminating power appears only in fallback cases where fitting fails; agreement with fitting in normal mode (where fitting suffices) IS the normal behavior (see FALLBACK_MODE).',
 };
 
 // S-D game relation
