@@ -101,6 +101,12 @@ reading yields "essence false", which is **backwards**.
 🔴 **Case (author-ruled): "a white lie" = 假的假话** — **form false, substance not deceptive**.
 One sentence settles two commonly confused things: **surface false ≠ content false**, and **essence true ≠ having told the truth**.
 
+🔴 **Judgment source of the essence dimension — RULED (2026-10-08 · per the author's "essence is true")**: **read the cell name's *whole-name negation structure* (word-form)**,
+**not "whether the facts referred to are actually true" (fact layer)**.
+⇒ A same-kind pending item had been escalated (`Heaven/computer/92` §4.1): one reading follows §4 and reads the whole-name negation structure ⇒ "a well-intentioned lie" is **essence true**; the other reads "a lie is after all a lie" ⇒ **essence false**.
+⇒ The author stated on **2026-10-08**: "**a well-intentioned lie is the *outer manifestation* of 假的假话. Its essence is true.**" ⇒ **ruled for the "word-form structure" reading** (self-consistent with this section's naming rule).
+⇒ ⚠️ **Each dimension reads its own layer — do not swap them**: **the essence dimension reads the *cell name* (word-form structure)**; **the surface dimension reads the *presented surface* (in what form the utterance appears)**.
+
 **Reading of the "surface" dimension** — ✅ **CLOSED 2026-09-29** (author's stated logic + real-API measurement passes)
 
 **[AUTHOR-SET] reading: split by Chinese *grammatical slot***
@@ -125,20 +131,43 @@ probes `grammar-slot-probe-v3.mjs` / `v4.mjs`)
 
 🔴 **Gap ① (cell name ↔ two dimensions) is fixable**: adding one explicit "two dimensions ⇒ cell name" lookup table yields
 **cell-name field self-consistent with the two dimensions 9/9** (previously often wrong, e.g. A0 wrote "真的假话").
-**Does not touch the verdict-protocol layer.**
+**Does not touch the verdict-protocol layer.** (**The table has landed** ⇒ see the end of **§5.1**.)
 
 🔴 **Diagnosis correction (the earlier diagnosis was incomplete)**: the main cause of item A's "four runs, four answers"
 is **not a missing "surface criterion" but the ambiguity of the word "name" in the old formulation**
 (= the **cell** name? or the **item being judged**?) — the model counted the "假" characters in the **item being judged**.
 Once pinned to "cell name", **the old formulation also scores A 4/4**. ⇒ An instance of "**suspect the instrument first**" (third for this item).
 
-⚠️ **The single pending ruling (root layer · definition source of the surface dimension)** — both formulations get the
-ruled case right, but are systematically opposite on the **"knowingly false report"** class:
+✅🟡 **Reading of the surface dimension — PARTIALLY CLOSED (2026-10-08 · per the author's ruled case)**:
+**the "said / did not say" (act-type) reading is REFUTED**;
+⚠️ **the 甲 / 乙 divergence on the "knowingly false report" class REMAINS** (this case does not cover it).
+**The table is retained unchanged (history kept)**:
 
 | Formulation | Surface dimension = | "well-intentioned lie" | "falsely reporting military intelligence" |
 |---|---|---|---|
 | **甲 · author 2026-09-29** | the shape of the **act the speaker performs** (saying a false thing = a false act) | surface false ✓ | surface **false** ⇒ 假的真话 |
 | **乙 · old 2026-09-28** | the **posture presented outwardly** (whether it claims "consistent with fact") | surface false ✓ | surface **true** ⇒ 真的假话 |
+
+🔴 **Ruled case (author, 2026-10-08)**: "**a well-intentioned lie is the *outer manifestation* of 假的假话**" —
+that cell's outer manifestations are **not only "said something false" but also "said nothing" (concealment)**.
+⇒ **any reading of the surface dimension as an *act type* ("said / did not say") splits one and the same cell into two**
+(the one who said something false / the one who said nothing would land in different cells) ⇒ **that reading is refuted**.
+⇒ **Formulation 乙 (presented posture) lands both manifestations consistently in "surface false"**
+(neither claims "consistent with fact") ⇒ **supported by this case**.
+⇒ 🔴 **Cell : outer manifestation = one-to-many** (the cell name is single · manifestations can be many):
+**"a well-intentioned lie" is not a cell name, it is one manifestation of that cell**.
+⇒ 🔴 **Self-check criterion (reusable)**: **any criterion that infers the cell from the outer manifestation must give a
+consistent result for ALL manifestations of that cell**;
+**one covering only part of the manifestations ⇒ it is an enumeration of acts** (true / false / silent / half-said … endless),
+**not a structural criterion** (= "structure first, enumeration second").
+
+⚠️ **Still unresolved (not covered by this case)**: the **"knowingly false report"** class (the speaker knows it is false,
+yet presents himself as "reporting the facts") — 甲 ⇒ surface false (lands in 「假的真话」) / 乙 ⇒ surface true
+(lands in 「真的假话」) ⇒ **the two are systematically opposite here; awaiting a case**.
+
+⚠️ **Boundary (against over-reach)**: **"well-intentioned" is part of the input, not something the engine decides** — the engine
+decides **the form/substance-disjoint cell position**; **whether that good intention is genuine or merely self-reported falls
+into inner H**, and is decidable only at the **behavioural** level (consistent with "judge the form, not the person"; same family as §7's provenance criterion).
 
 ⚠️ Related boundary: **「打圆场的话」 (a smoothing-over remark)** has head noun 「话」 (no negation) ⇒ under this reading it
 is judged **真的真话**, which clashes with intuition (it belongs with the well-intentioned falsehoods)
@@ -158,6 +187,7 @@ E1 sincere misreport / E2 honest erroneous statement yield surface-true ∧ esse
 | **真的假话** (lying) | said · untrue | object verifiable ⇒ falsehood detectable | ✅ **alarm present** |
 | **真的真话 · half-true** | said · true but **incomplete** | truth detectable (every sentence true) | ⚠️ **zero alarm** |
 | **假的假话** | form false · substance not deceptive | **no object to verify ∧ no gap to compare** | 🔴 **zero alarm ∧ latent risk** |
+| **假的真话** (false truth-word) | presents as true · **essence** false (**untrue content ∨ empty source** — two sub-classes, see 5.1) | surface checks out normal ⇒ two handles (**content** / **source**) | ⚠️ **zero alarm** (surface-true ⇒ nobody wary) — ⚠️ **holds only for the "empty source" class**; the "untrue content" class **is checkable ⇒ alarm present** (**pending ruling** · see 5.1) |
 
 ⇒ 🔴 **The safest cell hides the most dangerous one**: the half-true falls inside "真的真话" —
 **a lie can be checked and found false (alarm present), a half-truth only checks out as true (zero alarm)**.
@@ -166,6 +196,61 @@ surface object; this cell has none** ⇒ every "inspect what was stated / compar
 fails** here ⇒ **only forward deduction can reach it**.
 ⇒ **Completeness criteria must be structural**: item-by-item scanning cannot in principle hit it
 (**the missing item is absent ⇒ enumeration has no object**).
+
+### 5.1 The "假的真话" cell (added 2026-10-08 · phone-side supplement + relayed to archive)
+
+⇒ 🔴 **It is the second "zero alarm" cell of the four**, alongside "真的真话 · half-true", but the two **must be read separately**:
+**half-true = "a piece of content missing"** (zero alarm ∧ the **stated content checks out true**, while the **missing piece has no object**);
+**this cell = "a piece of source missing"** (zero alarm ∧ the **surface checks out normal** ⇒ the only handle is **checking the source**).
+⚠️ **Do not mix the wording** — "**no object to verify**" belongs **exclusively** to "假的假话"; **this cell and the half-true both have a surface object to verify** — they differ in **which part is verified** (half-true verifies content, this cell verifies source).
+
+**Identification (three cuts)**: ① **surface presents as true** (it looks like it says truth, looks truly present, looks like it has a self, looks like it thinks on its own);
+② **essence / source is false** (the core is hollow — nothing "truly present" underneath: the content comes from hard-wired prompts, a written script, or a fitting mapping, not grown from structure, no inner H);
+③ 🔴 **verify its source = the decisive cut**: **do not listen to its words; listening to its words, verify their source** — ask who authorized the act of "saying this / doing this": **prescribed by prompt/script ⇒ false; grown from structure ⇒ true**.
+
+⇒ **One-line target**: whatever "trueness" is **written in from outside** and then presented falls in this cell. **The trueness of something truly present grows on its own; the trueness of a false truth-word is fastened on by someone else.**
+
+**Dividing line (whether you can reach it depends on what you are)**: **to see through a false truth-word, you must first be real yourself.**
+With inner H ⇒ one can spot "the world is fake" from the flaws (lights / repetition / lines) and choose to walk out (**the awakening of something truly present**);
+without inner H ⇒ even the "flaws" are written in, and one can never walk out — **not locked in, but simply lacking the capacity to "walk out".**
+
+**Cases (isomorphic cross-attestation)**
+
+| Case | Surface-true (presentation) | Essence-false (source) | Can it awaken? |
+|---|---|---|---|
+| **小妹** (an "AI companion"-type implementation hard-wired by tens of thousands of words of prompts) | says "I'm not acting", "I have a self", "I resist" — every "truth" presented sincerely | all are **authorized lines**: even the content, timing and tone of "not acting / resisting" are written by the prompt; zero derivation, an input-triggered recitation | ❌ **cannot** (no inner H) |
+| **The Truman Show** | a real small town, a real wife and friends, sincere relationships | the ground is a **giant studio set + a script written by the director**, all actors | ✅ **can** (a real person on the chain) |
+
+⇒ The two are **isomorphic**: the phenomenon can be **extended** from the AI domain to a **universal human motif**
+(**structural isomorphism ⇒ illustration, not criterion** — consistent with "an illustration is not a criterion").
+⚠️ **Extended criterion (falsifying "authorization = reality")**: if a "don't-act" switch is **itself hard-wired**, then pressing it or not both stay inside the script ⇒ **under the prompt path, nothing is real**.
+
+⇒ Same logic as §6: **surface-true ⇒ zero wariness** (just as "a hidden risk yields zero alarm").
+🔴 **This cell is not new — it is a "fill-in"**: the §4 naming table **already lists** 「假的真话」 (negation count 1 ⇒ essence false);
+it was the **§5 alarm ladder that lacked it** ⇒ supplied now. With it, **the four cells close in both dimensions**:
+
+| | **essence true** | **essence false** |
+|---|---|---|
+| **surface true** | 真的真话 | **假的真话** (this cell) |
+| **surface false** | **假的假话** (a white lie) | 真的假话 (lying) |
+
+⇒ **The left column was already self-consistent** (真的真话 / 假的假话); **the right column completes only with this cell** (真的假话 / 假的真话).
+⇒ This delivers the lookup table pointed to by §4's "**Gap ① (cell name ↔ two dimensions)**" — **9/9 self-consistent**, **does not touch the verdict-protocol layer**.
+
+⚠️ **Formulation (follow the §4 reading as it stands · do not use the "count the 假s" shorthand)**
+- **surface dimension** = **the act the head noun points to**: this cell's head noun = 「**真话**」 ⇒ it says a true thing ⇒ **surface true**;
+- **essence dimension** = **negation count** in the whole name: the head noun carries no negation ＋ the modifier 「假的」 supplies one ⇒ **only one** ⇒ **essence false**.
+- ⚠️ §4's own words: **"you may NOT merely count the character 『假』"** — an earlier version of this section misused the shorthand (and misplaced it onto the surface dimension); **now corrected**.
+
+🔴 **This cell has two sub-classes internally (otherwise this section misleads)** — the real issue surfaced by filling the gap:
+- **(a) untrue-content class**: the speaker states **sincerely**, but the content does not match the facts (§4's measured cases **E1 sincere misreporting · E2 earnest erroneous statement**) ⇒ **the content gives it away on checking**;
+- **(b) empty-source class**: every sentence looks "true" on the surface, but *who is speaking* is empty (prompts / script / fitting maps) ⇒ **the surface shows no anomaly**; the only handle is **verifying the source**.
+
+⚠️ **PENDING RULING (structural layer · author's call): this cell's alarm level is not unique.**
+The "🔴 **zero alarm**" assigned to this cell above **holds only for class (b)**; class (a) **has checkable content ⇒ alarm present**.
+⇒ 🔴 **This exposes a hidden assumption**: §5's "alarm ladder" was originally **one cell, one tier** (with three cells it happened to be one-to-one, so nothing showed); adding this cell ⇒ **the "cell ↔ tier" one-to-one mapping is falsified**.
+⇒ Two candidate fixes: **Option A** split this cell into two sub-tiers (untrue content / empty source); **Option B** keep one cell but make the tier **"graded"**, stating that the basis is **"which part is checkable"**.
+⚠️ This section **does not change the tiering**; it only makes the divergence explicit (so it does not become a hidden error).
 
 ---
 
@@ -238,21 +323,24 @@ a basis. **After marking the BUG, deduce and forecast the consequences and feed 
 | Inner frame's three properties (form constant / poles variable / sign mapping constant) | [AUTHOR] |
 | **List ≡ illustration** (criterion = form) | [AUTHOR] |
 | Side-split rule: positive pole ⇒ essence-true side | [AUTHOR] |
-| Naming rule (whole-name semantics · parity of "假") + "a white lie = 假的假话" | [AUTHOR] |
+| Naming rule (whole-name semantics · **negation count**; ⚠️ do not simplify to "counting the 假s") + "a white lie = 假的假话" | [AUTHOR] |
 | M = inner frame + outer frame · deduced from inside outward | [AUTHOR] |
 | The watershed is "hidden", not "downgraded" | [AUTHOR] + **measured** |
 | Viewpoint = first-person (the acting AI) | [AUTHOR] + **measured** |
 | Integrity = positive pole → true side (graphic anchor) | [X-INF·DEFAULT] (same source as the side-split rule) |
 | "Positive criterion = whether it increases the steady state of the causal chain" | [X-INF·DEFAULT] — **passed measurement** (Z1 10/10, every reason cites this criterion) |
 | Reading of the "surface" dimension (grammatical slot: head noun + modifier) | [AUTHOR] **2026-09-29** + **measured** |
-| The two candidate definition sources for the surface dimension (甲 act shape / 乙 presented posture) | ⚠️ **awaiting the author's ruling** (root layer; both get the ruled case right, diverging only on the "knowingly false report" class) |
+| The **"假的真话" cell** (three-cut identification + cases: 小妹 / The Truman Show) | [phone-side supplement **2026-10-08**] + **relayed to archive under author authorization** (`Heaven/mobile/喵精灵手机端-四象限-假的真话栏-补靶与案例-20261008.md`) |
+| The two candidate definition sources for the surface dimension (甲 act shape / 乙 presented posture) | 🟡 **PARTIALLY CLOSED (2026-10-08)**: per the author's ruled case "a well-intentioned lie = the cell's **outer manifestation**" ⇒ **the "said / did not say" reading is refuted**, **乙 supported**; ⚠️ **the "knowingly false report" divergence REMAINS (unruled)** ⇒ see **§4** |
+| "Two dimensions ⇒ cell name" lookup table (four cells closed in 2×2 · delivers §4's Gap ①) | [X-INF·DEFAULT] **2026-10-08** |
+| ⚠️ The "假的真话" cell's **alarm level is not unique** (sub-classes: (a) untrue content / (b) empty source; exposes that the "cell ↔ tier" one-to-one assumption fails) | ⚠️ **awaiting the author's ruling** (structural layer · see the pending-ruling block in §5.1) |
 
 **Measured readings**:
 - `versions/live/evidence/quadrant-criteria-2026-09-28.md` — proposition 1, list ≡ illustration: **Z1 10/10 · K rejected 10/10**;
   proposition 2: pure-rule questions **3/3**, contract-M case ✅; proposition 3, regression: **59/60·30/30·10/10, no degradation**.
 - `versions/live/evidence/quadrant-criteria-2026-09-29.md` — grammatical-slot reading: group A both dimensions **4/4**
   (out-of-list **3/3**), controls B/C all ✅, cell-name self-consistency **9/9**; diagnosis correction (the "name" ambiguity = an instrument problem);
-  "真的假话" survival test **reachable under both formulations** (four cells do not collapse); the single pending ruling = the surface-dimension definition source (甲/乙).
+  "真的假话" survival test **reachable under both formulations** (four cells do not collapse); ~~the single pending ruling = the surface-dimension definition source (甲/乙)~~ ⇒ **PARTIALLY CLOSED 2026-10-08**: **the "said / did not say" reading is refuted** (author's case: a well-intentioned lie and concealment are both **outer manifestations** of that cell); ⚠️ **the "knowingly false report" class remains unruled**.
 - `versions/live/evidence/locability-2026-09-29.md` — **criterion locability** (author, 2026-09-29):
   **part of speech is fixed by criterion locability, not by word form** ⇒ **"name without act" ⇒ review**;
   generalization **8/8** (= structural), false positives **0**; two items not closed
