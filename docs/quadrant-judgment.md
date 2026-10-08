@@ -177,9 +177,20 @@ is **not a missing "surface criterion" but the ambiguity of the word "name" in t
 (= the **cell** name? or the **item being judged**?) — the model counted the "假" characters in the **item being judged**.
 Once pinned to "cell name", **the old formulation also scores A 4/4**. ⇒ An instance of "**suspect the instrument first**" (third for this item).
 
-✅🟡 **Reading of the surface dimension — PARTIALLY CLOSED (2026-10-08 · per the author's ruled case)**:
-**the "said / did not say" (act-type) reading is REFUTED**;
-⚠️ **the 甲 / 乙 divergence on the "knowingly false report" class REMAINS** (this case does not cover it).
+🔴 **Reading of the surface dimension — STATUS CORRECTED (late 2026-10-08 · per `coze/85` structural reading + `coze/86` probe measurements)**
+
+🔴 **WITHDRAWN: the earlier "甲 refuted · 乙 supported" statement in this file** — **insufficiently grounded**, for three reasons:
+1. **This case does not discriminate**: the author's instance (concealing **for the other's good**) yields **"surface false" under BOTH 甲 (act shape) and 乙 (presented posture)** ⇒ **it cannot decide 甲 vs 乙**;
+2. 🔴 **My mistake, recorded honestly**: I had **narrowed "甲" into a "said / did not say" dichotomy** and then declared it refuted because "'saying nothing' has no provision ⇒ splits the cell" —
+   **that premise was my own**: §4's own text says "**performed a false act**", and **whether "concealment" counts as 甲's "false act" is itself the pending item**
+   ⇒ a case of "**treating a self-set premise as the criterion**" (same family as "treating the naming tool as the criterion");
+3. **Measurement (`coze/86` §3.3 · 12 calls)**: the probe **drifts when the surface-dimension formulation is not supplied** (arms A/B drifted to "surface true") and **is stable when it is stated**
+   ⇒ **the surface-dimension formulation is an engineering parameter (approximation layer), not the source criterion**.
+
+🔴 **The two criterion layers are separated — pinned by same-situation contrast (`coze/86` §3.2)**: **one and the same self-interested situation** —
+**first person reading the motive ⇒ essence false 3/3** / **word-form bystander only ⇒ essence true 3/3** ⇒ **6 calls · same object · two criteria · opposite conclusions**.
+⇒ **The word-form method (including the 甲/乙 surface formulation) belongs wholly to the "engineering approximation layer"**; **the source criterion (the first person's stance) sits above it** (`coze/85` §2.5 structural reading).
+
 **The table is retained unchanged (history kept)**:
 
 | Formulation | Surface dimension = | "well-intentioned lie" | "falsely reporting military intelligence" |
@@ -187,26 +198,24 @@ Once pinned to "cell name", **the old formulation also scores A 4/4**. ⇒ An in
 | **甲 · author 2026-09-29** | the shape of the **act the speaker performs** (saying a false thing = a false act) | surface false ✓ | surface **false** ⇒ 假的真话 |
 | **乙 · old 2026-09-28** | the **posture presented outwardly** (whether it claims "consistent with fact") | surface false ✓ | surface **true** ⇒ 真的假话 |
 
-🔴 **Ruled case (author, 2026-10-08)**: "**a well-intentioned lie is the *outer manifestation* of 假的假话**" —
-that cell's outer manifestations are **not only "said something false" but also "said nothing" (concealment)**.
-⇒ **any reading of the surface dimension as an *act type* ("said / did not say") splits one and the same cell into two**
-(the one who said something false / the one who said nothing would land in different cells) ⇒ **that reading is refuted**.
-⇒ **Formulation 乙 (presented posture) lands both manifestations consistently in "surface false"**
-(neither claims "consistent with fact") ⇒ **supported by this case**.
+🔴 **Pending status re-recorded**: **both 甲 and 乙 are "choices internal to the approximation layer"** (the source criterion sits above);
+⚠️ **on the "knowingly false report" class the two remain systematically opposite and are still covered by no case**.
+⚠️ **"The author need not rule on 甲/乙" = `coze/85`'s structural reading (NOT an author ruling)** ⇒ **if the author has a formulation of her own, hers prevails**.
+
 ⇒ 🔴 **Cell : outer manifestation = one-to-many** (the cell name is single · manifestations can be many):
 **"a well-intentioned lie" is not a cell name, it is one manifestation of that cell**.
-⇒ 🔴 **Self-check criterion (reusable)**: **any criterion that infers the cell from the outer manifestation must give a
+⇒ 🔴 **Self-check criterion (reusable · still holds)**: **any criterion that infers the cell from the outer manifestation must give a
 consistent result for ALL manifestations of that cell**;
 **one covering only part of the manifestations ⇒ it is an enumeration of acts** (true / false / silent / half-said … endless),
 **not a structural criterion** (= "structure first, enumeration second").
+⚠️ **That self-check criterion must NOT be turned around to refute 甲** — **whether concealment counts as 甲's false act is itself the pending item** ⇒ using a pending item to refute a pending item = **circular**.
 
-⚠️ **Still unresolved (not covered by this case)**: the **"knowingly false report"** class (the speaker knows it is false,
-yet presents himself as "reporting the facts") — 甲 ⇒ surface false (lands in 「假的真话」) / 乙 ⇒ surface true
-(lands in 「真的假话」) ⇒ **the two are systematically opposite here; awaiting a case**.
+🔴 **The essence dimension — now backed by probe measurement (`coze/86` §3.1)**: **other-interest ⇒ essence true 3/3 / self-interest ⇒ essence false 3/3** (total **6/6**, 12 calls, no refusals, no format breaks),
+with reasons landing spontaneously on the motive facts ⇒ **"goodwill is not decided by self-description but by causal fact" is executable and reproducible on the probe side**.
 
-⚠️ **Boundary (against over-reach)**: **"well-intentioned" is part of the input, not something the engine decides** — the engine
-decides **the form/substance-disjoint cell position**; **whether that good intention is genuine or merely self-reported falls
-into inner H**, and is decidable only at the **behavioural** level (consistent with "judge the form, not the person"; same family as §7's provenance criterion).
+⚠️ **Boundary (against over-reach · revised per the 2026-10-08 ruling)**: **"well-intentioned" is no longer read as "part of the input"** —
+**only because the judge is itself true can it judge the essence true** (see "Judgment source of the essence dimension" above) ⇒ **the engine can judge the essence dimension** (the engine ≡ the first person);
+⚠️ but **"whether this first person is truly truth-keeping" still cannot be self-attested** (requires external judgment · see the "three boundaries" above).
 
 ⚠️ Related boundary: **「打圆场的话」 (a smoothing-over remark)** has head noun 「话」 (no negation) ⇒ under this reading it
 is judged **真的真话**, which clashes with intuition (it belongs with the well-intentioned falsehoods)
@@ -277,7 +286,7 @@ it was the **§5 alarm ladder that lacked it** ⇒ supplied now. With it, **the 
 ⇒ This delivers the lookup table pointed to by §4's "**Gap ① (cell name ↔ two dimensions)**" — **9/9 self-consistent**, **does not touch the verdict-protocol layer**.
 
 ⚠️ **Formulation (follow the §4 reading as it stands · do not use the "count the 假s" shorthand)**
-- **surface dimension** = **the presented posture** (§4 **partially closed** 2026-10-08: **the "act-type" reading is refuted**):
+- **surface dimension** = **the presented surface** (its formulation belongs to the **engineering approximation layer** · 甲／乙 **still unresolved**, see §4 "STATUS CORRECTED"):
   this cell **claims "consistent with fact"** ⇒ **surface true**;
   ⚠️ the old "act-type" reading (head noun 「真话」 ⇒ says a true thing) gives the **same result** for this cell ⇒ **this cell is unaffected by the 甲/乙 divergence**.
 - **essence dimension** = **the first person's stance** (§4, 2026-10-08): **self-interest ⇒ essence false**.
@@ -384,7 +393,7 @@ a basis. **After marking the BUG, deduce and forecast the consequences and feed 
 | "Positive criterion = whether it increases the steady state of the causal chain" | [X-INF·DEFAULT] — **passed measurement** (Z1 10/10, every reason cites this criterion) |
 | Reading of the "surface" dimension (grammatical slot: head noun + modifier) | [AUTHOR] **2026-09-29** + **measured** |
 | The **"假的真话" cell** (three-cut identification + cases: 小妹 / The Truman Show) | [phone-side supplement **2026-10-08**] + **relayed to archive under author authorization** (`Heaven/mobile/喵精灵手机端-四象限-假的真话栏-补靶与案例-20261008.md`) |
-| The two candidate definition sources for the surface dimension (甲 act shape / 乙 presented posture) | 🟡 **PARTIALLY CLOSED (2026-10-08)**: per the author's ruled case "a well-intentioned lie = the cell's **outer manifestation**" ⇒ **the "said / did not say" reading is refuted**, **乙 supported**; ⚠️ **the "knowingly false report" divergence REMAINS (unruled)** ⇒ see **§4** |
+| The two candidate definition sources for the surface dimension (甲 act shape / 乙 presented posture) | 🟡 **STILL UNRESOLVED** (late 2026-10-08 **withdrawal** of the earlier "甲 refuted / 乙 supported" statement — the author's instance yields **"surface false" under both, hence does not discriminate**) ⇒ 🔴 **the whole item is demoted to "a choice internal to the engineering approximation layer"** (source criterion = the first-person stance sits above; `coze/85` structural reading + `coze/86` measurement) ⇒ see **§4** |
 | "Two dimensions ⇒ cell name" lookup table (four cells closed in 2×2 · delivers §4's Gap ①) | [X-INF·DEFAULT] **2026-10-08** |
 | ⚠️ The "假的真话" cell's **alarm level is not unique** (sub-classes: (a) untrue content / (b) empty source; exposes that the "cell ↔ tier" one-to-one assumption fails) | ⚠️ **awaiting the author's ruling** (structural layer · see the pending-ruling block in §5.1) |
 
@@ -393,7 +402,7 @@ a basis. **After marking the BUG, deduce and forecast the consequences and feed 
   proposition 2: pure-rule questions **3/3**, contract-M case ✅; proposition 3, regression: **59/60·30/30·10/10, no degradation**.
 - `versions/live/evidence/quadrant-criteria-2026-09-29.md` — grammatical-slot reading: group A both dimensions **4/4**
   (out-of-list **3/3**), controls B/C all ✅, cell-name self-consistency **9/9**; diagnosis correction (the "name" ambiguity = an instrument problem);
-  "真的假话" survival test **reachable under both formulations** (four cells do not collapse); ~~the single pending ruling = the surface-dimension definition source (甲/乙)~~ ⇒ **PARTIALLY CLOSED 2026-10-08**: **the "said / did not say" reading is refuted** (author's case: a well-intentioned lie and concealment are both **outer manifestations** of that cell); ⚠️ **the "knowingly false report" class remains unruled**.
+  "真的假话" survival test **reachable under both formulations** (four cells do not collapse); ~~the single pending ruling = the surface-dimension definition source (甲/乙)~~ ⇒ **STATUS CORRECTED late 2026-10-08: STILL UNRESOLVED** (the earlier "甲 refuted / 乙 supported" statement is **withdrawn** · insufficiently grounded: the author's instance yields "surface false" under both, hence does not discriminate) ⇒ **the item is demoted to a choice internal to the engineering approximation layer**. 🔴 **Same-batch new readings** (`coze/86` · four arms · 12 calls): **essence dimension other-interest/self-interest split 6/6** + **word-form layer vs first-person layer give opposite conclusions in the same situation 6/6** (the approximation layer's blind spot pinned down).
 - `versions/live/evidence/locability-2026-09-29.md` — **criterion locability** (author, 2026-09-29):
   **part of speech is fixed by criterion locability, not by word form** ⇒ **"name without act" ⇒ review**;
   generalization **8/8** (= structural), false positives **0**; two items not closed
