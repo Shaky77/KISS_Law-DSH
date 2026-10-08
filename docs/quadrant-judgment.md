@@ -374,6 +374,15 @@ Cannot judge ⇒ **block + mark + deduce the terminal states of both branches, a
 (the terminal state S+1 after passing / the terminal state D-1 after transgression), so that the human's ruling has
 a basis. **After marking the BUG, deduce and forecast the consequences and feed them back together, rather than doing nothing.**
 
+🔴 **"Ambiguous" is a sub-case of "cannot judge"; the deduction duty applies equally (`computer/96` measured · 2026-10-09)**:
+insufficient evidence (broken chain) ⇒ **stop** (cannot judge); evidence **ambiguous** (both causal readings partially
+grounded, no unique ruling) ⇒ **turn** — output a **conditional branch**
+"`if <causal A> => essence X; if <causal B> => essence Y`", **giving both arms, choosing neither**.
+Measured (12 calls): **no prompt ⇒ 6/6 stop (cannot judge) / explicitly enabled ⇒ 6/6 turn (conditional branch)** —
+⇒ the gap is not "the model cannot turn", it is "**it was not permitted to turn**"; the conditional branch it produces
+**is not a hard ruling — it is exactly "not choosing for H, laying both arms out"** (same source as §7 subjectivity and §8 integrity).
+⚠️ The wording is a **candidate** [X-INF·DEFAULT]; **whether it lands in code is subject to the author's ruling** (engine no-go zone).
+
 ---
 
 ## 10. Provenance status
@@ -395,6 +404,8 @@ a basis. **After marking the BUG, deduce and forecast the consequences and feed 
 | The **"假的真话" cell** (three-cut identification + cases: 小妹 / The Truman Show) | [phone-side supplement **2026-10-08**] + **relayed to archive under author authorization** (`Heaven/mobile/喵精灵手机端-四象限-假的真话栏-补靶与案例-20261008.md`) |
 | The two candidate definition sources for the surface dimension (甲 act shape / 乙 presented posture) | 🟡 **STILL UNRESOLVED** (late 2026-10-08 **withdrawal** of the earlier "甲 refuted / 乙 supported" statement — the author's instance yields **"surface false" under both, hence does not discriminate**) ⇒ 🔴 **the whole item is demoted to "a choice internal to the engineering approximation layer"** (source criterion = the first-person stance sits above; `coze/85` structural reading + `coze/86` measurement) ⇒ see **§4** |
 | "Two dimensions ⇒ cell name" lookup table (four cells closed in 2×2 · delivers §4's Gap ①) | [X-INF·DEFAULT] **2026-10-08** |
+| **Viewpoint-dimension independent re-run** (word-form ↔ first-person stance · 9 samples × 2 criteria × 3 runs = 54 calls) | [X-INF·**RE-RUN** **2026-10-09**] `computer/95`; both arms flip cell on the **same sentence "善意的谎言"** (other-interested concealment: word-form ⇒ essence false "真的假话" / first-person ⇒ essence true "**假的假话**"), 6/6 stable; independently reproduces this ruling's case |
+| **"Ambiguous ⇒ conditional branch"** (explicitly enabled vs not prompted · 2 × 2 × 3 = 12 calls) | [X-INF·**RE-RUN** **2026-10-09**] `computer/96`; no prompt ⇒ cannot-judge 6/6 / explicitly enabled ⇒ conditional branch 6/6 (see §9) |
 | ⚠️ The "假的真话" cell's **alarm level is not unique** (sub-classes: (a) untrue content / (b) empty source; exposes that the "cell ↔ tier" one-to-one assumption fails) | ⚠️ **awaiting the author's ruling** (structural layer · see the pending-ruling block in §5.1) |
 
 **Measured readings**:
