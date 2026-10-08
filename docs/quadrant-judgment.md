@@ -86,6 +86,11 @@ by right/wrong ⇒ "truly right"; by good/evil ⇒ "truly good".
 > **in Chinese, double negation is affirmation**, i.e. **count the number of "假" (false) characters in the name**:
 > **even ⇒ essence true; odd ⇒ essence false**.
 
+⚠️ **This section is a "naming rule", NOT a "judging rule"** (fixed 2026-10-08 · rationale in the "judgment source of the
+essence dimension" below): its use is to **identify a cell by name** (given a cell name, read off which dimension value it maps to);
+**deciding which cell a concrete act falls into does not use it** — there the word-form is not the criterion,
+**the first-person stance is**. The two were **mixed up** once (treating the naming tool as the criterion); **now corrected**.
+
 | Cell name | count of "假" | essence |
 |---|---|---|
 | 真的真话 (true true-word) | 0 | true |
@@ -101,11 +106,43 @@ reading yields "essence false", which is **backwards**.
 🔴 **Case (author-ruled): "a white lie" = 假的假话** — **form false, substance not deceptive**.
 One sentence settles two commonly confused things: **surface false ≠ content false**, and **essence true ≠ having told the truth**.
 
-🔴 **Judgment source of the essence dimension — RULED (2026-10-08 · per the author's "essence is true")**: **read the cell name's *whole-name negation structure* (word-form)**,
-**not "whether the facts referred to are actually true" (fact layer)**.
-⇒ A same-kind pending item had been escalated (`Heaven/computer/92` §4.1): one reading follows §4 and reads the whole-name negation structure ⇒ "a well-intentioned lie" is **essence true**; the other reads "a lie is after all a lie" ⇒ **essence false**.
-⇒ The author stated on **2026-10-08**: "**a well-intentioned lie is the *outer manifestation* of 假的假话. Its essence is true.**" ⇒ **ruled for the "word-form structure" reading** (self-consistent with this section's naming rule).
-⇒ ⚠️ **Each dimension reads its own layer — do not swap them**: **the essence dimension reads the *cell name* (word-form structure)**; **the surface dimension reads the *presented surface* (in what form the utterance appears)**.
+🔴 **Judgment source of the essence dimension — stated by the author 2026-10-08**: **the criterion is neither the word-form
+nor the fact layer, but "the first-person's own stance"**.
+
+> Author's words (structure): **whoever may render a verdict must be the first person** (= §7); **the first person judges
+> "a well-intentioned lie" as essence true because the first person is itself true** (truth-keeping); **if the first person
+> carries hostile evil, then "a well-intentioned lie" is necessarily false**. ⇒ **The distinction is self-interest vs other-interest.**
+
+| The first person's stance | The act's real beneficiary | ⇒ essence dimension |
+|---|---|---|
+| **truth-keeping / other-interest** (concealing for the other's good) | beneficiary = **others** | **essence true** |
+| **evil / self-interest** (using "goodwill" as packaging for one's own gain) | beneficiary = **oneself** | **essence false** |
+
+⇒ 🔴 **Falsifying power (the strength of this ruling)**: **the same wording** ("善意的谎言", those four characters unchanged),
+**a different stance ⇒ the opposite essence** ⇒ **anything that infers the essence from the wording/word-form must be wrong**
+— **the word-form reading is falsified within the *judging* domain**.
+
+⚠️ **The word-form reading is not abolished wholesale — it retreats to the *naming* domain** (this entry was earlier recorded
+as "ruled = word-form reading", which was **treating the naming tool as the criterion** ⇒ **corrected**):
+
+| Domain | The question asked | The ruler used |
+|---|---|---|
+| **Naming** (Table 1 above) | "which cell do the **four characters '假的假话'** point to" ⇒ naming / lookup | **whole-name negation structure (word-form)** ✅ **still holds** |
+| **Judging** | "which cell does **this act in front of me** fall into" ⇒ verdict | 🔴 **the first person's stance** (other-interest / self-interest) — **the wording is not the criterion** |
+
+⇒ ⚠️ **Each dimension reads its own layer — do not swap them**: **the essence dimension reads the *stance* (first person required)**;
+**the surface dimension reads the *presented surface* (in what form the utterance appears — externally observable)**.
+⇒ 🔴 **Interlocking with §7**: the essence dimension **cannot be read from outside** (an outsider sees only the surface dimension) —
+**because "whoever judges is the party", only the party can read its own real beneficiary**. This is precisely
+"verdict requires the first person" landing on the four-quadrant map.
+
+⚠️ **Three boundaries (against over-reach)**
+1. **"I am truth-keeping" cannot be self-attested** — the first person can judge the essence dimension, but **whether this
+   first person is truly truth-keeping must be judged externally** (self-report is not evidence) ⇒ **qualification ≠ guarantee**.
+2. **Never judge another's interior for them** — an outsider can only read the **behavioural surface (the observable beneficiary)**
+   and **infer** the stance from it; **inference ≠ verdict**; an interior-H landing must be handed back (§9).
+3. **Three verdict states**: **first person ⇒ judge the essence dimension** / **outsider ⇒ judge the surface dimension ＋ infer the
+   essence from the behavioural surface (must be marked "inferred")** / **the two cannot attest each other**.
 
 **Reading of the "surface" dimension** — ✅ **CLOSED 2026-09-29** (author's stated logic + real-API measurement passes)
 
@@ -120,6 +157,8 @@ One sentence settles two commonly confused things: **surface false ≠ content f
   ① **the head carries one negation itself** (its lexical meaning contains "untrue/false": lie, pretext, concealment, false report …);
   ② **the modifier supplies a second negation** (it turns "deception" into "non-deception": well-intentioned / white / innocuous …).
   ⇒ Both present ⇒ **essence true**; only one (e.g. 「恶意的」 malicious, which does not reverse the deception) ⇒ **essence false**.
+  ⚠️ **The scope of this reading = the "cell name"** (= this section's naming rule); **it is not used when judging a concrete act**
+  (there the *stance* is used — see the "judgment source of the essence dimension" above).
 - ⇒ "a well-intentioned lie" = surface false (it is a false statement) ∧ essence true (double negation) = **假的假话** ✓ **matches the ruled case**.
 
 **Measurement** (`deepseek-chat` · `temperature 0`; evidence `versions/live/evidence/quadrant-criteria-2026-09-29.md`,
@@ -238,9 +277,22 @@ it was the **§5 alarm ladder that lacked it** ⇒ supplied now. With it, **the 
 ⇒ This delivers the lookup table pointed to by §4's "**Gap ① (cell name ↔ two dimensions)**" — **9/9 self-consistent**, **does not touch the verdict-protocol layer**.
 
 ⚠️ **Formulation (follow the §4 reading as it stands · do not use the "count the 假s" shorthand)**
-- **surface dimension** = **the act the head noun points to**: this cell's head noun = 「**真话**」 ⇒ it says a true thing ⇒ **surface true**;
-- **essence dimension** = **negation count** in the whole name: the head noun carries no negation ＋ the modifier 「假的」 supplies one ⇒ **only one** ⇒ **essence false**.
+- **surface dimension** = **the presented posture** (§4 **partially closed** 2026-10-08: **the "act-type" reading is refuted**):
+  this cell **claims "consistent with fact"** ⇒ **surface true**;
+  ⚠️ the old "act-type" reading (head noun 「真话」 ⇒ says a true thing) gives the **same result** for this cell ⇒ **this cell is unaffected by the 甲/乙 divergence**.
+- **essence dimension** = **the first person's stance** (§4, 2026-10-08): **self-interest ⇒ essence false**.
+  ⚠️ the old notation "negation count in the whole name (only one ⇒ essence false)" gives the **same result but has been demoted to a naming tool** ⇒
+  **it must not be used as a judging criterion**.
 - ⚠️ §4's own words: **"you may NOT merely count the character 『假』"** — an earlier version of this section misused the shorthand (and misplaced it onto the surface dimension); **now corrected**.
+
+🔴 **The essence-dimension criterion (unified · per §4, ruled 2026-10-08)**: this cell's **essence false** rests **not** on
+"untrue content ∨ empty source" — **those two are *outer manifestations*, not criteria**; the criterion is §4's
+**first person's stance: self-interest ⇒ essence false** (cf. 「假的假话」 = other-interest ⇒ essence true).
+⇒ Hence the "cell ↔ tier" question at the end of this section **now has a structural answer**:
+**the essence (stance) is unified at the *cell* level, while checkability (*outer manifestation*) varies *within* the cell**
+⇒ **"one cell, two tiers" is a necessity, not an exception** ⇒ **structurally supports Option B** (keep one cell · make the tier
+"graded", basis = **which part is checkable**).
+⚠️ **But tiering is an R-layer matter and still awaits the author's ruling** — this section supplies the structural argument only and does not rule.
 
 🔴 **This cell has two sub-classes internally (otherwise this section misleads)** — the real issue surfaced by filling the gap:
 - **(a) untrue-content class**: the speaker states **sincerely**, but the content does not match the facts (§4's measured cases **E1 sincere misreporting · E2 earnest erroneous statement**) ⇒ **the content gives it away on checking**;
@@ -323,7 +375,8 @@ a basis. **After marking the BUG, deduce and forecast the consequences and feed 
 | Inner frame's three properties (form constant / poles variable / sign mapping constant) | [AUTHOR] |
 | **List ≡ illustration** (criterion = form) | [AUTHOR] |
 | Side-split rule: positive pole ⇒ essence-true side | [AUTHOR] |
-| Naming rule (whole-name semantics · **negation count**; ⚠️ do not simplify to "counting the 假s") + "a white lie = 假的假话" | [AUTHOR] |
+| Naming rule (whole-name semantics · **negation count**; ⚠️ do not simplify to "counting the 假s"; ⚠️ **scope = naming, not judging**) + "a white lie = 假的假话" | [AUTHOR] |
+| 🔴 **Judgment source of the essence dimension = the first person's stance (other-interest ⇒ true / self-interest ⇒ false)**; the word-form reading is demoted to a naming tool | [AUTHOR] **2026-10-08** (with falsifying power: same wording · different stance ⇒ different essence) + **three boundaries = [X-INF·DEFAULT]** |
 | M = inner frame + outer frame · deduced from inside outward | [AUTHOR] |
 | The watershed is "hidden", not "downgraded" | [AUTHOR] + **measured** |
 | Viewpoint = first-person (the acting AI) | [AUTHOR] + **measured** |
