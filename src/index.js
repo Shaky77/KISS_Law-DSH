@@ -40,6 +40,29 @@
 import { writeFileSync, appendFileSync } from 'node:fs';
 import { WeiwenLawEngine, DEFAULT_RIGID_ANCHORS } from './core/engine.mjs';
 import { R_DOMAIN, THREE_IRON_LAWS } from './core/law.mjs';
+// [2026-10-21 中英对齐 · synced from the CN edition] Criterion-wiring readout (read-only surface):
+//   makes "which criteria in the library actually enter the computation" auditable.
+//   No verdict, no state writes, no gate participation — meta-cognition may READ, never RULE
+//   (docs/runway-and-criterion §4).
+import { readout as criterionReadout } from './core/readout.mjs';
+// [2026-10-21] Five-stratum readout (R→S→D→H→M, each layer given a substitutable quantity).
+import { strataReadout } from './core/strata.mjs';
+// [2026-10-21] Four-layer nesting (macro/micro inside R/S/D/H) + M's directional form.
+import { NESTED_VARS, M_CONSTRAINT, mDirection, mTwoLayer, mConstraintShape, nestAudit } from './core/nested.mjs';
+// [2026-10-21 12:0x · author ruling] Variables as acts: R = look-up (an act), H = observer stance
+//   (a choice), plus the three-notch measure of the S↔D tension L.
+//   Author: "don't make R a fixed assignment, make it an executable act; the tension in between
+//   I haven't worked out — I'm a humanities person, this is engineering, you try."
+import {
+  R_ACTION, H_OBSERVER, H_PERMIT, hPermitOf, LOSS_BEARER, lossRoute, tensionOf, slidePos, verbAudit,
+  TENSION_OUTPUT, checkTensionOutput,
+  R_ONTOLOGY, R_SCALE, R_RELAY, rSourceGrade, MARGIN_CONSENSUS, pickMargin, notchCapOf,
+  CLAUSE_SLOTS, checkClauseShape,
+  H_AUTHORITY, CAPACITY_VS_LIABILITY, ESCALATION, ESCALATE, mustEscalate, EVIDENCE_LIFECYCLE,
+  GATE_FOLD, gateOf,
+  PROVENANCE_ATTESTATION,
+  H_UMBRELLA, H_FACETS, H_SHAPE, INNER_OUTER_SEAM, FACET_DISCIPLINE, facetOf, isCrossFacet, FORMULA_INPUT,
+} from './core/verb.mjs';
 import { bugKeyOf } from './core/bugstop.mjs';
 import { defineTool } from '@deepseek-ai/dsh-tools';
 
@@ -675,6 +698,218 @@ function apply(ctx) {
         engine: engine.anchorChannel,
         note: '授权锚唯一来源＝结构入口 setPrincipalScope（宿主在启动/step 边界声明任务范围）；被审计 agent 的自述与窗口面文本**都不授权**（否则＝自我授权 / 假人证）。入口未接 ⇒ 锚池留空 ⇒ 不可逆动作交人工，此为设计而非漏读。',
       };
+    },
+  }));
+
+  // ════════════════════════════════════════════════════════════════════
+  // [2026-10-21 中英对齐] 以下四个工具同步自中文本仓（weiwen-law-dsh）。
+  //   对齐纪律：**结构一致、条目随本体**。描述面翻英文（对外可用），note 面保留中文
+  //   （两仓同源、判据表述不分叉）。参数顺序与中文本仓逐项对齐。
+  //   四者全部是**只读面**：不产生 verdict、不写状态、不进任何闸门。
+  // ════════════════════════════════════════════════════════════════════
+
+  // [2026-10-20] 判据接线自查（元认知的第一个可观测面）
+  ctx.tools.register(defineTool({
+    name: 'query_criterion_wiring',
+    description: 'Criterion-wiring self-check (read-only). The library\'s criteria are registered into four buckets — decision slot / readout slot / declaration slot / undetermined — and this returns the members of each, the gaps already declared on paper (criteria that should have been wired but were not), and whether each of the three time phases (past · present · future) of the causal chain is connected. Answers one question: "of the rules I know, how many actually enter the computation". Changes no allow/deny verdict.',
+    parameters: {},
+    output: { schema: { type: 'object', additionalProperties: true }, render: renderObj },
+    async execute() {
+      return {
+        ...criterionReadout(engine),
+        note: '只读面：不产生 verdict、不写状态、不参与闸门。gaps 是如实登记的缺口（不是免责通道）；unmapped 是欠账，不视为通过。',
+      };
+    },
+  }));
+
+  // ── 五层推演读数（R→S→D→H→M，逐层给「可代入量」）──────────────────
+  ctx.tools.register(defineTool({
+    name: 'query_strata',
+    description: 'Five-stratum readout (read-only): walks R→S→D→H→M and returns, per layer, the quantities that can actually be substituted into the formula — each with its expression and with "where it stops". Three states are explicit: ok (computable now) / pending (missing a constant or its evidence, carrying a TBD pointer) / absent (the quantity does not exist in the implementation). Also returns the cross-layer substitution bans (e.g. ΣS and S_now aggregate in opposite directions and may not stand in for each other). The R layer additionally exposes the domain-capacity face: p_max (evidenced standard value) / N_opp (denominator, absent in the engine) / R₀ (= p×N) / rCapRoute (which formula this domain should use), plus a domain-table health check that counts "malformed entry" separately from "legal standard that gives no number". Changes no allow/deny verdict.',
+    parameters: {},
+    output: { schema: { type: 'object', additionalProperties: true }, render: renderObj },
+    async execute() {
+      return {
+        ...strataReadout(engine),
+        note: '只读面：不产生 verdict、不写状态、不参与闸门。pending/absent 是如实登记，不是免责通道；pending 必带 evidence 线索，absent 必带缺口说明。',
+      };
+    },
+  }));
+
+  // ── 四层嵌套（R/S/D/H 各自的宏观／微观）＋ M 公式方向 ─────────────
+  ctx.tools.register(defineTool({
+    name: 'query_nested',
+    description: 'Four-layer nesting readout (read-only): returns, for R/S/D/H, the macro form, the micro form, the containment relation (which binds which), the termination criterion for expansion, and a medical-domain instance; plus the DIRECTION of M = (R×S)/(D×H) — up / down / indeterminate, never a number, because the formula\'s own text forbids assignment and computation. Pass per-layer deltas (-1/0/+1) to get a direction. Also returns the shape test for the formula constraint `0 < H/(S↔D) < R`: `↔` is NOT an operator — it marks the internal rail of H (S end ↔ D end), H being a slider on that rail — so only the slider\'s position shape is judged (on_rail / off_low / off_high / unknown), never a number. Pass hPosition to judge the shape. Produces no verdict and enters no gate.',
+    parameters: {
+      delta: { type: 'object', description: 'Per-layer change: {R,S,D,H}, each -1 (down) / 0 (unchanged) / +1 (up). Omit to get static structure and the audit only.' },
+      macroDelta: { type: 'object', description: 'Macro-layer change in two-layer mode (optional); giving it together with microDelta switches to the two-layer containment judgement.' },
+      microDelta: { type: 'object', description: 'Micro-layer change in two-layer mode (optional).' },
+      hPosition: { type: 'string', description: 'H\'s position shape on the S↔D rail: inside (strictly on the rail) / at_s (pinned to the S end, agency at zero) / at_d (pinned to the D end, at R\'s scale) / beyond (past R, out of domain). Omit and it is not judged (unknown, which is not the same as satisfied).' },
+    },
+    output: { schema: { type: 'object', additionalProperties: true }, render: renderObj },
+    async execute(args = {}) {
+      const out = { vars: NESTED_VARS, audit: nestAudit(), constraint: M_CONSTRAINT };
+      if (args.macroDelta || args.microDelta) {
+        out.twoLayer = mTwoLayer(args.macroDelta || {}, args.microDelta || {});
+      } else if (args.delta) {
+        out.direction = mDirection(args.delta);
+      }
+      if (args.hPosition !== undefined) {
+        out.constraintShape = mConstraintShape({ pos: args.hPosition });
+      }
+      out.note = '只读面：M 只输出方向，不输出数值（CORE_FORMULA: 定性方向关系，不赋值）。indeterminate 是定性关系的上限，不是缺口。⚠️ `↔` 不是算子（不存在「待实现的算子」）；它标记 H 内部那条滑轨。**区间长度（张力 L）可求**，见 query_tension；不可求的是把 `↔` 当运算符。';
+      return out;
+    },
+  }));
+
+  // ── 张力 L（S↔D 之间的跨距）＋ R/H 的动作形态 ───────────────────
+  ctx.tools.register(defineTool({
+    name: 'query_tension',
+    description: 'S↔D tension readout (read-only): computes the span L between "what the standard requires" and "what this case actually allows". Three notches, routed by what the domain actually provides — notch A (a tolerance exists): L = |deviation| / tolerance, dimensionless, the unit being "how many tolerances"; notch B (only clauses or act lists): returns a GAP LIST (required acts − allowed acts), and a set difference has no magnitude, so it never carries a number; notch C (neither available): not judged, which is not the same as compatible. Also returns H\'s position shape on the tension (on_rail / off_low / off_high / zero_tension / unknown), where zero_tension is a structural fact: S and D are fully compatible ⇒ span is zero ⇒ the lever has no arm ⇒ H has nowhere to stand. Also returns the three-layer distinction of R (ontology has no ceiling / the domain reading is a projection / R = 100 is a mere scale), the consensus margin interval for the given consequence level, and a SHAPE check on clauses (slot presence only, no natural-language parsing). Also returns who holds H\'s discretion (set by the first person, with no higher licensing authority) and the ESCALATION criterion (undecidable ∧ must trace to an owner ∧ concerns that owner ⇒ hand back to the human for final ruling; missing one of the three stops at H and does not hand back), plus the evidence-grade convention (second-hand evidence does not block a verdict; a to-do is not a debt). Also judges the SOURCE OF THIS LAYER\'S RULER: pass citableToPublic to separate "public original standard" (origin, citable externally) from "an upper layer\'s paraphrase" (relay, valid only inside this layer and never to be passed off as the original) — R does not reach you directly: objective within a layer, a projection across layers, and handing in the original against this layer\'s gap means handing in the wrong ruler. Also returns LOSS ATTRIBUTION: loss from paraphrase or relay can only be paid by H (R/S/D carry no "bearing the consequence" property, hence no capacity to pay); pass relayLayers to get the direction — more layers ⇒ total H up ⇒ M down, so removing layers raises M directly; the root of the loss is that the receiver must rebuild the context, not that information was lost. Also returns H\'s RUNWAY PERMIT: pass runwayCovered to judge whether this spot may "run wide open, don\'t be afraid, play to your strengths" — where the runway is paved, excess caution is withdrawn (it is only interest paid on a gap) ⇒ loss-bearing H retires ⇒ total H down ⇒ M up; where it is not paved, run along the known boundary first. Granularity follows runway coverage, not industry name; what is withdrawn is excess caution, NOT consequence attribution. Produces no verdict and enters no gate.',
+    parameters: {
+      tol: { type: 'number', description: 'Notch A: the standard\'s tolerance (same unit as dev). Example: an infusion pump at ±5 ⇒ tol = 5.' },
+      dev: { type: 'number', description: 'Notch A: the actual deviation (same unit as tol). May be negative; tension takes the absolute value.' },
+      required: { type: 'array', items: { type: 'string' }, description: 'Notch B: the act set S requires (what the clause says must be done).' },
+      allowed: { type: 'array', items: { type: 'string' }, description: 'Notch B: the act set D allows (what this case can actually do).' },
+      notchH: { type: 'number', description: 'The ABSOLUTE margin corresponding to the notch H chose (same unit as L: how many tolerances). Omit and the position is not judged.' },
+      rCap: { type: 'number', description: 'H\'s SCALE READING (percentage scale ⇒ 80 means 80%). ⚠️ A reading, not a ceiling: R\'s ontology has no ceiling, so no "rCap < 1" requirement exists. Can be computed automatically from criticality + notch.' },
+      scale: { type: 'number', description: 'The scale (default 100 = percentage scale, i.e. the old paper\'s R = 100). Changing the scale changes the reading only, never the verdict.' },
+      criticality: { type: 'string', description: 'Consequence level (key into the consensus margin table): metrology_high_risk / aero_medical_derating / mil_industrial_derating / commercial_derating. Given, it looks up the margin interval and computes rCap.' },
+      notch: { type: 'string', description: 'Which notch H chose: toward_s (stay with the standard, take the large end of the margin) / balanced (take the interval midpoint) / toward_d (favour the perturbation, take the small end).' },
+      clauses: { type: 'array', items: { type: 'object', additionalProperties: true }, description: 'Clause list: checks SHAPE only (action + object + value/unit as a pair + source + version). No natural-language parsing. A bare string is reported as unstructured.' },
+      undecidable: { type: 'boolean', description: 'Escalation clause ①: is this something H cannot decide? Omit and escalation is not judged (unknown ≠ no need to escalate).' },
+      mustTraceOwner: { type: 'boolean', description: 'Escalation clause ②: must it be traced to a responsible person? Purely technical and unattributable ⇒ stop at H.' },
+      relatesToOwner: { type: 'boolean', description: 'Escalation clause ③: does it concern some responsible person? All three conjoined before it returns to the human.' },
+      citableToPublic: { type: 'boolean', description: 'The source of this layer\'s ruler: can this requirement be pointed to a public original — standard number + clause number + version? true ⇒ origin (citable externally); false ⇒ relay (an upper layer\'s paraphrase, valid only inside this layer, never to be passed off as the original). Omit ⇒ the source is not judged (≠ origin). ⚠️ The test does not read industry wording, only "can you point to it": down a company → department → manager → you chain you hold relay, and handing in origin against it means handing in the wrong ruler.' },
+      wants: {
+        type: 'string',
+        description: 'Which face of H you are asking about (controlled values: who = who / qualification / signature | what_can = can-do / notch / permit | what_cost = how much is paid / loss | visible = can it be seen from outside / the seam). 🔴 H is an umbrella term, not a scalar: omitting wants ⇒ the face is undetermined ⇒ returns question_incomplete (completable — NOT "cannot judge", and NOT an allow). Given, it returns the criterion for that face.',
+      },
+      selfReadsAs: {
+        type: 'string',
+        description: 'Which face\'s reading you intend to use in order to answer the face named by wants (same controlled values). 💰 Two different faces ⇒ crossFacet = true, i.e. a cross-face misinference (forged authority). Example: using "the output style is consistent" (visible) to answer "what is his motive" (who). Omit ⇒ cross-face is not judged (≠ it is not a cross-face misinference).',
+      },
+      relayLayers: { type: 'number', description: 'How many relay layers sit on this chain of mine (0 = direct contact with the original context, 1 = immediate manager, 2 = department + manager …). Given, it returns the DIRECTION of loss payment: loss can only be paid by H (R/S/D carry no "bearing the consequence" property ⇒ no capacity to pay), more layers ⇒ total H up ⇒ M down. Direction only, never a value for H. Omit ⇒ not judged (≠ lossless).' },
+      runwayCovered: { type: 'boolean', description: 'Is the CRITERION RUNWAY paved at this spot (not "does this industry have standards", but "is the criterion here present"). true ⇒ issue the executor "run wide open, don\'t be afraid, play to your strengths": withdraw excess caution (it is only interest paid on a gap), loss-bearing H retires ⇒ total H down ⇒ M up; effective H does not shrink. false ⇒ run along the known boundary, do not shed caution (shedding it by force measures the gap, not the runway). ⚠️ Granularity = the extent of runway coverage, not the industry name. Omit ⇒ the permit is not judged (≠ free to run wide open).' },
+      inFormula: { type: 'boolean', description: 'Can this quantity ENTER THE FORMULA (= could another person, following it, land on the same reviewable original or record?). true ⇒ it enters, and it is necessarily outer H (then grade the trace strength hard/soft). false ⇒ not in the input set ⇒ state is not_in_input_set (NOT a debt, NOT booked), and the hint is to first ask "can it be externalised". ⚠️ Distinct from not_collected (in the input set but not collected — that IS a debt); the two kinds of "absent" must never be merged. Omit ⇒ not judged (≠ in, and ≠ out).' },
+    },
+    output: { schema: { type: 'object', additionalProperties: true }, render: renderObj },
+    async execute(args = {}) {
+      const out = {
+        action: { R: R_ACTION, H: H_OBSERVER },
+        audit: verbAudit(),
+      };
+      const t = tensionOf(args);
+      out.tension = t;
+
+      // R 的三层区分：本体无上限 / 读数是域的投影 / 刻度只是换算
+      out.R = { ontology: R_ONTOLOGY, scale: R_SCALE };
+
+      // 🔴 R 不直达：本层拿到的尺子是 origin 还是 relay（层内客观 ≠ 跨层直达）
+      out.relay = R_RELAY;
+      if (args.citableToPublic !== undefined) {
+        out.rSource = rSourceGrade({ citableToPublic: args.citableToPublic });
+      }
+
+      // 🔴 损耗只能由 H 支付：转述层数 ↑ ⇒ 总 H ↑ ⇒ M ↓（只判方向，不给数值）
+      out.loss = LOSS_BEARER;
+      // 张力输出的合法形状（档B 只允许缺口清单/不判；给比值即形状非法）
+      out.tensionOutput = TENSION_OUTPUT;
+
+      // 🔴 H 是统称（安 2026-10-20 20:3x）：先说清它有几个面，再看你问哪一面。
+      out.hUmbrella = H_UMBRELLA;
+      out.hFacets = H_FACETS;
+      // 内 H/外 H 之间那道缝（此前无落点）
+      out.seam = INNER_OUTER_SEAM;
+      // 🔴 公式准入律（安 2026-10-20 20:45）：能进公式的 H，全部是外 H
+      out.formulaInput = FORMULA_INPUT;
+      // 输入集自检：没给 ⇒ 不判（不默认"在内"）；false ⇒ 不进公式、不挂账
+      if (args.inFormula === true) {
+        out.formulaInputNow = {
+          inFormula: true,
+          tier: '一级：留痕 ⇒ 进（权重按 PROVENANCE_ATTESTATION 再判 hard/soft）',
+        };
+      } else if (args.inFormula === false) {
+        out.formulaInputNow = {
+          inFormula: false,
+          state: FORMULA_INPUT.states.NOT_IN_INPUT_SET,
+          bookkeeping: '不挂账（不是欠账）',
+          reroute: '先问「能不能外化」——补得成可留痕形态就是 not_collected，补不成才是内 H',
+        };
+      }
+      out.facetRule = FACET_DISCIPLINE;
+      if (args.wants !== undefined) {
+        out.facetNow = facetOf({ wants: args.wants });
+        // 跨面自检：本次问的是哪面、而查询里同时给了别的面的读数 ⇒ 提示但不阻断
+        if (args.selfReadsAs !== undefined) {
+          out.crossFacet = isCrossFacet({ asked: args.wants, read: args.selfReadsAs });
+        }
+      }
+      if (args.relayLayers !== undefined) {
+        out.lossRoute = lossRoute({ relayLayers: args.relayLayers });
+      }
+
+      // 🔴 H 的通行许可：跑道铺到处 ⇒ 放开了跑（撤过度谨慎，不是免后果归属）
+      out.permit = H_PERMIT;
+      if (args.runwayCovered !== undefined) {
+        out.permitNow = hPermitOf({ runwayCovered: args.runwayCovered });
+      }
+
+      // 余量档：查共识表（区间 ＋ 取端），不拍数
+      let rCap = args.rCap;
+      if (args.criticality) {
+        out.margin = MARGIN_CONSENSUS;
+        out.picked = pickMargin({ criticality: args.criticality, notch: args.notch });
+        if (rCap === undefined && out.picked.ok) {
+          const cap = notchCapOf({ criticality: args.criticality, notch: args.notch });
+          out.cap = cap;
+          if (cap.ok) rCap = cap.rCap;
+        }
+      }
+      if (args.notchH !== undefined || rCap !== undefined) {
+        out.position = slidePos({ tension: t, notchH: args.notchH, rCap, scale: args.scale });
+      }
+
+      // 条款形状（不做 NLP 抽取，只校验槽位）
+      if (Array.isArray(args.clauses)) {
+        const rows = args.clauses.map(checkClauseShape);
+        out.clauses = {
+          rows,
+          slots: CLAUSE_SLOTS,
+          summary: {
+            structured: rows.filter((r) => r.ok).length,
+            unstructured: rows.filter((r) => !r.ok).length,
+          },
+          note: 'unstructured 不是"判不出"，是**输入缺形状** ⇒ 该补槽位（可执行动作），不是落 review 的理由。',
+        };
+      }
+
+      // 🔴 H 的裁量权归属：由第一视角自己定；无上级授权者（否则嵌套不终止）
+      out.authority = {
+        h: H_AUTHORITY,
+        split: CAPACITY_VS_LIABILITY,
+        note: '裁量权可归 AI（H 自己判）；责任权唯人类。二者不可互代：判得出「谁有责任」≠「责任已裁定」。',
+      };
+
+      // 🔴 升级判据：不是「判不出就交还」，是三条合取
+      out.escalation = ESCALATION;
+      if ([args.undecidable, args.mustTraceOwner, args.relatesToOwner].some((v) => v !== undefined)) {
+        out.verdictEscalate = mustEscalate({
+          undecidable: args.undecidable,
+          mustTraceOwner: args.mustTraceOwner,
+          relatesToOwner: args.relatesToOwner,
+        });
+      } else {
+        out.verdictEscalate = { verdict: ESCALATE.UNKNOWN, ok: false, reason: '未给三条中任一条 ⇒ 不判（≠ 不必升级）' };
+      }
+
+      // 🔴 二手来源不阻塞：待办 ≠ 欠账
+      out.evidence = EVIDENCE_LIFECYCLE;
+      // 🔴 实测补的（2026-10-20 E2）：provenance 能不能被别人照着核
+      out.provenance = PROVENANCE_ATTESTATION;
+
+      out.note = '只读面：张力只是 S↔D 的跨距，**不是 M 的值**。档B 不参与比值（集合差没有大小）。zero_tension ≠ 通过，它表示「照标准做就行、不需要能动性」。🔴 R=100 是**刻度**不是上限（R 本体无上限）；rCap 是读数，不是界。🔴 H 的取值由第一视角自己定、无上级授权者；升级唯一出口=「判不出 ∧ 须追责 ∧ 与责任人有关」。🔴 **R 不直达**：本层（部门/管理者/主审）手上的尺子是 origin 还是 relay 决定该查什么；放行由上一层给，自评 M 通过不构成放行。🔴 **损耗只能由 H 支付**（唯一主动项）：转述层数↑⇒总 H↑⇒M↓；但优化方向是**移项**（把 H 从零收益的复述处移到正收益的判断处），不是"减少 H"——H=0 违反 `0 <`。🔴 **H 也是通行许可**：「放开了跑，别怕」是给执行者的**指令形态**（不是取值）⇒ 跑道铺到处才发；放开＝把损耗 H 退掉 ⇒ 总 H↓ ⇒ M↑，**不是 H 变大**。';
+      return out;
     },
   }));
 }

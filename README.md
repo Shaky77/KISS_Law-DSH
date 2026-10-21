@@ -71,14 +71,16 @@ After it runs: DeepSeek will **proactively call the `query_iron_laws` tool** and
 
 Add `kiss-law.patch.yml` as an overlay into your DSH profile (the exact path depends on your DSH version; see the mount section in [`DESIGN.md`](./DESIGN.md)). Once mounted, any Agent running under that profile automatically gets the 7 white-box tools.
 
-> Note: the exact native-mount profile path varies with the DSH version. This repo has verified through real runs that the plugin loads in DSH and all 7 tools register. If the official API changes, verify against the current official docs.
+> Note: the exact native-mount profile path varies with the DSH version. This repo has verified through real runs that the plugin loads in DSH and all 11 tools register. If the official API changes, verify against the current official docs.
 
 ## How the model calls it (for AI engineers)
 
-> **Plain version**: the plugin registers 7 white-box tools with DSH; the model calls them like ordinary functions to **self-check boundaries**, while 3 hooks **hard-gate** it (2 gate the act/step, 1 gates the receipt) and a 4th hook is a read-only audit.
+> **Plain version**: the plugin registers 11 white-box tools with DSH; the model calls them like ordinary functions to **self-check boundaries**, while 3 hooks **hard-gate** it (2 gate the act/step, 1 gates the receipt) and a 4th hook is a read-only audit.
 > **Pro version**: excerpted from `src/index.js` (full code in repo), see the block below.
+>
+> The first seven answer "what does the framework say and how is it running"; the last four are **read-only readouts** — they report how the library maps onto computation, what each layer can actually be substituted with, and where the tension sits. **None of them produces a verdict, writes state, or enters a gate**: meta-cognition may READ, never RULE.
 
-### 7 white-box tools (real registered names)
+### 11 white-box tools (real registered names)
 
 | Tool | What the model uses it for |
 |---|---|
@@ -89,6 +91,10 @@ Add `kiss-law.patch.yml` as an overlay into your DSH profile (the exact path dep
 | `query_boundary` | query inner-H boundary (this plugin never reads/writes the subjective black box) |
 | `query_bugstop` | query First-Bug Halt loop status: which fault links are halted-unrepaired, missing steps (backtrack/trace/fix), whether the white-box loop is closed |
 | `query_anchor_channel` | self-report of the anchor channel: whether the principal's declared task scope reached the engine, plus the observed message shape / role vocabulary (observe what the host actually passes, instead of guessing field names) |
+| `query_criterion_wiring` | **read-only.** Which criteria in the library actually enter the computation: four buckets (decision slot / readout slot / declaration slot / undetermined), the gaps declared on paper, and whether each of the three time phases (past · present · future) is connected. Answers "of the rules I know, how many are wired" |
+| `query_strata` | **read-only.** Five-stratum readout R→S→D→H→M: per layer, the quantity that can be substituted into the formula, with three explicit states — `ok` / `pending` (missing a constant or its evidence, carrying a pointer) / `absent` (the quantity does not exist). Includes the cross-layer substitution bans and the R-layer domain-capacity face |
+| `query_nested` | **read-only.** The macro/micro nesting inside R/S/D/H, the containment relations, the termination criterion for expansion, and M's **direction** (up / down / indeterminate — never a number). Also judges the shape of the `0 < H/(S↔D) < R` constraint: `↔` is not an operator, it marks H's internal rail |
+| `query_tension` | **read-only.** The S↔D span L, in three notches (tolerance ⇒ a dimensionless ratio; clauses only ⇒ a gap list, and a set difference has no magnitude; neither ⇒ not judged). Also returns R's three-layer distinction, the H permit (runway covered ⇒ withdraw excess caution), who bears the relay loss, the escalation criterion, and the source grade of this layer's ruler (origin vs relay) |
 
 ### 3 hard gates (hooks) + 1 read-only audit hook
 
@@ -227,7 +233,7 @@ This repository is an **external plugin** for DeepSeek Harness (dsh, command `ds
 - Node.js `^22.19 || >=24` (hard requirement of dsh; odd versions unsupported)
 - A DeepSeek API Key (or any OpenAI-compatible endpoint key)
 - dsh is currently in developer preview (v0.1.x); the official notice states breaking API changes may occur — pin a specific version for production
-- **Compatibility statement**: verified against DSH v0.1.x — live runs measured 2026-08-19 and 2026-09-21: 7 white-box tools registered, and 3 hard gates + 1 read-only audit hook working end to end (the receipt gate was observed blocking on a real failed call and returning the corrective receipt). Mainline evolves fast — re-check against the current official docs before integrating (see DESIGN.md for mounting details).
+- **Compatibility statement**: verified against DSH v0.1.x — live runs measured 2026-08-19 and 2026-09-21: 7 white-box tools registered, and 3 hard gates + 1 read-only audit hook working end to end (the receipt gate was observed blocking on a real failed call and returning the corrective receipt). *Those two runs measured 7 because 7 is what registered then; the four readout tools were added in October 2026 and bring the count to 11 (table above). The historical readings are left as measured rather than back-dated.* Mainline evolves fast — re-check against the current official docs before integrating (see DESIGN.md for mounting details).
 
 ### Option 1: npx quick start (recommended for first try)
 
@@ -257,7 +263,7 @@ export DEEPSEEK_API_KEY=sk-xxxx     # Linux/macOS
 #    $env:DEEPSEEK_API_KEY="sk-xxxx" # Windows PowerShell
 ```
 
-Once mounted, any Agent running under that profile automatically gains the 7 white-box self-check tools (`query_iron_laws` / `query_steady_state` / `list_rigid_anchors` / `query_conduction_chain` / `query_boundary` / `query_bugstop` / `query_anchor_channel`), and every tool call passes through the `tools/pre-execute` hard-guard gate (R/D/S/H/M total adjudication) plus the `agent/pre-step` inner-H inviolability gate.
+Once mounted, any Agent running under that profile automatically gains the 11 white-box self-check tools (`query_iron_laws` / `query_steady_state` / `list_rigid_anchors` / `query_conduction_chain` / `query_boundary` / `query_bugstop` / `query_anchor_channel` / `query_criterion_wiring` / `query_strata` / `query_nested` / `query_tension`), and every tool call passes through the `tools/pre-execute` hard-guard gate (R/D/S/H/M total adjudication) plus the `agent/pre-step` inner-H inviolability gate.
 
 ### Daily use vs stress testing
 
