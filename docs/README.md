@@ -51,3 +51,42 @@ this repository once served a page running an engine three weeks stale.
 There is no `index.html` here. The browser landing page lives in the Chinese edition
 ([`weiwen-law-dsh/docs/index.html`](https://github.com/Shaky77/weiwen-law-dsh/blob/main/docs/index.html)),
 which loads `./engine/engine.js` from the mirror above. This repository currently has no published page.
+
+## Criterion language domain
+
+Some criteria in this repository are stated in terms that hold **in English specifically**. This section
+classifies them, because "it breaks when you change the language" has three different causes and only one
+of them is a defect.
+
+| Tier | What the criterion reads | When the language changes | What to do |
+|---|---|---|---|
+| **A** | An identifier or a syntactic position — `inner: {`, a keyword in code state, an AST shape | still holds | nothing |
+| **B** | A natural-language literal — `/滑轨\|滑块/`, `label: '…'` | holds **only while the text it reads is still in that language** | raise to A by re-anchoring the structure; if the field is irreducibly prose, record *what it borrows from* and *when that expires* |
+| **C** | **An ambiguity the language itself does not resolve** | **fails necessarily — and that is not a defect** | do not "fix" it; state the domain |
+
+Tier C is the one worth spelling out. English `from` is both an import keyword and an ordinary preposition,
+so prose and code are **not separated at the writing level** — a bare regex over `from '…'` cannot tell
+`import x from './y.mjs'` from `rigidity from "not shifting with subjectivity"`. Chinese prose is written
+in Chinese characters while keywords stay English, so the two are **separated at the character level** and
+the same regex never collides.
+
+The consequence is uncomfortable and worth stating plainly: **the Chinese edition used to pass that check
+by luck, not by structure.** It passed because of the script system, not because the criterion was right.
+The English edition is where the criterion's actual content got exposed.
+
+Fixing it was not a matter of rewording prose until the regex stops matching — that is enumeration, and the
+next sentence collides again. The fix was to make the criterion read what it always meant:
+**"is there an import statement in the code"**, not "does the text contain `from '`". Both editions now
+carry the same state-machine scanner. It is *necessary* here and *preventive* there. The difference is the
+language, not the structure.
+
+**Tier C criteria are annotated in place** with a `LANGUAGE DOMAIN` block, and the block states which
+language the reasoning was written against and what would no longer hold elsewhere. Retrieve them all with:
+
+```bash
+grep -rn "LANGUAGE DOMAIN" .
+```
+
+One rule of thumb, because both mistakes are easy: **demoting a tier-C criterion to "broken"** leads someone
+to rewrite a criterion that was correct; **promoting a tier-B criterion to "just needs a note"** leaves a real
+defect in place. Classify before touching.
