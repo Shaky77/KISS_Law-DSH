@@ -16,7 +16,7 @@
 
 ## Not translated here — the numbered working notes
 
-The numbered working notes `27`–`40` exist **only in the Chinese edition**
+The numbered working notes `27`–`45` exist **only in the Chinese edition**
 ([`weiwen-law-dsh/docs/`](https://github.com/Shaky77/weiwen-law-dsh/tree/main/docs)).
 
 They are dated working notes — a record of how each criterion was forced out, one ruling at a time —
