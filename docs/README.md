@@ -21,13 +21,14 @@ The numbered working notes `27`–`40` exist **only in the Chinese edition**
 
 They are dated working notes — a record of how each criterion was forced out, one ruling at a time —
 not reference documentation. Their content is already carried into `src/core/` in both editions,
-and the two editions' test suites (517 here, 515 there) assert the same behaviour.
+and the two editions' test suites (**608 here, 601 there**, measured 2026-10-28) assert the same behaviour.
 
 **What this means for a reader of this repository:**
 
 - A `docs/NN` reference in a comment points at one of those notes. If you want the reasoning, it is in the Chinese edition at that number.
 - The behaviour it justifies is **not** in the Chinese edition alone: it is in `src/core/` here, and covered by tests here.
-- The difference in test counts is **not** a coverage gap: the four Chinese-named test groups in the other edition were written with English names here, and the two suites are otherwise aligned case by case.
+- The test counts differ by **7**, and the difference is accounted for rather than waved at: this edition carries `pledge-wiring.test.mjs` (9 tests) plus one extra case each in `police-gate` and `receipt-gate`; the other edition carries 4 more cases in `h-boundary`. Those 4 cover behaviour that also exists here, but here it is covered inside `pledge-wiring` instead (the pledge exemption and the `effect` whitelist), so the two suites are **not** aligned case by case any more — they are aligned by criterion.
+- ⚠️ **Neither number is a coverage claim.** A count says how many cells were written down, not which ones. If you want to compare coverage, compare the criterion each cell names; the totals will tell you nothing. This file previously asserted 517/515 and "otherwise aligned case by case" — both had quietly gone stale as batches landed, which is why the numbers now carry a measurement date.
 
 If a specific note matters to you, ask and it can be translated — one at a time, in the order you need them,
 rather than all at once.
