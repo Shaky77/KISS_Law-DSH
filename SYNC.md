@@ -112,6 +112,20 @@ Eleven commits touch `src/`. They do not map one-to-one onto eleven tasks — se
 - ⇒ Same family as iron law #4's addendum: **a "cold" reading also has to be doubted.** A deny whose reason you cannot state is not a measurement. The `kind`-only version was exactly that: *a negative reading with no live evidence.*
 - Chinese write-up: `docs/45` §7 (Chinese repo).
 
+
+### B9 · Local read/write exempt from the content gate — and the **position** of an exemption is part of it (author ruling, 2026-10-29)
+- Files: `src/core/engine.mjs` (`isLocalReadWrite` + the exemption inside `checkInnerH`), `test/local-rw-exemption.test.mjs` (14), both editions.
+- Ruling, verbatim: *"Local reads and writes are all exempt … local is a closed environment; it does not go out … the responsibility is borne directly by the user. But deletion is still not exempt yet."*
+- 🔴 **Not a tool-name allowlist.** The ground is whether the action can move the outside world: local read does not leave the machine, local write can be written back (the user is right there), deletion cannot be undone. Landing: layer ∈ {`file-read`,`file-write`} **∧** landing slots non-empty. Credential layers, delete, send, exec fall out by construction.
+- 🔴 **This closes the H content gate only.** The R layer — credentials, irreversible-without-anchor, outbound landing points, the exec container, and pledge reconciliation ("cannot reconcile the landing point") — is untouched. So an external agent's report of *"write refused under an active pledge"* does **not** change with this commit. Exempting *"should this content be read as an injection"* is not exempting *"may this action be done"*.
+- 🔴 **Pitfall 1 — where the exemption sits matters more than what it says.** First version put it at the top of `checkInnerH`; measured, that released all **26** "external content ⇒ hand over" cases, because it also skipped the `provenance:'third-party'` branch. Moved into the "source unlabeled" segment: the premise is *"responsibility for the source rests with the user"*, and the moment a caller marks third-party, that premise is gone.
+- 🔴 **Pitfall 2 — a branch that can never execute.** First version re-checked URL/UNC inside the local test; mutation testing was completely insensitive to it. `attribution` already rules on "name says local read/write × arguments carry an outbound landing point ⇒ cannot attribute", and both URL and UNC return `ok:false` there. Removed. Tighten in `attribution` — that is the criterion, this is a consumer.
+- **One line deliberately NOT added**: no "self-audit tool" exemption in H. Mutation testing shows it is unobservable (`query_*` takes `{}`). A line whose removal no test can detect only turns "criterion present" into self-comfort. For whoever next hits "an external agent reports `query_*` is blocked": the missing piece is not an exemption there — get their real call shape first.
+- Mutation, 5 spots: 4 turn red; adding `file-delete` to the exempt set does **not**, and that is a structural fact rather than a gap — deletion is refused in the **R layer**, so whether H exempts it is unobservable. Written into the test comment instead of pretended.
+- The one hard proof is test ❺: same injection text, same tool, landing point URL → local `C:/`, verdict flips deny(H) → allow. Controls ❻❼❽ prove it is judged on the landing point, not indiscriminate release.
+- ⚠️ **Unresolved**: the external tester reports "all reads blocked on 0.2.13"; on the same build, through the real `apply()` gate, this edition reads **allow** for the same calls. Same build, same tool name, opposite verdicts ⇒ one variable unlocated. Asked for **field names** of one real call rather than guessing. "I cannot reproduce it" is neither "your reading is wrong" nor "it is fixed".
+- Chinese write-up: `docs/46` (Chinese repo).
+
 ## 4. Order of work, and the acceptance test for each batch
 
 Each batch must end with this repo's own test suite green **and** a live behavioural check — not a diff review. A diff that looks right is not evidence that behaviour is right; that is exactly the failure this repo's wall #6 is about.
