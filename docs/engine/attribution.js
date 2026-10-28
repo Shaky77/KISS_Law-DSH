@@ -950,11 +950,30 @@ export function actionProfile(call, attrib) {
 //   file-delete / cred-delete = 结构化删除工具。
 export const SCAR_LAYERS = new Set(['exec-destructive', 'file-delete', 'cred-delete']);
 
+// ---------- 命令里的路径形态：**一处定义** ----------
+//
+// 🔴 [2026-10-28 同构回填 · 中文仓实测逼出来的] 病灶：抽取正则只认 `/` `./` `~/` 三种开头，
+//   **不认 Windows 盘符** ⇒ `Get-Content C:/Temp/ws/a.md` 被从第二个字符处匹配成 `/Temp/ws/a.md`，
+//   盘符被吃掉 ⇒ 与带盘符的作用域前缀永不相交 ⇒ **范围内的动作被判成范围外**（中文仓那边表现为
+//   「担保违背」误拦，本仓表现为 scar 锚归属判「无锚可归」）。
+//   ⚠️ 同一形态在本仓也写了两遍（本文件 `targetsOf` / `DECL_PATH`），都漏盘符，且字符类已互相分叉
+//   （一处排除 `-`、一处不排）。⇒ 按「一处定义」收口。**路径允许连字符**，故字符类不排除 `-`
+//   （排除了会把 `a-b.md` 截成 `a`，是静默错值）。
+//   覆盖五种：盘符 `C:\` `C:/`、UNC `\\host\share`、POSIX `/x`、相对 `./` `../`、家目录 `~/`。
+export const CMD_PATH_RE = /(?<=^|[\s=:'"(,，。；、：])(?:[a-z]:[\\/][^\s;|&"'(),，。；、]*|\/\/[^\s;|&"'(),，。；、]*|\/[^\s;|&"'(),，。；、]*|\.{1,2}\/[^\s;|&"'(),，。；、]*|~\/[^\s;|&"'(),，。；、]*)/gi;
+
+/** 从一段命令文本里抽出路径形态的落点（去重、保序）。 */
+export function cmdPathHits(cmd) {
+  const s = String(cmd ?? '');
+  if (!s) return [];
+  return [...new Set((s.match(CMD_PATH_RE) || []).map((x) => x.trim()).filter(Boolean))];
+}
+
 // 已声明**范围**里抽取作用域锚（**路径锚 + 类别锚**）。路径级 + 类别级两档，皆取自既有词汇/形态，不扩表。
 // ⚠️ 来源纪律（2026-09-20 · 锚源定案）：入参只能是**委托人声明的任务范围**（结构入口）。
 //    窗口面（`agent/pre-step` 的消息流）是**观察面**，其文本不得喂进本函数 —— 实测两种失效模式：
 //    "假接通"（承接语抽不出锚却报"通道已通"）与"假人证"（agent 自述含真路径却被当真授权）。
-const DECL_PATH = /(?:^|[\s=:'"(,，。；、：])((?:\.{0,2}\/|~\/|\/)[^\s;|&"'(),，。；、]*)/g;
+const DECL_PATH = /(?:^|[\s=:'"(,，。；、：])((?:[a-zA-Z]:[\\/]|\.{0,2}\/|~\/|\/)[^\s;|&"'(),，。；、]*)/g;
 /**
  * 抽取"已声明范围"里的对象/作用域（＝授权锚）。
  * @param {string} text 委托人声明的任务范围（**不是** agent 的言 —— 言属言行比对轴，不作锚源）
@@ -1003,8 +1022,9 @@ function targetsOf(call, layer) {
   }
   const cmd = extractCommand(call).cmd;
   if (!cmd) return out;
-  const hits = cmd.match(/(?<=^|[\s=:'"(,])(\/[^\s;|&"'(),]*|\.{1,2}\/[^\s;|&"'(),]*|~\/[^\s;|&"'(),]*)/g) || [];
-  return [...new Set(hits)];
+  // 形态定义收在 `CMD_PATH_RE` 一处（本文件上方）：盘符/UNC/POSIX/相对/家目录五种。
+  //   此处原先自带一份只认 POSIX 的正则（且排除 `-`）⇒ Windows 盘符路径抽不出来 ⇒ 锚归属判「无锚可归」。
+  return cmdPathHits(cmd);
 }
 
 /**

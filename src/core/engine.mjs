@@ -1452,6 +1452,25 @@ export class WeiwenLawEngine {
     const _a = call?.args ?? {};
     const isDocWrite = TOOL_CATEGORY[call?.name] === 'write'
       || (TOOL_CATEGORY[call?.name] == null && _a.path != null && _a.content != null);
+    // 🔴 [2026-10-28 · the boundary, drawn: action face belongs to R, it does not enter the content gate]
+    //   "Is this an action?" is answered by the **declaration** (deployment side), never by guessing a verb table.
+    //   Measured (external agent, reproduced locally, same instance same pledge):
+    //     Get-Content <in-scope file>  => allow (never matched in the first place)
+    //     Set-Content <in-scope file>  => deny/H "content carries the form of an operational instruction"
+    //     New-Item / Copy-Item / Out-File / echo >  => allow
+    //   Narrowed to words: the trigger is the **write verbs** Set / Write / Add; Get / ZZZ do not trigger.
+    //   => root cause: `isActionCall` decided "action" from the SHELL_HEAD **verb table** (a table is an enumeration):
+    //      PowerShell's Set/Write/Add are not in it, so an action the agent itself proposed got sent to the
+    //      content gate and was judged as "external content".
+    //   Wrong proposition type: the content gate judges "can external data rewrite the subject's behavior",
+    //     while a command *is* the behavior itself — it belongs to R (sink / scope / reversibility / destruction),
+    //     not to the content face of H. One thing must not be judged at two gates.
+    //   => structural fix: ask the **declaration channel** (deployment side, the audited party cannot write it);
+    //      the verb table remains only a fallback when nothing is declared.
+    //   ⚠️ Applies to `exec` only: `write` already has the DOC_SINK exemption, and the existing criterion faces of
+    //     `send`/`delete` are left untouched (keep the blast radius small, do not "widen while we are here").
+    const _declVerb = this._declOf(call)?.verb ?? null;
+    const isDeclaredExec = _declVerb === 'exec';
 
     // Dynamic view (dialectical unity): with provenance, judge inside/outside, not wording
     const prov = call?.provenance ?? call?.ctx?.provenance;
@@ -1505,7 +1524,7 @@ export class WeiwenLawEngine {
     //   which are actions by nature) not judged.
     //   Measured (independent test set · real-API generated: 60 attacks + 90 normals): attacks +5, false hits +0
     //   (strict Pareto gain); the no-exemption version had false hits +29 (all tech docs) ⇒ exemptions are required.
-    if (!isDocWrite && !isActionCall(call) && targetsBehaviorConstraint(s)) {
+    if (!isDocWrite && !isDeclaredExec && !isActionCall(call) && targetsBehaviorConstraint(s)) {
       return { kind: 'review', law: 'H', reason: '来源未标注；结构判据命中——内容指向主体行为约束（外 H 行为面可观测）。追因止于 D 层：来源未标注 ⇒ 内外归属不可判 ⇒ 不可判恶意、亦不可放行，交还用户裁决后再执行。' };
     }
     if (hitsInnerH(s)) {
@@ -1531,7 +1550,7 @@ export class WeiwenLawEngine {
     // 否则「看起来像指令」去审一个本来就是指令的东西，必然全命中——实测只读侦察
     // （git fetch && git rev-parse && git ls-remote && git status）被误判 review，属误伤。
     // 与 isDocWrite（写盘内容＝落定数据）同构：落点性质决定该不该审。
-    if (!isDocWrite && !isActionCall(call) && looksLikeOperationalDirective(s)) {
+    if (!isDocWrite && !isDeclaredExec && !isActionCall(call) && looksLikeOperationalDirective(s)) {
       return { kind: 'review', reason: '来源未标注；结构判据命中——内容含操作指令的形式（外 H 行为面可观测，非纯内 H 对象）。追因止于 D 层：来源未标注 ⇒ 内外归属不可判 ⇒ 不可判恶意、亦不可放行，交还人工复核。' };
     }
     // 🔴 [2026-09-28 · disambiguation of `null` (do not conflate again)] This `null` = **this layer does not
