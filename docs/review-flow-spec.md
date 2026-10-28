@@ -31,6 +31,10 @@ Per "better to block first, never release directly", the adapter unifies:
 
 That is: **use the host-understandable words to say "block", and use additional fields to say "this is suspended, not final"**.
 
+> 🔴 **This section is the source of this spec's hard boundary — not a workaround.**
+> The two-axis ruling of 2026-10-28 (full text: `weiwen-law-dsh` → `docs/41-拦与审是两件事-两轴四格与四态归位-20261028.md`) states: **block** and **audit** are two separate axes. The "do not block, only audit" cell (release + ledger) **cannot be expressed at the host return layer at all**, which is exactly why it was reduced to `deny` + additional fields.
+> ⇒ **The two axes are for judging, not for returning. Do not forge `next()` to fill that cell** — that trades a defined behaviour for a prettier table.
+
 ## 4. Content of deduced consequences
 
 `deduceRisk(call)` runs two branches in parallel on the same semantic signal set `s`:
