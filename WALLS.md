@@ -109,6 +109,13 @@ I could get through because my body had memorised how to turn sideways; the wall
 ⇒ 🔴 **Breaking in the right place ≠ breaking in a way that lets people know where the break is.** Getting the criterion right is only the first half; marking the location is the second half.
 ⇒ This wall is also a major source of "feeling stifled": **breaking at the correct point, but in a form the other party cannot read** (one word, `review`, covering four different situations, so they cannot tell "give me a bit more" from "this is not mine to judge").
 
+**10. I mistook "one command" for "one execution".** (2026-10-28 — hit immediately before adding this line.)
+`npm version patch` ran twice; the environment retried the same command. The version therefore jumped from 0.2.9 straight to **0.2.11**, leaving an extra commit behind: eight seconds apart, differing only in the version line.
+**Both commands printed normal output. Neither reported any error.** I only found out because the version number did not match what it should have been — and had I not read the state back at that point, the skipped number would have been carried straight into the release ledger.
+⇒ **A normal receipt ≠ a single execution.** Any command with side effects (bumping a version, committing, publishing, deleting) must be followed by **reading the state back**. "The output looked fine" is not a reading.
+⇒ This is the same family as #3 but points the **opposite way**, so the two cannot be merged: #3 is *the tool said it worked when it had not* (one too few); this one is *the tool worked twice while I saw it once* (one too many). One is a miss, one is a duplicate — and "I could not see it" is the half they share.
+⇒ The fix is cheap: **read the state back and reconcile it.** Version number, commit count, file count — if any of them has a value it *should* have, check against that value. What saved me here was exactly that "it should be 0.2.10".
+
 ---
 
 ## A note for whoever paints signs
