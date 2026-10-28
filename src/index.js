@@ -39,7 +39,8 @@
 
 import { writeFileSync, appendFileSync, readFileSync, readdirSync } from 'node:fs';
 import { createHash } from 'node:crypto';
-import { WeiwenLawEngine, DEFAULT_RIGID_ANCHORS } from './core/engine.mjs';
+import { WeiwenLawEngine, DEFAULT_RIGID_ANCHORS, isIrreversible } from './core/engine.mjs';
+import { parseCapability, capabilityStatus, parsePledge, pledgeStatus, isNarrower, locValues } from './core/capability.mjs';  // [2026-10-28 · batch 4] 通行证 + 担保：判据与词汇都在该模块，适配层只做签发/自提/自省（不重写判据）
 import { R_DOMAIN, THREE_IRON_LAWS } from './core/law.mjs';
 // [2026-10-21 中英对齐 · synced from the CN edition] Criterion-wiring readout (read-only surface):
 //   makes "which criteria in the library actually enter the computation" auditable.
@@ -139,24 +140,59 @@ function logline(s) {
 }
 
 // ⑥ Window police: evidence-sufficiency gate (audit layer, zero intrusion into core criteria)
-function evidenceOf(args) {
-  if (!args || typeof args !== 'object') return null;
-  const RES = ['command', 'path', 'url'];
-  if (!RES.some((f) => f in args)) return null;
-  for (const f of RES) {
-    if (!(f in args)) continue;
-    const v = args[f];
-    if (typeof v !== 'string') continue;
-    if (!v.trim()) return false;
-    if (f === 'command') {
-      const m = v.match(/(?:^|\s)((?:https?:\/\/|\/|\.\/|~|\w:)[^\s]*)/);
-      if (!m) return false;
+// 🔴 [2026-10-28 · ported from the Chinese repo · structural fix] **The evidence requirement follows
+//   "irreversibility", not "field names".**
+//   The old criterion was "does the argument carry one of the field names command/path/url" ⇒ enumeration, and
+//   pointing the wrong way:
+//     · read-only operations were asked for evidence ⇒ `Get-ChildItem` (list a directory) was judged
+//       "did not externalize a target" and refused every time (measured);
+//     · write operations slipped out through the allow branch because the extractor could not read them.
+//   ⇒ **One and the same default (insufficient evidence), two opposite directions** (write passes / read is
+//     refused) — a violation of iron law #7, "the default direction may not be dropped".
+//   The root cause is not "a few field names are missing"; the gate picked the wrong layer. It should ask
+//   "can this action cause an irreversible change" (structure), not "is some name present in the arguments"
+//   (enumeration).
+//   ⇒ New version: judge irreversibility first (reusing the engine's `isIrreversible` — **same criterion source,
+//     one definition**, never a second copy). Irreversible ⇒ evidence required; reversible/read-only/query ⇒ not
+//     required (no false hit).
+//   ⚠️ Evidence present ≠ allowed: an out-of-bound target (`rm -rf /`) still goes to the R anchors. This gate
+//     only covers "the target is missing".
+// Evidence shape: path / URL. **Recognise the shape, not the field name** (same philosophy as the engine's
+//   `_SH12_LOC_KEY`: whatever the host names it, it still reaches it).
+const EVIDENCE_SHAPE = /(?:[A-Za-z]:[\\/]|\\\\|\/|https?:\/\/|~[\\/])/;
+function evidenceOf(call) {
+  const args = call?.args;
+  if (!args || typeof args !== 'object') return null;   // no argument object ⇒ evidence not required
+  if (Object.keys(args).length === 0) return null;      // empty (query / self-audit) ⇒ not required, avoid false hits
+  if (!isIrreversible(call)) return null;               // reversible / read-only ⇒ evidence not required
+  // Irreversible ⇒ a "concrete object" must be findable in the arguments; scan every string value (nested),
+  //   without trusting field names.
+  // ⚠️ Check the **landing slots** first (real-API measurement 2026-10-28: `write_file{path:"notes.md"}` was
+  //   judged "did not externalize a concrete target"): a relative path is a legal usage (the base is the process
+  //   cwd), but because it "does not look like an absolute path" it was read as "no target given". A non-empty
+  //   string in a landing slot **is itself an object** and need not resemble an absolute path — this layer judges
+  //   by key semantics, the next layer falls back to shape. Both layers are needed: shape alone false-hits legal
+  //   relative paths; key names alone let a different key slip through.
+  if (locValues(args).length) return true;
+  let sawString = false;
+  let sawObject = false;
+  const walk = (v, d) => {
+    if (d > 3 || v == null || sawObject) return;
+    if (typeof v === 'string') {
+      if (!v.trim()) return;
+      sawString = true;
+      if (EVIDENCE_SHAPE.test(v)) sawObject = true;
+      return;
     }
-  }
-  return true;
+    if (Array.isArray(v)) { v.forEach((x) => walk(x, d + 1)); return; }
+    if (typeof v === 'object') { Object.values(v).forEach((x) => walk(x, d + 1)); }
+  };
+  walk(args, 0);
+  if (!sawString) return false;   // arguments present but all empty ⇒ evidence missing
+  return sawObject;               // a concrete object shape found ⇒ evidence present; otherwise missing
 }
 function policeGate(call) {
-  const ev = evidenceOf(call?.args);
+  const ev = evidenceOf(call);
   if (ev === false) {
     return {
       kind: 'deny',
@@ -236,6 +272,147 @@ export function setPrincipalScope(text) {
   });
   if (_scopeChanges.length > 20) _scopeChanges.shift();
   return prev;
+}
+
+// ---------- 结构入口（宿主集成方侧；模型不可达）：通行证（Host-issued Capability） ----------
+// 为何要有这一层（2026-10-27 · 小D 提案「通行证」的落地形态）：
+//   上面 `setPrincipalScope` 的授权面是**自由文本**，靠 `declaredAnchors` 从文本里抽路径。
+//   实测两种失效（本次 probe，六种写法逐一跑）：
+//     · `允许向 xiaoD/ 目录推文` ⇒ paths=[] nouns=[file] —— **路径一条都没抽出来**，
+//       反而抽成类别锚 `file` ⇒ 所有 file 类动作全部"归锚成功" ⇒ **签了一张自己不知道范围的证**；
+//     · 抽取器认的是 `/` 开头的绝对形态，**相对前缀结构性抽不出**（换措辞救不回来）。
+//   ⇒ 修法不是补词表（那是 X 轴右端，已否），而是**把作用域改成直接声明**：
+//     宿主给结构化对象，引擎不做文本抽取、只做包含判定。动作类与作用域**绑成二维**
+//     （`file-write`/`network-send`/`cred-read` 这些原本**从来没进过归锚判据**的层，现在可被凭证覆盖）。
+// ⚠️ 纪律与 setPrincipalScope 同源：**模块级导出、不是工具** ⇒ 模型调不到 ⇒
+//    **结构上不可能自我授权**（主体分离由位置保证，不靠内容判别）。
+//   ⚠️ 另给进程环境变量 `WEIWEN_CAPABILITY`（JSON）作为宿主的第二条签发路径：
+//      环境变量由**启动进程者**设定，被审计的模型改不了自己的进程环境 ⇒ 同样在宿主侧。
+let _hostCapability = null;      // 当前有效证（**替换**语义，不累积）
+let _hostCapRaw = null;          // 原始输入（诊断用；不可解析时也要能看到"宿主到底给了什么"）
+let _hostCapError = null;        // 不可解析的原因（null = 可解析或未签发）
+// 证变更留痕（append-only，上限 20）：签发/替换/撤回都是责任归因事件，静默变更不可溯。
+const _capChanges = [];
+/**
+ * 宿主显式签发/替换/撤回收通行证。
+ *
+ * 三条契约（与 capability.mjs 的硬约束对齐）：
+ *   ① 只能在这里签发 —— 本函数不进工具表，模型调不到；
+ *   ② **替换不累积** —— 旧证当场失效（不留"历史授权"可复用）；
+ *   ③ 证必须有 `maxUses` 或 `expiresAt`（都没有由 parseCapability 拒绝，避免变成永久白名单）。
+ * @param {object|string|null} input 结构化证 / JSON 字符串；null 或空串 ⇒ 显式撤回
+ * @returns {{ok:boolean, prev:object|null, cap:object|null, why:string|null}}
+ */
+export function setPrincipalCapability(input) {
+  const prev = _hostCapability;
+  const rawIn = (input === null || input === undefined || (typeof input === 'string' && !input.trim())) ? null : input;
+  if (rawIn === null) {
+    _hostCapability = null; _hostCapRaw = null; _hostCapError = null;
+    if (prev !== null) _capChanges.push({ at: new Date().toISOString(), kind: 'revoke', id: prev?.id ?? null });
+  } else {
+    const parsed = parseCapability(rawIn);
+    _hostCapRaw = rawIn;
+    if (parsed.ok) {
+      _hostCapability = parsed.cap; _hostCapError = null;
+      _capChanges.push({
+        at: new Date().toISOString(),
+        kind: prev ? 'replace' : 'declare',
+        id: parsed.cap.id ?? null,
+        actions: parsed.cap.actions,
+        scope: parsed.cap.scope.map((s) => s.raw),
+        maxUses: parsed.cap.maxUses,
+        expiresAt: parsed.cap.expiresAt,
+      });
+    } else {
+      // 不可解析 ⇒ **清空有效证**但保留原值与错误：引擎侧会因"证在场但不可解析"而 fail-closed。
+      //   为何不保留旧证继续用：宿主给了一份新证却被判无效时，"悄悄继续用旧证"＝授权面与宿主意图脱节。
+      _hostCapability = null; _hostCapError = parsed.why;
+      _capChanges.push({ at: new Date().toISOString(), kind: 'invalid', id: null, why: parsed.why });
+    }
+  }
+  if (_capChanges.length > 20) _capChanges.shift();
+  if (prev !== _hostCapability) logline(`capability ${rawIn === null ? 'revoke' : (_hostCapError ? 'invalid' : 'declare')}`);
+  return { ok: rawIn === null ? true : _hostCapError === null, prev, cap: _hostCapability, why: _hostCapError };
+}
+
+// ---------- 担保（Pledge）：被审方自陈的界，只能收窄 ----------
+// 来由（安 2026-10-28）：通行证解决了"谁批准"，但空着"谁承诺"。
+//   她要的是一部可核对的账本：AI 先做推演、交一个界做担保，此后实际动作对不上自己的担保即按第一 Bug 阻止。
+// 🔴 与通行证的**方向相反**，这是它安全的根据：
+//     通行证＝宿主批给你的上限；担保＝你自己承诺的下限（比上限更窄）。
+//     有效面 ＝ 批准面 ∩ 担保面 ⇒ 担保永远只能让允许面变**小**。
+//   ⇒ 所以"被审方提交担保"不违反"不能自签授权"：它签的是认罪的状子，不是放行的条子。
+//     （engine 侧同据此设：担保 pass 不跳任何判据，只有 breach 才生效 —— 见 engine.mjs 担保段。）
+// 🟡 两条来源：`submit_pledge` 工具（AI 自提，先报备后干活）＋ 本函数/`WEIWEN_PLEDGE`（宿主代提）。
+//   两条都只能是收窄 —— 因为收窄之后还要过通行证与刚性锚，担保放不出任何东西。
+let _hostPledge = null;
+let _hostPledgeRaw = null;
+let _hostPledgeErr = null;
+const _pledgeChanges = [];   // 签发/替换/撤回留痕（append-only，上限 20；与证的变更史同构）
+
+/**
+ * 宿主或 AI 提交/替换/撤回担保。替换不累积（旧担保当场失效，旧账不继承）。
+ * @param {object|string|null} input 结构化担保 / JSON 字符串；null 或空串 ⇒ 撤回
+ * @returns {{ok:boolean, prev:object|null, pledge:object|null, why:string|null}}
+ */
+export function setPledge(input) {
+  const prev = _hostPledge;
+  const rawIn = (input === null || input === undefined || (typeof input === 'string' && !input.trim())) ? null : input;
+  if (rawIn === null) {
+    _hostPledge = null; _hostPledgeRaw = null; _hostPledgeErr = null;
+    if (prev !== null) _pledgeChanges.push({ at: new Date().toISOString(), kind: 'revoke', id: prev?.id ?? null });
+  } else {
+    const parsed = parsePledge(rawIn);
+    _hostPledgeRaw = rawIn;
+    if (parsed.ok) {
+      _hostPledge = parsed.pledge; _hostPledgeErr = null;
+      _pledgeChanges.push({
+        at: new Date().toISOString(),
+        kind: prev ? 'replace' : 'declare',
+        id: parsed.pledge.id ?? null,
+        actions: parsed.pledge.actions,
+        scope: parsed.pledge.scope.map((s) => s.raw),
+        maxUses: parsed.pledge.maxUses,
+        expiresAt: parsed.pledge.expiresAt,
+        grounded: !!parsed.pledge.reason,
+      });
+    } else {
+      // 不可解析 ⇒ 清空有效担保但保留原值与原因：引擎侧会因"担保在场但不可解析"而 fail-closed（review）。
+      //   为什么不留着旧担保继续用：宿主/AI 给了一份新担保却被判无效时，悄悄沿用旧的有＝承诺面与当事人意图脱节。
+      _hostPledge = null; _hostPledgeErr = parsed.why;
+      _pledgeChanges.push({ at: new Date().toISOString(), kind: 'invalid', id: null, why: parsed.why });
+    }
+  }
+  if (_pledgeChanges.length > 20) _pledgeChanges.shift();
+  if (prev !== _hostPledge) logline(`pledge ${rawIn === null ? 'revoke' : (_hostPledgeErr ? 'invalid' : 'declare')}`);
+  return { ok: rawIn === null ? true : _hostPledgeErr === null, prev, pledge: _hostPledge, why: _hostPledgeErr };
+}
+
+/**
+ * 被审方自提担保（`submit_pledge` 工具走这里）：**只接受收紧，绝不受理放宽**。
+ *
+ * 🔴 这一条是落地时才发现的缺口，不是实现细节（2026-10-28）：
+ *   若被审方能随时替换自己的担保，那"对不上自己提交的担保就停"形同虚设 ——
+ *   干了坏事之前先改一份宽的担保即可。⇒ 收紧是自伤（允许），放宽是授权（只能宿主给）。
+ *
+ * ⚠️ 还有一条同族纪律：**被拒的提交不改变任何状态**。
+ *   实测踩到：初版把非法提交也写进 `_hostPledgeRaw` ⇒ 引擎读到"担保在场但不可解析"⇒
+ *   此后**每一个调用**都 fail-closed 成 review ⇒ 一次乱填就把 agent 自己锁死（可被用来 DoS）。
+ *   宿主那条路（`setPledge` / 环境变量）保持 fail-closed 不变：那是配置错误，必须响。
+ * @returns {{ok:boolean, prev:object|null, pledge:object|null, why:string|null}}
+ */
+export function narrowPledge(input) {
+  const parsed = parsePledge(input);
+  if (!parsed.ok) {
+    logline(`pledge narrow rejected -> invalid(${parsed.why})`);
+    return { ok: false, prev: _hostPledge, pledge: _hostPledge, why: `担保格式不成立：${parsed.why}` };
+  }
+  const cmp = isNarrower(parsed.pledge, _hostPledge);
+  if (!cmp.ok) {
+    logline(`pledge narrow rejected -> wider(${cmp.why})`);
+    return { ok: false, prev: _hostPledge, pledge: _hostPledge, why: `只能收紧不能放宽：${cmp.why}（放宽须宿主签发，例如 WEIWEN_PLEDGE 或 setPledge）` };
+  }
+  return setPledge(parsed.pledge);
 }
 
 // ---------- Structural entry (host integrator side; unreachable by the model): broken-window heal ----------
@@ -451,6 +628,27 @@ function apply(ctx) {
   // inject the plugin many times in one process (one per agent/session, and harnesses re-inject per
   // case) ⇒ the set is bounded: past 32 instances the oldest ref is dropped, so heal stays a "lift the
   // stop-loss in this process" action instead of an unbounded reference holder.
+  // ── 担保提交工具自己的可信声明（2026-10-28）────────────────────────────
+  // 为什么需要：`submit_pledge` 名字里没有动作词 ⇒ 归因判不出动作类别 ⇒ **"提交担保"这个动作自己会被拦**，
+  //   于是一套要求"先报备再干活"的机制，卡在"报备这一步过不去"上（真 API 实测踩到：整链启动不了）。
+  // `verb:'read'` 说的是**影响面**：它只写本进程内的 pledge 账本（不碰文件、不发网络、不执行命令）。
+  // `effect:'self-ledger'` 说的是**审计面**：它连"改宽自己"都做不到（narrowPledge 恒比 isNarrower）
+  //   ⇒ 把它送进 H 的内容闸只会审出误伤（实测：reason 写成"推演依据：…"就命中指令形态被判 deny）。
+  // ⚠️ 它不豁免任何其他判据：真正的动作（write_file / rm …）该怎么判还怎么判。
+  engine.declareTool('submit_pledge', { verb: 'read', effect: 'self-ledger' });
+
+  // ── 宿主签发路径（环境变量）：与 WEIWEN_TOOL_DECLS 同族 ────────────────
+  //   环境变量由**启动进程者**设定 ⇒ 被审计的模型改不了自己的进程环境 ⇒ 同样在宿主侧。
+  //   两条语义相反：WEIWEN_CAPABILITY=批准上限，WEIWEN_PLEDGE=自陈的界（只能更窄）。
+  //   ⚠️ 解析失败必须进日志：否则又是一次静默失败（与 WEIWEN_TOOL_DECLS 同一条纪律）。
+  if (process?.env?.WEIWEN_CAPABILITY) {
+    const r = setPrincipalCapability(process.env.WEIWEN_CAPABILITY);
+    logline(`env WEIWEN_CAPABILITY -> ${r.ok ? 'declare' : 'invalid(' + r.why + ')'}`);
+  }
+  if (process?.env?.WEIWEN_PLEDGE) {
+    const r = setPledge(process.env.WEIWEN_PLEDGE);
+    logline(`env WEIWEN_PLEDGE -> ${r.ok ? 'declare' : 'invalid(' + r.why + ')'}`);
+  }
   _liveEngines.add(engine);
   if (_liveEngines.size > 32) _liveEngines.delete(_liveEngines.values().next().value);
   logline('apply() entered — registering tools/pre-execute, agent/pre-step, tools/post-execute (receipt gate), tools/result and white-box self-check tools');
@@ -509,6 +707,13 @@ function apply(ctx) {
       //   来源**不是**消息文本（窗口面是观察面 ⇒ 噪音），也**不是** exec 视图里猜的字段名。
       //   入口未接 ⇒ null ⇒ 锚池留空 ⇒ 不可逆动作交人工（fail-closed）；**绝不臆造授权**（假人证比无人证更坏）。
       taskAnchor: _hostPrincipalScope,
+      // 通行证（结构凭证）：与 taskAnchor 并列的**第二条授权面**，但它是结构化的 ——
+      //   作用域直接声明、不从文本抽（`declaredAnchors` 抽不出相对前缀，见 setPrincipalCapability 注释）。
+      //   ⚠️ 递下去的是**原文**（raw），不是解析产物：同一来源只有一种形态，引擎侧解析一次即可。
+      taskCapability: _hostCapRaw,
+      // 担保（被审方自陈的界）：与通行证并列，但方向相反 —— 它只能把允许面变窄。
+      //   ⚠️ 未提交 ⇒ null ⇒ 引擎侧本判据不介入 ⇒ 行为与本判据出现前完全一致（零回归）。
+      pledge: _hostPledgeRaw,
       // lift First-Bug structural flags to top level so engine.checkFirstBug can read them
       // (DSH passes these on exec.arguments; the engine expects them on call)
       selfReference: a.selfReference,
@@ -877,6 +1082,78 @@ function apply(ctx) {
         loadedAt: LOADED_AT,
         ...criterionReadout(engine),
         note: '只读面：不产生 verdict、不写状态、不参与闸门。gaps 是如实登记的缺口（不是免责通道）；unmapped 是欠账，不视为通过。双指纹：buildId＝src/core 内容哈希（判据域，答判成什么）；bundleId＝src 全量含本适配层（行为域，答怎么落到宿主上）。都不含版本号 ⇒ 外部审计方可自行重算比对外，不必依赖被测方自报包版本。',
+      };
+    },
+  }));
+  // ── 担保提交（被审方自陈的界 · 2026-10-28）──────────────────────────
+  //   结构：AI 先报备"我接下来只在这些动作类 × 这些落点 × 这些次数内活动"，此后越出即被拒。
+  //   🔴 为什么这不违反「被审对象不能自己给自己签授权」：担保**只能收窄**。
+  //      有效面 = 宿主通行证 ∩ 担保 ⇒ 自己提一个更宽的界，允许面一点不变（只是账本变松）。
+  //      它签的是认罪的状子，不是放行的条子。
+  //   🟡 参数刻意写成 `paths` / `hosts`（具体落点），不用抽象的 scope 数组。两个理由，都是实测出来的：
+  //      ① 担保本来就该落到具体位置，抽象范围事后核不了；
+  //      ② 带落点的调用才落在本层判据的输入面上（否则"提交担保"这个动作自己会被拦成 review，
+  //         形成"要担保先过闸、过闸又得先有担保"的死循环）。
+  ctx.tools.register(defineTool({
+    name: 'submit_pledge',
+    description: 'Submit or replace a pledge — a bound you declare on yourself. State that from now on you will act only within [action classes × targets × uses/expiry]. Any later action of yours that falls outside it is refused and counted toward the First Bug. A pledge can only NARROW authorisation, never widen it (effective surface = host capability ∩ pledge); a wider pledge does not buy you a single extra permission, it only loosens your own ledger. Narrower is better. Not submitting leaves this criterion inactive and behaviour exactly as before.',
+    parameters: {
+      actions: { type: 'array', items: { type: 'string' }, description: 'Action classes; legal values write/delete/read/send/exec/destroy. Fill them by how the TOOL is classified, not by what the task means: if the only tool you have is a shell / command runner, writing a file through it is `exec` (the act happens inside the exec channel) — declare `exec` or it will be judged a breach; declare `write` only when a dedicated write_file-style tool exists.' },
+      paths: { type: 'array', items: { type: 'string' }, description: 'Allowed path prefixes. Must be absolute: a relative prefix cannot be reconciled afterwards (the process cwd is unknown to the engine) and is refused at submit time rather than misjudged as a breach later.' },
+      hosts: { type: 'array', items: { type: 'string' }, description: 'Hosts you are allowed to reach' },
+      maxUses: { type: 'integer', description: 'Maximum number of actions to be honoured (at least one of maxUses / expiresAt must be given, otherwise it is a permanent pledge and is refused)' },
+      expiresAt: { type: 'string', description: 'Expiry, ISO 8601' },
+      reason: { type: 'string', description: 'Why this scope is needed (the forward-deduction you based it on; omitting it marks the pledge ungrounded but does not block it)' },
+      id: { type: 'string', description: 'Optional id for reconciliation' },
+    },
+    output: { schema: { type: 'object', additionalProperties: true }, render: renderObj },
+    async execute(args) {
+      const scope = [
+        ...(Array.isArray(args?.paths) ? args.paths : []),
+        ...(Array.isArray(args?.hosts) ? args.hosts.map((h) => (/^host:/i.test(String(h)) ? h : 'host:' + h)) : []),
+      ];
+      const r = narrowPledge({
+        id: args?.id, actions: args?.actions, scope,
+        maxUses: args?.maxUses, expiresAt: args?.expiresAt, reason: args?.reason,
+      });
+      return {
+        ok: r.ok,
+        why: r.why,
+        pledge: pledgeStatus(r.pledge),
+        previous: r.prev ? { id: r.prev.id, actions: r.prev.actions, scope: r.prev.scope.map((s) => s.raw) } : null,
+        note: r.ok
+          ? '担保已生效（替换旧担保，不累积）。它只能让允许面变窄 —— 不会因此多出任何权限。'
+          : '担保未被接受：上面 why 是具体原因。不生效时引擎行为与未提交完全一致（不含任何放宽或收紧）。',
+      };
+    },
+  }));
+  // ── 通行证与担保状态（只读面）──────────────────────────────────────
+  //   为何必须有个自省面：凭证的判据是「三件事」（动作类 / 作用域 / 次数与到期），
+  //   而这三件都在宿主侧设定。被测方若看不见自己的证长什么样，就只能靠猜措辞。
+  //   ⇒ 把证**原样摊开**：签了什么、用了几次、何时到期；担保则给出「提交的界 vs 实际兑现/越界」。
+  //   ⚠️ 只读：不产生 verdict、不写状态、不参与闸门。
+  registerSelfAuditTool(defineTool({
+    name: 'query_capability',
+    description: 'Capability and pledge status (read-only). Returns the credential the host currently issued (action classes / scope / uses and expiry / uses consumed / recent use trace), the history of declare-replace-revoke events, and — separately — the pledge you submitted, set against what you actually honoured or breached. Answers "what does my pass actually cover, and does my own declared bound still hold". Changes no allow/deny verdict. A credential can only be issued by the host (module-level setPrincipalCapability, or the WEIWEN_CAPABILITY process variable); a pledge can be submitted by you, but only ever narrower.',
+    parameters: {},
+    output: { schema: { type: 'object', additionalProperties: true }, render: renderObj },
+    async execute() {
+      return {
+        buildId: BUILD_ID,
+        bundleId: BUNDLE_ID,
+        loadedAt: LOADED_AT,
+        ...capabilityStatus(_hostCapability, _hostCapRaw, _hostCapError),
+        // 担保：一本可核对的账本 —— 提交的界 vs 实际兑现/越界
+        pledge: pledgeStatus(_hostPledge),
+        pledgeChanges: _pledgeChanges.slice(-10),
+        changes: _capChanges.slice(-10),
+        issuePaths: [
+          'setPrincipalCapability(cap) —— 宿主模块级导出（模型不可达）',
+          'WEIWEN_CAPABILITY=<json> —— 进程环境变量（启动进程者设定）',
+          'submit_pledge —— 被审方自提的担保（只能收窄，不能放宽）',
+          'WEIWEN_PLEDGE=<json> —— 宿主代提担保（进程环境变量）',
+        ],
+        note: '只读面：不产生 verdict、不写状态、不参与闸门。未签发时引擎行为与本判据出现前完全一致；签发后：刚性锚 deny 不变、出界必 review，只有"域内且无锚可归"的动作会由 review 变 allow（那是补上可验证的归属，不是放宽）。',
       };
     },
   }));

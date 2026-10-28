@@ -65,7 +65,7 @@ test('❶ wiring lock: the chain query reports the previous real action and name
   assert.ok(out.selfAuditTools.includes('query_conduction_chain'), 'the registry must contain the audit tool itself');
 });
 
-test('❷ registration and recording are one action: every registered tool is in the self-audit registry', async () => {
+test('❷ registration and recording are one action: the roster covers the read-only face, and the side-effecting face is named explicitly', async () => {
   const { ctx, tools } = mockCtx();
   apply(ctx);
   assert.ok(tools.length > 0, 'the adapter must register tools');
@@ -74,11 +74,29 @@ test('❷ registration and recording are one action: every registered tool is in
   const registered = tools.map((t) => t.name).sort();
   const recorded = [...out.selfAuditTools].sort();
 
+  // The read-only face = the roster (add and register are the same action inside registerSelfAuditTool).
+  assert.deepEqual(recorded, [...recorded].sort(), 'the roster must be de-duplicated and stable');
+  assert.ok(recorded.length > 0, 'the roster must not be empty');
+
+  // 🔴 Criterion upgraded 2026-10-28 (ported from the Chinese repo): "every registered tool ≡ the roster" is wrong.
+  //   Why: the roster exists to **exclude self-reference** (a self-audit tool must not report itself as the
+  //   object under audit). A tool with side effects — `submit_pledge` — **must stay inside the adjudication
+  //   chain**: it changes state, so hiding it from the chain is exactly the self-reference the roster prevents.
+  //   ⇒ The right criterion is: registered − roster = the **explicitly named** side-effecting face.
+  //   Any new tool that is not named here still turns this red, so the original intent of the lock
+  //   ("nobody adds a tool quietly") survives intact.
+  const SIDE_EFFECT_TOOLS = ['submit_pledge'];
+  const unexpected = registered.filter((n) => !recorded.includes(n));
   assert.deepEqual(
-    recorded,
-    registered,
-    'the self-audit registry must equal the set of registered tools exactly — a tool registered but not recorded is an invisible self-reference',
+    unexpected,
+    [...SIDE_EFFECT_TOOLS].sort(),
+    'a tool that is registered but absent from the self-audit roster must be named here explicitly (it is the side-effecting face and has to stay in the chain); if it is not named, suspect a quietly added tool',
   );
+  // Reverse direction: every name on the roster must actually be registered — an exclusion set holding a
+  //   name that does not exist is a lock that does not lock.
+  for (const n of recorded) {
+    assert.ok(registered.includes(n), `roster entry "${n}" must actually be registered`);
+  }
 });
 
 test('❸ with a history of only self-audit calls, the answer is null and says so — never a fabricated chain', async () => {

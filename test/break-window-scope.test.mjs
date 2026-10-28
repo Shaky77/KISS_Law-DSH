@@ -101,13 +101,14 @@ test('❹ counter-lock: the roster is not a catch-all — it holds only what the
   assert.ok(Array.isArray(st.selfAuditTools), 'the self-audit roster must be readable (otherwise "why is this one exempt" cannot be checked)');
   assert.ok(st.selfAuditTools.includes('query_steady_state'), 'a registered self-audit tool must be on the roster');
   assert.ok(!st.selfAuditTools.includes('write_file'), 'write tools must not slip into the self-audit roster');
-  // Roster ⊆ registered tools, and the difference must be exactly the side-effecting ones.
-  //   This is sharper than "counts are equal": equal counts only say the numbers match; naming the difference says
-  //   **who is excluded and why**.
+  // Roster ⊆ registered tools, and the difference must be exactly the side-effecting one (`submit_pledge`
+  //   registers straight through ctx.tools.register). Sharper than "counts are equal": equal counts only say
+  //   the numbers match; naming the difference says **who is excluded and why**.
   const registered = tools.map((t) => t.name).sort();
   const inRoster = new Set(st.selfAuditTools);
   const diff = registered.filter((n) => !inRoster.has(n));
-  assert.deepEqual(diff, [], `roster must cover every registered tool in this build, unexpected diff ${JSON.stringify(diff)}`);
+  assert.deepEqual(diff, ['submit_pledge'], `the difference between the roster and the registered set must be exactly the side-effecting tool; actual ${JSON.stringify(diff)}`);
+  assert.ok(!inRoster.has('submit_pledge'), 'submitting a pledge writes its own ledger ⇒ it must NOT enter the self-audit roster (otherwise it could borrow the exemption to slip past a broken window)');
 });
 
 test('❺ capped reading: the ledger keeps counting (streak truthful) but the threshold reading never says 7/5', () => {

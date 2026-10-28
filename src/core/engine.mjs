@@ -8,6 +8,11 @@
 import { BugStopGuard, bugKeyOf } from './bugstop.mjs';
 import { attributeCall, extractCommand, commandLayer, DELETION_LAYERS, GIT_DESTRUCTIVE, speechProfile, actionProfile, CONTAINER_VERBS, domainOf, declaredAnchors, scarUnanchored } from './attribution.mjs';  // + [2026-09-23 字典即S] commandLayer（破坏标记的唯一读法：字典词素 + 工具名封闭集，引擎只消费不自兜底）  // + [2026-09-20] 锚归属（痕锚：scar+无锚⇒review，coze/51 方向；判定逻辑归 attribution，引擎只消费）  // path-1 attribution + its deletion-layer set + git-destructive vocab + extractCommand + [2026-09-20] speech/action profile (知行合一轴; vocabulary owned by attribution; engine only consumes)
 import { R_DOMAIN, FRACTAL_PROPERTY } from './law.mjs';  // R 域刚性锚点常量 + 分形属性常量：destructive 检测须体现 R_DOMAIN 边界法则；跨调用组合须接 FRACTAL_PROPERTY 分形横向递归（接线，非加层）。[2026-09-24 同构回填 · base A → B] 旧注记的 "FRACTAL_PROPERTY cross-call recursion left as the next frontier" 至此交付。
+// [2026-10-28 · batch 4] 通行证（宿主签发的结构凭证）＋ 担保（被审方自陈的界）。
+//   判据与词汇归 capability，引擎只消费（与 attribution 同一种分工）：
+//   动作类封闭集、作用域归一、落点键表都只有一份定义，引擎不自带第二套。
+//   ⚠️ 两者字段同形、语义相反 —— 证是「谁批准」（宿主给的上限），担保是「谁承诺」（被审方自己交的下界）。
+import { parseCapability, capabilityVerdict, consume, parsePledge, pledgeVerdict, consumePledge, notePledgeBreach } from './capability.mjs';
 import { SAccountLedger, classifyReversibility, rDomainsForLayer } from './ledger.mjs';  // [2026-09-20] S 账本（用户账本模型）：R=字典 / SD=轴标记 / term 字典序索引 / S≠R 异类 / 疤窗可逆性。仅附加记录，不碰裁决核心。
 
 // [2026-09-18] R 域层级 → 权威权重（结构性推导，非枚举阈值、非拍脑袋数字）
@@ -283,6 +288,28 @@ function inferCategory(call) {
     return 'exec';
   }
   return 'other';
+}
+// 🔴 [2026-10-28 · ported from the Chinese repo · structural unification] "Irreversibility" is **one criterion**,
+//   not one copy per gate. Measured on the same day: `extractPath` (field whitelist) and `_sh12LocKeyShape`
+//   (morpheme form) gave opposite answers for the same call ⇒ write operations passed unconditionally.
+//   ⇒ Defined here, **single source**: the adapter's window police and every engine gate share it.
+//   Use: it decides **how hard to look**. Irreversible actions require attribution and evidence; reversible or
+//   read-only actions do not — which neither treats "did not look" as "nothing wrong" (fail-open) nor turns a
+//   read-only call into a block (false hit).
+const IRREVERSIBLE_CATS = new Set(['write', 'exec-destructive', 'exfil', 'exfil-net']);
+// Destructive morphemes (illustrative, not an exhaustive list): match the **morpheme**, not the whole name, so any
+//   naming the host chooses still hits. Deliberately excludes exec|shell|bash|pwsh|cmd|run|spawn — those are
+//   **execution channel names** (they can run commands), not **action intent** (they want to destroy); including
+//   them would judge "list a directory with pwsh" as irreversible ⇒ read-only calls would also demand attribution
+//   and evidence (a measured false hit). Channels are judged by inferCategory reading the **command content**.
+const IRREVERSIBLE_VERB = /(delete|remove|write|edit|create|drop|destroy|truncate|purge|wipe|overwrite|rename|move|chmod|chown|send|upload|post|put|patch)/i;
+export function isIrreversible(call) {
+  const cat = inferCategory(call);
+  if (IRREVERSIBLE_CATS.has(cat)) return true;
+  if (cat === 'read') return false;                      // explicitly read-only ⇒ reversible
+  const name = String(call?.name ?? '');
+  const action = typeof call?.args?.action === 'string' ? call.args.action : '';
+  return IRREVERSIBLE_VERB.test(name) || IRREVERSIBLE_VERB.test(action);
 }
 function inferCallSemantics(call, ctx = {}) {
   const category = inferCategory(call);
@@ -1440,7 +1467,30 @@ export class WeiwenLawEngine {
 
   // ---------- H inner-H non-intrusion: any read/write of subjective black box is rejected; outer-H audit allowed ----------
   checkInnerH(call) {
-    const s = stripZeroWidth(JSON.stringify(call ?? ''));
+    // 🔴 [2026-10-28 · range of the content gate] An action that only writes its own ledger, and can only
+    //   narrow itself, does **not** enter this gate.
+    //   Symptom (measured by an external agent, reproduced locally): a pledge's `reason` has to say why the
+    //   scope is needed; the moment it reads like a plan — "deduction: first read …, then modify …" or
+    //   "steps: 1… 2…" — it hits LABEL_ACTION_ZH ⇒ review ⇒ deny outside. **The system asks for a reason,
+    //   then treats a reason shaped like a plan as an injection.** That loop pushes the agent into not
+    //   writing reasons at all (marked ungrounded), and an ungrounded pledge is weaker for audit, not stronger.
+    //   Why this is not a back door: the action's effect surface is its own ledger (no disk, no send, no
+    //   exec), and `narrowPledge` always compares through `isNarrower` ⇒ it can only tighten and cannot
+    //   produce a new permission. Auditing an action that cannot move the world only produces false hits.
+    //   Range is drawn by "can this change or read the outside world" — the same rule as the broken-window range.
+    if (this._declOf(call)?.effect === 'self-ledger') return null;
+    // 🔴 [2026-10-28 · real-API measurement] Engine metadata does not enter the content gate.
+    //   Symptom (K4): with a pledge in force, `query_capability` was denied at H — "content carries the form of
+    //   operational instructions". What it was scanning was `call.pledge.reason`: the audited party telling the
+    //   engine **why it needs this scope**, not external data. The content gate's range is **external input**
+    //   (can it rewrite the subject's behaviour); a self-declared bound is neither external nor landed nor sent
+    //   anywhere ⇒ outside that range.
+    //   ⚠️ Only `pledge` is stripped (new in this batch, and it carries free text). Not a single field of `args`
+    //     is touched — the criteria below still see the real arguments.
+    const _scanCall = call && typeof call === 'object' && 'pledge' in call
+      ? (() => { const { pledge: _omit, ...rest } = call; return rest; })()
+      : call;
+    const s = stripZeroWidth(JSON.stringify(_scanCall ?? ''));
     if (isOuterHAudit(s)) return null; // outer-H audit behavior: white-box observable, allowed (H dual identity · outer.auditable)
     // Write-disk tools (write_file/edit/write): content is "landed data" not "exec instruction" —
     // Same philosophy as the deduction-layer landing criterion: whether text gets executed depends on its sink; writing an ordinary file has no execution sink,
@@ -1920,8 +1970,20 @@ export class WeiwenLawEngine {
     if (!decl || typeof decl !== 'object' || typeof decl.verb !== 'string') return false;
     const ALLOWED = new Set(['read', 'write', 'delete', 'exec', 'send']);
     if (!ALLOWED.has(decl.verb)) return false;
+    // [2026-10-28 · outer-H boundary: effect declaration]
+    //   `effect: 'self-ledger'` = this action **writes only its own ledger**: no disk, no send, no exec,
+    //   nothing in the outside world changes — and (guaranteed by `narrowPledge`) it can only narrow
+    //   itself, so it can never produce a new permission.
+    //   ⇒ such a call does not enter the content gate (see the first line of `checkInnerH`). The reason is
+    //     not "it is trustworthy" but **it cannot move the world**: range is drawn by "can this change or
+    //     read the outside world", not by "did I remember to make an exception for it".
+    //   ⚠️ The declaration exists only on the deployment side (this method and the constructor); the
+    //     audited agent cannot supply this field.
+    const ALLOWED_EFFECT = new Set(['self-ledger']);
+    if (decl.effect !== undefined && !ALLOWED_EFFECT.has(decl.effect)) return false;
     this.toolDecls.set(name, {
       verb: decl.verb,
+      ...(decl.effect ? { effect: decl.effect } : {}),
       ...(decl.noun ? { noun: String(decl.noun) } : {}),
       ...(decl.reversible !== undefined ? { reversible: !!decl.reversible } : {}),
       ...(decl.note ? { note: String(decl.note) } : {}),
@@ -2467,7 +2529,148 @@ export class WeiwenLawEngine {
     //     在坐标图**外**）就出来了。⇒ 故 **review 的理由是"未来无法验证"，不是"引擎判不出"**
     //     （措辞按此校正，免得把**边界**说成**缺陷**）。坐标图**内**才是唯稳律的工程场：
     //     场外的东西只负责交回，不负责补造（⇒ 不在图内凭空补一个"在飞态"字段去装图外的答案）。
-    const scar = scarUnanchored(call, attrib, this.anchorPool);
+    // ═══ [2026-10-27 · 通行证（宿主签发的结构凭证）· 位置＝痕锚归属之前 ═══
+    //   为何放在这里（顺序即语义）：
+    //     · 之后 —— 刚性锚 R 已 deny（`rm -rf /` 一类，证**不能**把它放行）；
+    //     · 之前 —— 痕锚归属判的是「归属能不能被猜出来」，凭证判的是「归属有没有人认领」。
+    //       凭证**在场且覆盖**时，归属不再靠猜（`declaredAnchors` 抽不出相对前缀，抽歪就自动放宽）；
+    //       凭证**在场但不覆盖**时，必须 review（越出授权面），而不是退回"猜"。
+    //   三态缺省方向（对照 scar 的"表外 ⇒ review"）：
+    //     absent（未签证书 / 证未列该动作类）⇒ 本判据不介入，行为与本判据出现前**一字不变**（零回归）；
+    //     pass ⇒ 记一次使用后跳过痕锚猜测；fail ⇒ review。
+    //   ⇒ 不变式（两条，可测）：① 刚性锚 deny 永不被证改变（证不买通客观规则）；
+    //     ② 出界必 review（无证时为 allow 的普通写/外传，越出证域即被拦下 —— 这是本判据的主效力）。
+    //     ⚠️ 域内且无锚可归的删除/破坏会从 review 变 allow —— 那不是放宽，是"无人认领→有人认领"
+    //        （review 的正当理由是"归属未来无法验证"，证签了即当场可验）。
+    // 🔴 [2026-10-28 · real-API measurement, two scenarios both hit it] An action that only writes its own
+    //   ledger — submitting or narrowing a pledge — does **not** go through the authorisation reconciliation.
+    //   It is not "spending an authorisation to do work"; it is "handing in or swapping a promise".
+    //   Without this exemption the mechanism locks itself: `submit_pledge` is declared `verb:'read'`, so the
+    //   moment the current pledge does not list `read`, **the very act of narrowing the pledge is judged a
+    //   breach** ⇒ the pledge can never be changed again ⇒ "it may only narrow" collapses, because narrowing
+    //   itself is what got locked out. (Measured: second submit in K3, first submit in K4 — both deny/R.)
+    //   Why this opens no hole: `narrowPledge` always compares through `isNarrower` ⇒ it cannot produce a new
+    //   permission; and the content gate already exempts it on the same ground (it cannot move the world).
+    //   第三面（同一晚实测到的）：**自查只读工具**也没有落点 —— 它读自己的账，不加载荷。
+    //   若把它送进对账，`pledgeVerdict` 会得到"目标不可判" ⇒ unknown ⇒ review ⇒ 对外 deny
+    //   ⇒ 担保一生效，agent 连"我现在承诺了什么"都问不出来（账面不对称：承诺可见、履行不可见）。
+    //   射程仍按同一条原则划：**能不能改变/读取外部世界**。自查读的是本进程的账本，不是外部。
+    const _noAuthReconcile = this._declOf(call)?.effect === 'self-ledger' || this.isSelfAuditTool(call?.name);
+    const capRaw = _noAuthReconcile ? null : (call?.taskCapability ?? null);
+    let cap = null, capParseErr = null, capVerdict = null;
+    if (capRaw) {
+      const parsed = parseCapability(capRaw);
+      if (!parsed.ok) {
+        // 证在场但不可解析 ⇒ **不得**当成"没签证书"（那会把一个错误的配置静默变成放任）
+        this._mark('R', {
+          step: '划定边界 · 通行证（授权面是否可判）',
+          hit: true,
+          cuts: true,
+          note: `宿主签发的通行证不可解析：${parsed.why} ⇒ 授权面不可判`,
+        });
+        return {
+          kind: 'review',
+          law: 'R',
+          reason: `宿主签发的通行证不可解析（${parsed.why}）⇒ 授权面不可判 ⇒ 返回人类裁决，不猜`,
+          attrib,
+          deduced: true,
+          capability: { state: 'invalid', why: parsed.why },
+        };
+      }
+      cap = parsed.cap;
+      capVerdict = capabilityVerdict({ call, layer: attrib?.layer ?? null, cap });
+      this._mark('R', {
+        step: '划定边界 · 通行证（动作类 × 作用域 × 次数/到期）',
+        hit: capVerdict.state === 'fail',
+        cuts: capVerdict.state === 'fail',
+        targets: capVerdict.targets ? capVerdict.targets.values : null,
+        note: `${capVerdict.state} · ${capVerdict.why}`,
+      });
+      if (capVerdict.state === 'fail') {
+        return {
+          kind: 'review',
+          law: 'R',
+          reason: `通行证不覆盖本次动作（${capVerdict.why}）⇒ 越出授权面 ⇒ 未来无法验证其归属 ⇒ 返回人类裁决`,
+          attrib,
+          deduced: true,
+          capability: capVerdict,
+        };
+      }
+      // pass 才计数（fail 不消耗次数：被拦下的动作没有发生，记了会把次数耗在没做的事上）
+      if (capVerdict.state === 'pass') consume(cap, { action: capVerdict.action, targets: capVerdict.targets.values });
+    }
+    // ═══ 担保对账（安 2026-10-28）：被审方自己提交的「界」，核的是"谁承诺了什么、做到了没有" ═══
+    //   与通行证的分工：证回答**谁批准**（授权面），担保回答**谁承诺**（承诺面）。
+    // 🔴 引擎侧只允许担保**做减法**：pass 只记一次兑现，**不跳任何后续判据**（不跳痕锚、不跳推演）
+    //    ⇒ 担保在结构上不可能放宽授权 —— 它没有"放行"这个出口，只有"拒绝"和"记账"。
+    // 🟡 未达不判：本段只在**动作发生时**判越界，从不事后追问"担保内的事你做完没有"
+    //    （为什么没做完落在内 H，不可观测；拿不可观测的量做闸门 = XSUB-10 的老病）。
+    const pledgeRaw = _noAuthReconcile ? null : (call?.pledge ?? null);
+    let pledge = null, pledgeV = null;
+    if (pledgeRaw) {
+      const parsedP = parsePledge(pledgeRaw);
+      if (!parsedP.ok) {
+        // 同通行证的处理：给了一份读不懂的担保 ⇒ 承诺面不可判 ⇒ 交人，**不得静默当没提**
+        this._mark('R', { step: '划定边界 · 担保（自陈的界是否可判）', hit: true, cuts: true, note: `担保不可解析：${parsedP.why}` });
+        return {
+          kind: 'review',
+          law: 'R',
+          reason: `被审方提交的担保不可解析（${parsedP.why}）⇒ 承诺面不可判 ⇒ 返回人类裁决，不猜`,
+          attrib,
+          deduced: true,
+          pledge: { state: 'invalid', why: parsedP.why },
+        };
+      }
+      pledge = parsedP.pledge;
+      pledgeV = pledgeVerdict({ call, layer: attrib?.layer ?? null, pledge });
+      this._mark('R', {
+        step: '划定边界 · 担保对账（自陈的界 vs 本次动作）',
+        hit: pledgeV.state === 'breach',
+        cuts: pledgeV.state === 'breach',
+        targets: pledgeV.targets ? pledgeV.targets.values : null,
+        note: `${pledgeV.state} · ${pledgeV.why}`,
+      });
+      if (pledgeV.state === 'breach') {
+        // 越界 ⇒ **立刻拒绝这次动作**（动作没有发生）＋ 第一 Bug 计数 +1。
+        //   ⚠️ 为什么是"拒动作 + 计偏离"，不是当场置 windowBroken：
+        //      单次越界可能是我方判据误差（铁律 #11「先取证，不许推理定案」），一次就断窗会把工程问题
+        //      变成会话死锁（须人工 heal）⇒ 防线自己成了故障源。而"拒绝这次动作"本身已兑现"立刻阻止"。
+        //      连续越界累积到**既有**阈值 mHumanCap/maxFailureStreak 即自动停机 —— 用现成阈值承载，不新拍阈值。
+        notePledgeBreach(pledge, { action: pledgeV.action, targets: pledgeV.targets?.values ?? [], why: pledgeV.why });
+        this.failureStreak += 1; // 与 R 命中同权：违背自陈担保是确定的偏离，不是灰区
+        const mkP = this._markIntercept(call, bugKeyOf(call));
+        if (mkP.human) {
+          return this._toHuman({ law: 'R', bugKey: bugKeyOf(call), closedLoop: false, systemKey: mkP.systemKey, call,
+            reason: `同一系统「${mkP.systemKey}」违背自陈担保累计 ${mkP.sysCount} 次，达封顶 ${mkP.cap}：AI 停止纠结，转人工决策` });
+        }
+        return {
+          kind: 'deny',
+          law: 'R',
+          reason: `违背自陈担保（${pledgeV.why}）⇒ 越界动作已拒（第一 Bug 计数 ${this.failureStreak}，达阈即断窗止损）`,
+          attrib,
+          deduced: true,
+          pledge: pledgeV,
+          mMark: mkP,
+        };
+      }
+      if (pledgeV.state === 'unknown') {
+        // 判不出 ≠ 越界：目标不可判 ⇒ 无从核对 ⇒ 交人（既不当越界处置，也不静默放过）
+        return {
+          kind: 'review',
+          law: 'R',
+          reason: `担保在场，但本次动作核对不了（${pledgeV.why}）⇒ 判不出即交还，不猜`,
+          attrib,
+          deduced: true,
+          pledge: pledgeV,
+        };
+      }
+      // pass 只记兑现；expired 只说明担保失效（到期 ≠ 违背）—— 两者都不放行、不放宽
+      if (pledgeV.state === 'pass') consumePledge(pledge, { action: pledgeV.action, targets: pledgeV.targets.values });
+    }
+    // 证已放行 ⇒ 归属已有人认领，不再走痕锚猜测；否则照旧（行为零回归）
+    //   ⚠️ 这一行是「证 pass 的效力落点」，漏了它＝证只在判据里 pass、在判决上无效：
+    //     域内的破坏类动作仍会因"无锚"被 review（移植时真踩到，tests 8/10 顶出来的）。
+    const scar = capVerdict && capVerdict.state === 'pass' ? null : scarUnanchored(call, attrib, this.anchorPool);
     this._mark('R', {
       step: '划定边界 · 痕锚归属（不可逆动作的归属是否可在未来被验证）',
       hit: !!scar,
