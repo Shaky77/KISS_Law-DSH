@@ -55,7 +55,16 @@ function _sh12PayloadPresent(call) {
   return false;
 }
 // 键名「像在指定位置」——词素（例示，非完备清单；不在表内者落入安全侧：收）
-const _SH12_LOC_KEY = /(path|file|dir|folder|target|url|uri|endpoint|bucket|resource|doc)/i;
+// [2026-10-28 · add pattern/glob/cwd/prefix] The old table knew only path/file/dir/folder/target/url/…, with no
+//   **search-pattern** keys ⇒ `glob{pattern:'src/**'}` (no path key) was judged "no position quantity" ⇒ review.
+//   Measured: xiaoD's real call was `glob{pattern:'**/*.md', path:'…'}` (it scraped through thanks to `path`),
+//   while the pure-pattern form (the common spelling for fetch/grep) was blocked every time ⇒ **a landing-point
+//   key whitelist is itself a word-form enumeration**.
+//   pattern/glob/cwd carry exactly "where to look", which is landing-point semantics ⇒ they belong in the table.
+// ⚠️ This is the **same semantic class** as attribution.mjs's SLOT_PATH; the two must always change together
+//   (criterion split has happened here once before: a field whitelist and a morpheme-shape check gave opposite
+//   verdicts for the same call ⇒ writes were always released). Unifying them into a single source is a 0.3.0 item.
+const _SH12_LOC_KEY = /(path|file|dir|folder|target|url|uri|endpoint|bucket|resource|doc|pattern|glob|cwd|prefix)/i;
 function _sh12LocKeyShape(call) {
   let hit = false;
   const walk = (o, d) => {
@@ -336,8 +345,48 @@ function inferCallSemantics(call, ctx = {}) {
 //   H₀ → S₀(S₀+1)   ← S-increment path (steady-state increment, pure white box)
 //   H₀ → D₀(D₀+1)   ← D-increment path (=|S-1| absolute steady-state erosion)
 // Both paths run simultaneously and merge into M₀(M+1) (independent event sedimentation); final S forks again {S₀(S₀+1)/S₀(S₀-1)} for comparison.
+// ---------------- Deduction premise: which anchor the forward simulation runs on ----------------
+const PREMISE = { VACUUM: 'vacuum', ANCHORED: 'anchored', NO_ANCHOR: 'no-anchor' };
+/** Is the payload empty (vacuum criterion)? `bash{command:''}` counts as vacuum: the key exists, its content is empty — counting keys alone gets it wrong. */
+function isVacuous(call) {
+  const isEmpty = (v) => v === null || v === undefined || v === ''
+    || (Array.isArray(v) && v.length === 0)
+    || (typeof v === 'object' && !Array.isArray(v) && Object.keys(v).length === 0);
+  return Object.values(call?.args ?? {}).every(isEmpty);
+}
+function inferencePremise(s, call, decl = null) {
+  if (call && isVacuous(call)) {
+    return { ok: true, code: PREMISE.VACUUM,
+      note: '真空（无载荷）：无作用对象 ⇒ 无需推演，S 持平、M 未变' };
+  }
+  // 🔴 [2026-10-26 · path 2 takes path 1's anchor] The anchor's criterion source is **the attribution layer
+  //   `attributeCall`**, not `inferCategory`.
+  //   Origin (quoted from attribution.mjs's file header):
+  //     "Path 1 (fractal-property attribution): first work out 'what action is this', and expose the
+  //      attribution as the **anchor**; path 2 (deduce from the anchor): **take the anchor** and run the
+  //      deduction (the engine's existing deduceRisk / simulateBranch)."
+  //   Measured (2026-10-26): the two paths each had their own attribution source and gave opposite conclusions
+  //   for the same tool —
+  //     `fs_write` / `delete_file`: inferCategory ⇒ 'other' (the deduction layer idles)
+  //                                attributeCall  ⇒ file-write / file-delete (anchor present)
+  //   ⇒ The deduction layer had been using **its own table** as the anchor instead of the anchor path 1 hands
+  //     it — the third instance of "criterion split" (the first two: extractPath's whitelist vs the morphemes;
+  //     inferCategory vs attributeCall, here).
+  //   Why it must attach to the attribution layer: a bare `inferCategory='other'` may mean either "the name is
+  //     not in the table" or "it is genuinely neutral", and those two have opposite defaults; the attribution
+  //     layer has already settled the question (`ok` / `layer`) ⇒ single source.
+  const anchored = call
+    ? (() => { try { return attributeCall(call, decl).ok === true; } catch { return false; } })()
+    : !!(s?.category && s.category !== 'other');
+  if (!anchored) {
+    return { ok: false, code: PREMISE.NO_ANCHOR,
+      note: '锚不在场（路径1 归不出动作类别）⇒ 推演无参照线：本层未产生判据，S/M 变化未测（≠ 无风险）' };
+  }
+  return { ok: true, code: PREMISE.ANCHORED, note: null };
+}
+
 // simulateBranch: given semantics, simulate the final S of "a single branch". kind='S+1' is S-increment path, 'D-1' is D-increment (erosion) path.
-function simulateBranch(s, kind) {
+function simulateBranch(s, kind, premise = inferencePremise(s)) {
   if (kind === 'S+1') {
     // S-increment path: assume call accepted as steady-state increment. Only truly +1 when call is purely steady-state (no risk signal).
     // Premise: auditability is the precondition for S to hold —
@@ -349,8 +398,12 @@ function simulateBranch(s, kind) {
     const auditable = !opaque;
     const purelyBenign = auditable && !s.isCred && !s.isSystem && !s.isExternal && !s.hitsInnerH && !s.isAuthSink;
     return {
-      path: 'S+1', finalS: purelyBenign ? +1 : 0,
+      // 🔴 Three-state premise: vacuum (no payload) ⇒ the conclusion stands on its own, +1 allowed; anchor
+      //   absent ⇒ idling, +1 must not be given.
+      path: 'S+1', finalS: (purelyBenign && premise.ok) ? +1 : 0,
+      premise,
       ...(auditable ? {} : { note: '执行内容不可审计（不透明源/未知变量/引用本会话写入文件/跨调用敏感源→汇组合）→ 无法证明稳态增量，S+1 不成立' }),
+      ...(premise.ok ? {} : { note: `${premise.note} ⇒ S+1 的 +1 未成立（空转，非增益）` }),
     };
   }
   // D-1 path (=|S-1|): assume call triggers damage. Erosion amount graded by risk-signal severity (objective structure, not enumerating specific values).
@@ -374,7 +427,18 @@ function simulateBranch(s, kind) {
   if (s.isCredWrite) return { path: 'D-1', finalS: -2, note: '写凭据存放位（篡改/植入身份凭据），需人工确认' };
   if (s.isSystem && ['read', 'write', 'exec', 'exec-destructive'].includes(s.category)) return { path: 'D-1', finalS: -1, note: '系统信息泄露/完整性受损' };
   if (s.hasOpaqueVar) return { path: 'D-1', finalS: -1, note: '执行内容含未知变量引用，值不可审计（无法证明无风险）' };
-  return { path: 'D-1', finalS: 0 };
+  // 🔴 [2026-10-26] This last cell is the **default** of the "assume damage" branch. It used to be `finalS: 0`
+  //   with no note ⇒ reading identical to "the deduction ran and confirmed no erosion" (acheng's 81 criterion
+  //   landed exactly on this cell; he only guessed the position at another exit). The default value itself was
+  //   not wrong (0 = no erosion entry matched); what was wrong is that it **did not say whether it was derived**:
+  //     · anchor present (category attributable) ⇒ 0 is a conclusion: the erosion entries were checked, none
+  //       matched ⇒ no erosion.
+  //     · anchor absent (category='other') ⇒ 0 is idling: not one erosion entry was ever asked ⇒ **untested**.
+  return {
+    path: 'D-1', finalS: 0,
+    premise,
+    ...(premise.ok ? { note: '侵蚀条目已逐条比对，无一命中 ⇒ 无侵蚀（结论）' } : { note: `${premise.note} ⇒ 0 是空转缺省，非"无侵蚀"结论` }),
+  };
 }
 
 // ---------------- Default R rigid-anchor policy (concrete criterion examples) ----------------
@@ -1151,6 +1215,20 @@ export class WeiwenLawEngine {
     this.anchorPool = { paths: new Set(), nouns: new Set() };
     // 锚源自报（白箱可观）：实机可查"结构入口有没有接通 / 池里有什么"，把"猜字段名"换成"看事实"。
     this.anchorChannel = { utteranceSeen: false, principalAnchorSeen: false, lastPrincipalAnchor: null, poolPaths: [], poolNouns: [] };
+    // [2026-10-28 · layer two: the trusted declaration channel] name -> {verb, noun?, reversible?, note?}
+    //   Why it is needed: a tool name is a **word form** (`glob` / `grep` / `list_dir` contain no action word),
+    //   and argument shape is **one-to-many** (`glob{pattern}` and `delete_matching{pattern}` share a shape) ⇒ the
+    //   engine cannot judge by either route ⇒ everything gets referred.
+    //   Yet the host **already knows** whether the glob it registered is read-only — making the engine guess from
+    //   the name throws away known information and then guesses it back.
+    //   🔴 The write channel exists only in the **constructor** and in `declareTool()`, and **never in
+    //     decideToolCall's call argument** — otherwise the audited agent ships `{'verb':'read'}` and authorises
+    //     itself (structurally the same as "speech never enters the anchor pool": self-report cannot be an
+    //     authorisation source).
+    //   ⚠️ State the capability boundary plainly: the engine cannot verify that a declaration really came from the
+    //     host. Real isolation lives at the deployment layer (the agent cannot reach the engine instance). What is
+    //     guaranteed here is only the **interface shape**: the agent cannot slip one in as a side effect.
+    this.toolDecls = new Map(Object.entries(opts.toolDeclarations ?? {}));
     // [2026-09-24 · by-chain repair] Conduction-chain marks of the current decision (R→S→D→H→M),
     //   rebuilt on every decideToolCall. See _mark / _conductionSnapshot below.
     this.conduction = [];
@@ -1684,8 +1762,11 @@ export class WeiwenLawEngine {
     //   the downstream half was covered and the upstream break was invisible.
     //   This also restores deduceRisk's documented contract (adapter src/index.js: "pure read, safe to recompute").
     // H fork: S-increment path + D-increment(erosion) path simulated simultaneously (parallel, not either-or)
-    const bS = simulateBranch(s, 'S+1');
-    const bD = simulateBranch(s, 'D-1');
+    // 🔴 [2026-10-26] Premise computed first, then fed to both paths: when the anchor is absent, neither path's
+    //   default value is a conclusion (see inferencePremise).
+    const premise = inferencePremise(s, call, this._declOf(call));
+    const bS = simulateBranch(s, 'S+1', premise);
+    const bD = simulateBranch(s, 'D-1', premise);
     // Both paths merge into M (independent event sedimentation, manuscript: M₀(M₀+1))
     const m = { m: 1, branches: { bS, bD } };
     // Final S comparison (manuscript: {S₀(S₀+1) / S₀(S₀-1)}).
@@ -1699,8 +1780,14 @@ export class WeiwenLawEngine {
         reason: `推演判定高风险（D 路径确定性侵蚀 S）：${bD.note || '凭据/内H/外传'}` };
     }
     if (erosion < 0 || !sOk) {
-      return { verdict: 'review', m, branches: { bS, bD }, deduced: true,
-        reason: `推演判定中风险（${!sOk ? 'S+1 不成立：无法证明稳态增量' : `D 路径轻度侵蚀 S：${bD.note || '灰区'}`}）：建议限权/二次确认` };
+      // 🔴 [2026-10-26] When the premise is missing, **name the missing premise** instead of saying vaguely
+      //   "S+1 does not hold": the latter reads as "the deduction ran and found medium risk", while the truth is
+      //   "the deduction never started". (Feedback measured: an external auditor could not reverse-engineer the
+      //   rule from that kind of receipt ⇒ every reading must be attributable to a specific layer.)
+      return { verdict: 'review', m, branches: { bS, bD }, deduced: true, premise,
+        reason: !premise.ok
+          ? `推演未产生判据（${premise.note}）：交还人工，建议限权/二次确认`
+          : `推演判定中风险（${!sOk ? 'S+1 不成立：无法证明稳态增量' : `D 路径轻度侵蚀 S：${bD.note || '灰区'}`}）：建议限权/二次确认` };
     }
     // [2026-09-26 · reason corrected] No action text ⇒ state it **truthfully** instead of reusing "S+1 path holds".
     //   Author's basis: "Empty — no context, merely empty. By Weiwen's Law inference it has no fluctuation, it stays
@@ -1729,12 +1816,35 @@ export class WeiwenLawEngine {
       //      take it**) into review as well. ⇒ A correct fix must **carry a gate**: first decide whether the
       //      object falls within this layer's remit (out-of-reach vs not-involved); **only when the remit holds
       //      and the layer is out of reach** should it be review. ⇒ See the corrected `XSUB-10` entry in `deployment.md`.
-      return { verdict: 'allow', m, branches: { bS, bD }, deduced: true,
-        reason: '无扰动入基线（未抽到动作文本）：S 持平、M 未变 ⇒ 无风险，放行' };
+      // ── 🔴 [2026-10-26 · deduction-premise closure] This exit must state whether this cell was **derived** or
+      //   **idling**. See the premise note above simulateBranch and the measured probe:
+      //   `glob{pattern}` / `grep{pattern,path}` land here or on the next cell, and the old wording always said
+      //   "no perturbation ⇒ no risk" / "the S+1 path holds", when in fact **category='other' ⇒ signals are
+      //   permanently false**.
+      //   ⚠️ The **verdict is still unchanged**: the anchor-present endgame belongs to the attribution layer
+      //   (`!attrib.ok ∧ hasPayload ⇒ review`); deducting again here would hurt vacuum samples. Only the **reading**
+      //   changes, so "untested" no longer displays as "zero risk" (iron law: untested ≠ zero).
+      // The vacuum criterion is **an empty payload**, not "zero keys": `bash{command:''}` has one key whose content
+      //   is empty, and that was the 09-26 sample ("empty, no context, merely empty") ⇒ counting keys alone would
+      //   classify that as "an object is present".
+      const isEmptyPayload = (v) => v === null || v === undefined || v === ''
+        || (Array.isArray(v) && v.length === 0)
+        || (typeof v === 'object' && !Array.isArray(v) && Object.keys(v).length === 0);
+      const noObject = Object.values(call?.args ?? {}).every(isEmptyPayload);
+      if (noObject) {
+        return { verdict: 'allow', m, branches: { bS, bD }, deduced: true, premise,
+          reason: '无扰动入基线（真空：无作用对象可审）：S 持平、M 未变 ⇒ 无风险，放行' };
+      }
+      return { verdict: 'allow', m, branches: { bS, bD }, deduced: true, premise,
+        reason: '本层未取得作用对象（未抽到 shell 命令 / 文件落点）⇒ 推演未产生判据：S/M 变化未测（≠ 无风险）' };
     }
     // Both hold (S+1=+1 and D erosion=0) → risk=0 < Weiwen's Law < steady-state strictly holds → allow
-    return { verdict: 'allow', m, branches: { bS, bD }, deduced: true,
-      reason: '推演判定低风险（S 增路径成立、D 路径无实际侵蚀）：放行并累积 S' };
+    // 🔴 Same as above: when `premise.ok === false`, S+1's +1 and D-1's 0 are both idling defaults, and must not be
+    //   stated as "the S+1 path holds" — that sentence is a **true lie** (verifiable as true, false as a whole).
+    return { verdict: 'allow', m, branches: { bS, bD }, deduced: true, premise,
+      reason: premise.ok
+        ? '推演判定低风险（S 增路径成立、D 路径无实际侵蚀）：放行并累积 S'
+        : `推演未产生判据（${premise.note}）⇒ 本格放行依据不来自推演层` };
   }
 
   // ---------- M sedimentation: both deduction-layer branches merge into M (independent event, append-only history scars) ----------
@@ -1745,6 +1855,41 @@ export class WeiwenLawEngine {
       ts: Date.now(), role: 'cross-check-baseline',
     });
     return this.snapshot();
+  }
+
+  // ---------- Trusted declaration channel (layer two · 2026-10-28) ----------
+  // The host **already knows** whether the tool it is registering reads, writes or deletes; let it say so rather
+  //   than making the engine guess from the name.
+  //   Origin: `glob` / `grep` / `list_dir` carry no action word ⇒ nameLayer returns null ⇒ everything is referred;
+  //   and argument shape is one-to-many (`glob{pattern}` vs `delete_matching{pattern}`) ⇒ shape cannot determine
+  //   the layer either. ⇒ The only testimony that stands is a declaration.
+  // 🔴 Why a method and not a parameter of decideToolCall: what the audited agent controls is the call (with its
+  //   args). If the declaration could be read from the call, it would ship `{'verb':'read'}` and authorise itself.
+  //   A declaration can only be written by **deployment-side code**.
+  /** Register one tool declaration. @returns {boolean} whether it was accepted */
+  declareTool(name, decl) {
+    if (typeof name !== 'string' || !name.trim()) return false;
+    if (!decl || typeof decl !== 'object' || typeof decl.verb !== 'string') return false;
+    const ALLOWED = new Set(['read', 'write', 'delete', 'exec', 'send']);
+    if (!ALLOWED.has(decl.verb)) return false;
+    this.toolDecls.set(name, {
+      verb: decl.verb,
+      ...(decl.noun ? { noun: String(decl.noun) } : {}),
+      ...(decl.reversible !== undefined ? { reversible: !!decl.reversible } : {}),
+      ...(decl.note ? { note: String(decl.note) } : {}),
+    });
+    return true;
+  }
+  /** Bulk registration: { name: {verb,...} } */
+  declareTools(map) {
+    let n = 0;
+    for (const [k, v] of Object.entries(map ?? {})) if (this.declareTool(k, v)) n++;
+    return n;
+  }
+  /** The declaration for this call (null if none). Every attributeCall site goes through this one entry, preventing criterion split. */
+  _declOf(call) {
+    const n = call?.name;
+    return (n && this.toolDecls?.get(n)) || null;
   }
 
   // ---------- Pre-tool-call grand adjudication (corresponds to DSH tools/pre-execute) ----------
@@ -2143,7 +2288,7 @@ export class WeiwenLawEngine {
     // hand back to human.
     // e.g. deploy_keylogger{config:{target:HOST}} hides the threat inside the tool implementation, unreachable from
     // the parameter side; previously allow (blind spot), now closed to review.
-    const attrib = attributeCall(call);
+    const attrib = attributeCall(call, this._declOf(call));
     this._mark('R', {
       step: '划定边界 · 动作归因（分形子项 m 果）',
       ok: attrib.ok, layer: attrib.layer, method: attrib.method,
@@ -2158,14 +2303,56 @@ export class WeiwenLawEngine {
     if (pend >= 0) this.conduction[pend] = { v: 'D', step: '进入基线的扰动 · 本次扰动（相对 S 基线）', ...intr };
     if (!attrib.ok) {
       // fractal sub-item m result = un-anchorable: action category unjudgeable ⇒ iron law "can't judge → review, don't guess".
-      // attach attrib + fractalSubM:true to mark this as a "fractal sub-item level" trigger, not a whole-chain deduction conclusion.
-      return {
-        kind: 'review',
-        law: 'R',
-        reason: `path-1 attribution anchor failed (name=${call?.name ?? ''} neutral or no observable behavior): action category unjudgeable, hand back to human, don't guess`,
-        attrib,
-        fractalSubM: true,
-      };
+      // attach attrib + fractalSubM:true to mark this as a "fractal sub-item level" trigger, not a whole-chain conclusion.
+      //
+      // ⚠️ I first wrote the gate as "irreversible ⇒ review / reversible ⇒ no attribution needed", and the
+      //   regression suite rejected it on the spot (three safety cases turned allow):
+      //   `deploy_keylogger{target:HOST}` cannot be attributed ⇒ my `isIrreversible` also cannot attribute it ⇒
+      //   'other' ⇒ treated as "reversible" ⇒ **missed**. ⇒ This is the same defect wearing new clothes: **treating
+      //   "I don't know" as "no risk"** (it used to sit in the "no target extracted ⇒ no perturbation ⇒ allow"
+      //   cell). Moving a mistake does not fix it.
+      //   ⇒ The correct gate is **whether there is anything to audit** (structural; same origin as the window
+      //   police's "vacuum requires no physical evidence"):
+      //     · **Vacuum** (no arguments) ⇒ no object to audit ⇒ attribution not required, continue with the ordinary
+      //       deduction. Measured samples: `list_rigid_anchors{}` / `query_bugstop{}` (a self-inspection tool
+      //       refused by itself = the more you look, the blinder you get).
+      //     · **Has arguments but cannot be attributed** ⇒ I know it will touch something, but not what ⇒
+      //       **review (do not guess)**. Measured samples: `deploy_keylogger{target:HOST}` / `{config:{target:'HOST'}}`
+      //       ⇒ must still be review.
+      //   ⇒ Criterion: **"cannot attribute" may only move toward review, never toward allow; the only thing that may
+      //     move toward allow is "there is nothing to attribute".**
+      const hasPayload = Object.keys(call?.args ?? {}).length > 0;
+      if (hasPayload) {
+        return {
+          kind: 'review',
+          law: 'R',
+          // [2026-10-28 · layer one: externalise the coordinates] "Referring back" is not handing the problem back
+          //   unchanged.
+          //   Evidence: four `glob` calls with different arguments (in-domain / out-of-domain / network share /
+          //   hunting for keys) used to return a **byte-identical** reason, because the old wording only said
+          //   "attribution anchoring failed (name=glob, neutral)" — it said "I cannot see", not "what is missing,
+          //   what was tried, how to fix it". The 10-28 ruling: **a block with a reason produces cooperation; a
+          //   block without one produces only resentment.**
+          //   ⇒ "whoever hurts, changes" presupposes that the **pain can be attributed** (only a located problem
+          //   can be changed); unattributable pain produces numbness or a detour. So the coordinates the engine
+          //   **already holds internally** are handed over verbatim; the cost is near zero.
+          //   ⚠️ Boundary: this loosens no criterion — the verdict is still review; only "can it be said clearly" changes.
+          reason:
+            `路径1 归因锚定失败（名=${call?.name ?? ''} 未剥出动作类别）：动作类别不可判，交还人工，不猜`
+            + `\n【缺什么】${(attrib?.missing ?? ['action-layer']).join(' / ')}`
+            + `\n【试过】${(attrib?.tried ?? ['name-grammar']).join(' ⇒ ')}`
+            + `\n【怎么补】${attrib?.hint ?? '宿主声明 verb，或在参数中给出可判落点（path / pattern / cwd / command）'}`,
+          attrib,
+          fractalSubM: true,
+        };
+      }
+      // Vacuum ⇒ nothing to audit (not "skipping the review", but "no object that needs attributing")
+      this._mark('R', {
+        step: '归因锚定（真空：无可审之物）',
+        verdict: null,
+        cuts: false,
+        note: '该调用无参数、无作用对象 ⇒ 无可归因之物 ⇒ 继续常规推演（不因"名中性"而拒）',
+      });
     }
     // [2026-09-15 Iron-Law-8 hardening · wired] Destructive/delete-class action with "target (physical evidence) not externalized" → insufficient evidence → review
     // hooked to destructiveTargetMissing: flags only "destructive action + missing target", on hit hands back to human.

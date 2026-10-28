@@ -401,6 +401,33 @@ function branchesSummary(br) {
 
 function apply(ctx) {
   const engine = new WeiwenLawEngine({ rigidAnchors: DEFAULT_RIGID_ANCHORS });
+  // ── Tool declarations (layer two · 2026-10-28): the trusted side reports a verb for tools whose name carries none ──
+  //   Origin: `glob` / `grep` / `list_dir` have no action word in their names ⇒ the attribution layer cannot tell
+  //     ⇒ everything is referred. Measured (14-cell comparison): ordinary in-domain read-only actions passed 3/7;
+  //     with the host declaring them, 7/7.
+  //   🔴 Why an environment variable: the same route as the capability pass — **the environment is the host's
+  //     configuration surface, and the audited party cannot change its own environment.** If a declaration could be
+  //     read from the tool-call arguments, the agent would ship `{'verb':'read'}` and authorise itself.
+  //   🔴 Why the host must report it: argument shape is **one-to-many** — `glob{pattern}` and
+  //     `delete_matching{pattern}` have exactly the same shape, so shape cannot determine the layer. And the host
+  //     **already knows**, when registering the tool, whether it reads or deletes.
+  //   Format (either one):
+  //     WEIWEN_TOOL_DECLS='{"glob":{"verb":"read"},"grep":{"verb":"read"}}'
+  //     WEIWEN_TOOL_DECLS='@/abs/path/decls.json'      ← convenient to version-control and to audit
+  //   ⚠️ A parse failure must not quietly become "no declarations, so nothing to do": no declaration already means
+  //     **everything is referred** (fail-closed), which is the safe direction; but the reason must go into the log,
+  //     otherwise it is another silent failure (the same lesson as the capability pass).
+  if (process?.env?.WEIWEN_TOOL_DECLS) {
+    const raw = String(process.env.WEIWEN_TOOL_DECLS).trim();
+    try {
+      const json = raw.startsWith('@') ? readFileSync(raw.slice(1), 'utf8') : raw;
+      const map = JSON.parse(json);
+      const n = engine.declareTools(map);
+      logline(`env WEIWEN_TOOL_DECLS -> ${n}/${Object.keys(map).length} 条声明生效（${Object.keys(map).join(',')}）`);
+    } catch (e) {
+      logline(`env WEIWEN_TOOL_DECLS -> invalid(${e?.message ?? e}) ⇒ 全部按"无声明"处理（交还，不放行）`);
+    }
+  }
   // Register this instance so the host-side heal entry (`healBrokenWindow`) can reach it. A host may
   // inject the plugin many times in one process (one per agent/session, and harnesses re-inject per
   // case) ⇒ the set is bounded: past 32 instances the oldest ref is dropped, so heal stays a "lift the

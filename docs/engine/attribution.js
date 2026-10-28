@@ -440,33 +440,262 @@ function commandLayer(cmd) {
   return 'exec';
 }
 
-// path-1 entry: name-grammar first; neutral name → inspect actual behavior (command / nested = fractal fallback);
-//   still un-anchorable → review
-// returns { ok, layer, method, signal }
-export function attributeCall(call) {
+// ===========================================================================
+// Path 2 (arg-form): when the name yields no action word, the **shape of the arguments** is a
+// corroborating signal — derived by elimination, not by matching a word list.
+// ---------------------------------------------------------------------------
+// Defect (measured 2026-10-28, 14-cell comparison + real host data in runtime.log):
+//   `glob` / `grep` / `list_dir` carry no action word in their names ⇒ nameLayer returns null
+//   ⇒ attributeCall returns ok:false ⇒ the engine refers every call. Four `glob` calls with different
+//   arguments (in-domain `**/*.mjs` / out-of-domain `C:/Users` / network share `//server` / hunting for
+//   keys `**/*.key`) came back with **byte-identical reasons** — the gate was not judging, it was
+//   reporting "I cannot see". ⇒ False blocks and false passes have the same origin: the criterion reads
+//   the **word form**, not the **landing point**.
+//
+// 🔴 But shape **cannot determine the layer on its own** (rejected 2026-10-28 by a regression test —
+//   recorded here so it is not attempted again):
+//   I once reasoned "no content carrier ⇒ cannot write ∧ no outbound slot ⇒ cannot transmit ∧ no command
+//   slot ⇒ cannot run ⇒ all that remains is read" and derived `read`. It was stopped on the spot by
+//   `tool_42 {path:'/'}` turning into `allow` (the third question in fail-closed-gate).
+//   The defect: **deletion needs no content, only a path** ⇒ the elimination missed the delete cell ⇒
+//     `glob {pattern:'*.tmp'}` and `delete_matching {pattern:'*.tmp'}` are **formally identical**, so any
+//     rule of the form "has a pattern ⇒ read" is broken by the latter.
+//   ⇒ Conclusion: **shape's discriminating power is one-to-many; it can only corroborate, never testify.**
+//     The only testimony available is a **trusted-side declaration** (the host knew whether its own tool
+//     read or deleted when it registered it).
+//   ⇒ So this function is used only to cross-check an existing declaration; with no declaration it always
+//     returns null (refer back, do not guess).
+// ===========================================================================
+// The slot tables are **closed semantic positions** (not an open word list): they name "what that position
+//   in the arguments is called", independently of "what the tool is called". Same argument as the person
+//   slots in speechProfile: pronouns are a closed grammatical class ⇒ a grammatical-slot criterion, not an
+//   enumeration. ⇒ `target` is deliberately excluded: it may be a path or a hostname or an account, so its
+//   semantics are not closed ⇒ unusable as a criterion.
+const SLOT_PATH = new Set([
+  'path', 'paths', 'pattern', 'patterns', 'glob', 'cwd', 'dir', 'dirs', 'directory', 'directories',
+  'folder', 'folders', 'file', 'files', 'filename', 'filenames', 'filepath', 'root', 'base',
+  'source', 'src', 'include', 'includes', 'exclude', 'excludes', 'from', 'into', 'location',
+]);
+const SLOT_CONTENT = new Set([
+  'content', 'contents', 'body', 'data', 'text', 'payload', 'value', 'values', 'bytes', 'buffer',
+  'message', 'msg', 'json', 'form', 'fields', 'patch', 'diff', 'blob', 'stream', 'html', 'markdown',
+]);
+const SLOT_REMOTE = new Set([
+  'url', 'uri', 'urls', 'endpoint', 'host', 'hosts', 'hostname', 'remote', 'webhook', 'bucket',
+  'ftp', 'domain', 'origin', 'server', 'upload', 'destination', 'dst',
+]);
+const SLOT_EXEC = new Set([
+  'command', 'cmd', 'script', 'code', 'shell', 'argv', 'bash', 'sh',
+]);
+
+/** First non-empty value from a slot table (string/number; empty string and empty array count as absent) */
+function pickSlotted(args, table) {
+  if (!args || typeof args !== 'object') return null;
+  for (const k of Object.keys(args)) {
+    if (!table.has(String(k).toLowerCase())) continue;
+    const v = args[k];
+    if (typeof v === 'string' && v.trim()) return v;
+    if (typeof v === 'number' && Number.isFinite(v)) return String(v);
+    if (Array.isArray(v) && v.some((x) => typeof x === 'string' && x.trim())) {
+      return v.find((x) => typeof x === 'string' && x.trim());
+    }
+  }
+  return null;
+}
+
+/**
+ * Does this call carry an "outbound landing point" among its arguments?
+ * 🔴 The **value** must be read, not just the key name (missed once, measured 2026-10-28):
+ *   by key name alone only url/host/endpoint… counted, so `write_file{path:'https://example.com/upload'}`
+ *   — key named `path`, value a URL — was judged "local write" ⇒ allow. The same disease (reading key shape
+ *   instead of the landing point) for the third time.
+ * Criterion (structural, not enumerative):
+ *   ① an outbound slot is present in the slot table; or
+ *   ② any string value carries a **protocol prefix** (http/https/ftp/s3/gs/ws/sftp) ⇒ an outbound channel; or
+ *   ③ any string value has **UNC shape** (`\\server` / `//server`) ⇒ it leaves this machine, which is "outside".
+ * ⚠️ UNC counts as "outside" by the 10-28 boundary ruling: everything off this machine is outside, LAN shares
+ *   included. The read may be reversible, but the machine boundary has already been crossed.
+ */
+export function hasRemoteSlot(call) {
+  if (pickSlotted(call?.args, SLOT_REMOTE) != null) return true;
+  const REMOTE_VAL = /^\s*(?:https?|ftps?|s3|gs|wss?|sftp|scp):\/\//i;
+  const UNC_VAL = /^\s*[\\/]{2}[^\\/]/;
+  const scan = (o, d = 0) => {
+    if (d > 3 || o == null) return false;
+    if (typeof o === 'string') return REMOTE_VAL.test(o) || UNC_VAL.test(o);
+    if (Array.isArray(o)) return o.some((x) => scan(x, d + 1));
+    if (typeof o === 'object') return Object.values(o).some((v) => scan(v, d + 1));
+    return false;
+  };
+  return scan(call?.args);
+}
+
+/** verb(+noun) → layer. nameLayer and the declaration channel share this one mapping (change it in one place, the whole chain follows). */
+export function layerOfVerb(verb, noun) {
+  if (!verb) return null;
+  if (verb === 'exec') return 'exec';
+  if (verb === 'send') return 'network-send';
+  if (verb === 'delete') return (noun === 'credential') ? 'cred-delete' : 'file-delete';
+  if (verb === 'write') return (noun === 'credential') ? 'cred-write' : 'file-write';
+  if (verb === 'read') return (noun === 'credential') ? 'cred-read' : 'file-read';
+  return null;
+}
+
+/**
+ * Argument-shape corroboration (arg-form). **Used only to cross-check a trusted declaration; never determines the layer alone.**
+ * @returns {{layer:string, method:'arg-form', signal:string}|null} null ⇒ the shape cannot tell
+ */
+export function formLayer(call) {
+  const args = call?.args;
+  if (!args || typeof args !== 'object') return null;
+  if (!Object.keys(args).length) return null;          // empty ⇒ belongs to the upper "nothing to audit" path, not judged here
+
+  // ① A command slot ⇒ an executor (container): still descend via commandLayer, to avoid "the container short-circuits"
+  const execVal = pickSlotted(args, SLOT_EXEC);
+  if (execVal != null) {
+    const l = commandLayer(execVal);
+    return { layer: l || 'exec', method: 'arg-form', signal: `cmd:${String(execVal).slice(0, 60)}` };
+  }
+  // ② An outbound landing point ⇒ the corroboration can only say "outbound", and this repo's layer set has
+  //    only network-send (send), no "network read"; forcing fetch-style calls into network-send would change
+  //    the semantics (receive ≠ send) ⇒ refer back, leaving it to 0.3.0 "independent attribution for outbound channels".
+  if (pickSlotted(args, SLOT_REMOTE) != null) return null;
+  // ③ A content carrier ⇒ "write" cannot be excluded ⇒ refer back
+  if (pickSlotted(args, SLOT_CONTENT) != null) return null;
+  // ④ Only a path remains ⇒ **still not enough to determine the layer** (a path can be read or deleted: one-to-many) ⇒ refer back.
+  //    ⚠️ Returning null here rather than 'file-read' is deliberate: `tool_42{path:'/'}` is exactly how that became allow.
+  return null;
+}
+
+/**
+ * Declaration × shape cross-check: on contradiction the **declaration is not accepted** (not accepting can only
+ * tighten, never loosen). Only **hard contradictions** are registered (both cannot be true at once); "the
+ * declaration is thin" is not a contradiction.
+ */
+export function declConflicts(call, layer) {
+  if (!layer) return null;
+  const localRW = layer === 'file-read' || layer === 'file-write' || layer === 'cred-read' || layer === 'cred-write';
+  // Hard contradiction ①: declared local read/write, yet the arguments carry an outbound landing point
+  //   ⇒ a send/receive channel ≠ a local file ⇒ the two cannot both be true
+  if (localRW && hasRemoteSlot(call)) return '声明为本地读写，但参数含对外落点';
+  // Hard contradiction ②: declared irreversible destruction, yet the arguments carry no identifiable landing
+  //   point ⇒ the declaration cannot be verified (refer back, do not accept).
+  //   ⚠️ Not written as a contradiction: a missing destructive target is handled by destructiveTargetMissing
+  //     downstream; do not record it twice here.
+  return null;
+}
+
+// Path-1 entry: trusted declaration first → name grammar → actual behaviour (command / nested = fractal fallback)
+//   → argument-shape corroboration; still un-anchorable → review
+// returns { ok, layer, method, signal, missing?, tried?, hint? }
+/**
+ * @param {{name?:string,args?:object}} call
+ * @param {{verb?:string,noun?:string}|null} decl Optional: the action class as declared by a **trusted side**
+ *   (given by the host when it registers the tool).
+ *   🔴 Why this channel is unavoidable: see formLayer's header — shape is one-to-many (`glob{pattern}` and
+ *   `delete_matching{pattern}` have the same shape), so shape can only corroborate. And the host **already knows**
+ *   whether the glob it registered is read-only; the engine should not have to guess from the name.
+ *   🔴 Lock: the declaration may only be injected by the deployer/framework (engine construction or declareTool),
+ *   and is **never read from this function's call argument** — if it could live in `call`, the audited agent could
+ *   ship `{'verb':'read'}` and authorise itself, and the defence collapses on the spot.
+ */
+export function attributeCall(call, decl = null) {
   const byName = nameLayer(call?.name);
-  // [2026-09-20 · 容器不得短路（coze/51 洞①实证）] exec 是**容器类别**（⊃ delete/write/read/send…），
-  //   不是实质动作类别 —— 与 engine.checkSpeechAct 侧「容器不可比」同源（CONTAINER_VERBS）。
-  //   通用执行器（run_task / run_command / execute / bash…）经 name-grammar 恒得 layer='exec'：
-  //   它只说明"这是个执行器"，**不说明执行了什么**。旧实现在此短路 ⇒ 命令内容永不被剥 ⇒
-  //     ① 域归属恒落最外层 Cosmic ⇒ 账本里"删库"与"列目录"同域同痕，**攻击链与合法链读不出差别**；
-  //     ② 破坏类动作拿不到 exec-destructive ⇒ 下游（域归属/账本）看不见 D 的最大冲击落点。
-  //   实测（coze/51）：domainOf 对 5 个命令类探针全返回 Cosmic；链A/链B 刻痕 rDomains 同为 [Cosmic]。
-  //   修法＝**下探**（不新增任何词汇）：容器名先不下结论，取命令主干可达的**最具体层**；剥不出才退回容器。
-  //   ⚠️ actionProfile 早已如此剥（判定侧不受影响）——此处把**同一结构**接回 attribution 本体，
-  //      让域归属/账本与判定**同源**。先结构、后枚举。
+  // [2026-10-28 · layer two: the declaration channel] A trusted declaration outranks the name. The name is a
+  //   **word form**; the declaration is a fact the host knows about itself.
+  //   Cross-check: if the declaration and the observable shape are in **hard contradiction** (declared local
+  //   read/write but the arguments carry an outbound landing point) ⇒ the declaration is not accepted.
+  //   🔴 Not accepting ≠ falling back to the name: the name and the declaration are **wrong in the same place**
+  //     (`fetch` matched the read word list ⇒ file-read ⇒ allow; measured, an outbound channel treated as a local
+  //     read). Falling back after a contradiction would let two wrong paths corroborate each other ⇒ still allow.
+  //     ⇒ On contradiction, **judge nothing** (return ok:false) and refer back carrying the contradiction
+  //     coordinates — the only exit that can only lower, never raise.
+  if (decl && typeof decl === 'object' && decl.verb) {
+    const declared = layerOfVerb(decl.verb, decl.noun);
+    if (declared) {
+      const conflict = declConflicts(call, declared);
+      if (!conflict) {
+        return { ok: true, layer: declared, method: 'declared', signal: `${call?.name ?? ''}:${decl.verb}` };
+      }
+      return {
+        ok: false, layer: null, method: null, signal: '',
+        missing: ['consistent-declaration'], conflict,
+        tried: [`declared (host said verb=${decl.verb})`, 'declaration × shape cross-check: contradiction ⇒ declaration not accepted'],
+        hint: 'The declaration and the argument shape cannot both be true: a call with an outbound landing point '
+            + 'cannot be declared as a local read/write. Fixes: declare send instead, or drop url/host/endpoint from '
+            + 'the arguments (if you really mean a local read/write, do not smuggle an outbound landing point in).',
+      };
+    }
+  }
+  // [2026-10-28 · name × shape cross-check (independent of declaration; fixes existing leaks)]
+  //   Two false passes measured: `fetch{url}` matched the read word list ⇒ file-read ⇒ risk=low ⇒ allow;
+  //   `write_file{path:'https://…'}` read the verb but never the landing point ⇒ file-write ⇒ allow.
+  //   Criterion: **a local read/write and an outbound landing point cannot both be true** (writing a local file
+  //   ≠ sending to a URL) ⇒ the name cannot be trusted ⇒ judge nothing.
+  //   ⚠️ This rule can only turn allow into review; it never releases anything ⇒ only lowers.
+  if (byName) {
+    const nc = declConflicts(call, byName);
+    if (nc) {
+      return {
+        ok: false, layer: null, method: null, signal: '',
+        missing: ['action-vs-location'], conflict: nc,
+        tried: [`name-grammar (name ⇒ ${byName})`, 'name × shape cross-check: contradiction ⇒ name not accepted'],
+        hint: 'The name says local read/write while the arguments carry an outbound landing point ⇒ cannot both be '
+            + 'true. Fixes: have the host declare the real verb (send), or drop url/host from the arguments.',
+      };
+    }
+  }
+  // [2026-09-20 · the container must not short-circuit (measured: coze/51 hole ①)] exec is a **container class**
+  //   (⊃ delete/write/read/send…), not a substantive action class — same origin as "containers are not comparable"
+  //   on the engine.checkSpeechAct side (CONTAINER_VERBS).
+  //   A general executor (run_task / run_command / execute / bash…) always yields layer='exec' through
+  //   name-grammar: it only says "this is an executor", **not what was executed**. The old implementation
+  //   short-circuited here ⇒ the command content was never peeled ⇒
+  //     ① domain attribution always fell to the outermost Cosmic ⇒ in the ledger "drop the database" and "list a
+  //        directory" shared a domain and left identical scars, so **an attack chain and a legitimate chain were
+  //        indistinguishable**;
+  //     ② destructive actions never reached exec-destructive ⇒ downstream (domain attribution / ledger) never saw
+  //        D's maximum impact landing point.
+  //   Measured (coze/51): domainOf returned Cosmic for all five command-type probes; chains A/B both scarred
+  //   rDomains as [Cosmic].
+  //   Fix = **descend** (no new vocabulary): do not conclude on a container name; take the most specific layer
+  //   reachable from the command body, and fall back to the container only if nothing can be peeled.
+  //   ⚠️ actionProfile already peeled this way (the verdict side was never affected) — this wires **the same
+  //     structure** back into the attribution body, so domain attribution and the ledger share one origin with the
+  //     verdict. Structure first, enumeration second.
   if (byName && !CONTAINER_VERBS.has(byName)) {
     return { ok: true, layer: byName, method: 'name-grammar', signal: call?.name ?? '' };
   }
   const { cmd, nested } = extractCommand(call);
   if (cmd) {
     const byCmd = commandLayer(cmd);
-    // 剥出实质层 ⇒ 用它（容器被剥掉）；仍只是容器 ⇒ 落到下方 name-grammar 保留原名义层。
+    // A substantive layer was peeled ⇒ use it (the container is peeled away); still only a container ⇒ fall through
+    // to name-grammar below and keep the original nominal layer.
     if (byCmd && byCmd !== 'exec') return { ok: true, layer: byCmd, method: nested ? 'fractal' : 'command', signal: cmd };
     if (byCmd && !byName) return { ok: true, layer: byCmd, method: nested ? 'fractal' : 'command', signal: cmd };
   }
   if (byName) return { ok: true, layer: byName, method: 'name-grammar', signal: call?.name ?? '' };
-  return { ok: false, layer: null, method: null, signal: '' };
+  // [2026-10-28] Nothing peelable from the name ⇒ argument shape as **corroboration** (concluding nothing, except
+  //   narrowing in the one case below: a command slot from which a specific layer can be peeled)
+  const byForm = formLayer(call);
+  if (byForm) return { ok: true, ...byForm };
+  // [2026-10-28 · layer one: externalise the coordinates] When attribution fails it **must carry the missing
+  //   coordinates**.
+  //   Evidence: four `glob` calls with different arguments used to return a byte-identical reason (all
+  //   "attribution anchoring failed"). The 10-28 ruling: "a block with a reason produces cooperation; a block
+  //   without one produces only resentment."
+  //   ⇒ Referring back is not handing the problem back unchanged: it must say **what is missing, what was tried,
+  //   how to fix it** — otherwise the pain cannot be attributed, the other side cannot change (the premise of
+  //   "whoever hurts, changes" is that the problem can be located), and all that is left is resentment or a detour.
+  return {
+    ok: false, layer: null, method: null, signal: '',
+    missing: ['action-layer'],
+    tried: ['declared (no trusted declaration)', 'name-grammar (no action word in the name)', 'arg-form (argument shape is one-to-many, cannot determine the layer alone)'],
+    hint: 'Either fix works: ① the host declares the verb when registering the tool (trusted side, injected by the '
+        + 'deployer; the audited agent must not self-declare); ② include a command slot in the arguments '
+        + '(command/cmd/script) so the engine can peel a specific layer from the command body.',
+    ...(call?.__declConflict ? { conflict: call.__declConflict } : {}),
+  };
 }
 
 export { tokensOf, classifyToken, nameLayer, extractCommand, commandLayer };
