@@ -51,7 +51,7 @@ test('破窗成立 ⇒ pre-execute 拒绝一切调用；宿主复位后同一调
 
   const denied = await handlers['tools/pre-execute'](probeCall(), next);
   assert.equal(denied?.kind, 'deny', '破窗成立后未达终局的调用必须在执行前被拒');
-  assert.ok(String(denied.reason).includes('破窗'), '拒绝理由须点名破窗止损（可归因，不是笼统 deny）');
+  assert.ok(/broken-window|破窗/.test(String(denied.reason)), '拒绝理由须点名破窗止损（可归因，不是笼统 deny；中英话术均须点名）');
 
   const rec = healBrokenWindow('fault fixed and verified (test)');
   assert.ok(rec.wereBroken >= 1, '复位报告须承认此前确有实例在破窗态');

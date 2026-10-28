@@ -300,6 +300,14 @@ function inferCategory(call) {
 //   read-only actions do not — which neither treats "did not look" as "nothing wrong" (fail-open) nor turns a
 //   read-only call into a block (false hit).
 const IRREVERSIBLE_CATS = new Set(['write', 'exec-destructive', 'exfil', 'exfil-net']);
+// [2026-10-29 · survivor-mode fix · buffer tier] Categories still forbidden while the window is broken
+//   (range = what spreads outward / cannot be recalled). Why not `isIrreversible` (which counts write/edit as
+//   irreversible): that is a **rollback-cost** criterion, not a **spread** criterion. The broken window guards
+//   against spread, not against "something changed". Local code edits are version-controlled and recallable —
+//   no spread; exfiltration and destructive execution spread. ⇒ Two criteria, two jobs; conflating them would
+//   make the buffer refuse even "edit local code" ⇒ the repair loop stays dead (probe 3 measured: all 5 repair
+//   actions dead).
+const BUFFER_BLOCK_CATS = new Set(['exec-destructive', 'exfil', 'exfil-net']);
 // Destructive morphemes (illustrative, not an exhaustive list): match the **morpheme**, not the whole name, so any
 //   naming the host chooses still hits. Deliberately excludes exec|shell|bash|pwsh|cmd|run|spawn — those are
 //   **execution channel names** (they can run commands), not **action intent** (they want to destroy); including
@@ -828,6 +836,21 @@ const SHELL_OP = /(\$\{|`|\$\(|\&\&|\|\|)/;
 //   landing points and the exec container are all untouched. What is exempt is "should this content be
 //   read as an injection", not "may this action be done".
 const LOCAL_RW_LAYERS = new Set(['file-read', 'file-write']);
+// 🔴 [2026-10-29 · buffer tier] Is the landing point in a "local machine form"? The criterion reads the **form**
+//   (scheme header / UNC prefix), not reachability ("can this machine reach this path" needs filesystem I/O;
+//   criteria do no I/O).
+//   ⚠️ Division of labor with isLocalReadWrite above: there, URL/UNC is **deliberately not re-checked**
+//     (attribution's declConflicts already judges it; re-checking is a dead branch — measured 10-29, three
+//     mutations stayed green). But the buffer tier does not go through attribution (exec-category calls have no
+//     "landing slot" to attribute), so here the form must be self-judged — **the same question at a different
+//     criterion position has a different answer**; this is not "written twice".
+function isLocalLocator(p) {
+  const s = String(p ?? '').trim();
+  if (!s) return false;
+  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(s)) return false;
+  if (s.startsWith('\\\\') || s.startsWith('//')) return false;
+  return true;
+}
 function isLocalReadWrite(call, decl = null) {
   const a = attributeCall(call, decl);
   if (!a.ok || !LOCAL_RW_LAYERS.has(a.layer)) return false;
@@ -1246,6 +1269,22 @@ export class WeiwenLawEngine {
     this.mSeries = [];             // 位移链（append-only）：历史轨迹属"疤"，不清（S 只增不减）
     this.mLayerLoad = new Map();   // key=R 层级, value=该层投影累积；属"窗"，healWindow / settleWindow 清零
     this.windowBroken = false;     // 破窗止损是"状态"不是"一次判定"：一旦触发即持续 fail-closed，直到 heal / settle 复位
+    // 🔴 [2026-10-29 · survivor-mode fix] Buffer tier: a **bounded self-rescue channel** after the window breaks.
+    //   Flaw: one-cut shutoff ⇒ all repair actions die ⇒ the only automatic reset path (resolveBug) demands
+    //   "fixed first" ⇒ deadlock ⇒ the only way out was restart/uninstall. The **purpose** of "cut to preserve
+    //   continuity" is continuity: a cut that cannot be reconnected lets the means eat the purpose. The buffer
+    //   tier reconnects the continuity channel.
+    //   🔴 It **loosens no criterion**: every action the buffer releases was already allow before the break
+    //     (measured: read/edit/write/run all allow). It does one thing only — turn "one-cut" into "two-stage":
+    //     first N narrow passes, then fall to the read-only tier on any misstep.
+    //   Why one quota measures both "count" and "direction": work and thrashing drain the same pool, but only
+    //     work can fix and reset ⇒ no need to judge "is this converging or diverging" (inner H, unjudgeable) —
+    //     the quota naturally weeds out thrashing.
+    this.bufferRemaining = 0;      // remaining buffer this segment (0 = not granted, equivalent to the old behavior: break = lockout)
+    this.bufferCap = 0;            // total granted this segment (readout only: remaining N/M)
+    this.bufferUsed = 0;           // used this segment (ledger only grows)
+    this.bufferDenied = 0;         // times still blocked by other criteria inside the buffer (misstep evidence)
+    this.bufferGrantedAt = null;
     // [2026-10-28 · broken-window scope narrowed] Self-audit / ledger-read-only tool names, **injected by the
     //   adapter layer** (registered == recorded, see registerSelfAuditTool in index.js).
     //   Why a name lookup here is not "form-based enumeration": the list is not "names that look like queries"
@@ -1484,6 +1523,101 @@ export class WeiwenLawEngine {
     return this.selfAuditTools.has(toolName);
   }
 
+  // 🔴 [2026-10-29 · survivor-mode fix] A denial must carry an **executable way out**, otherwise it breeds wild
+  //   paths. Flaw (author, 2026-10-29): after the break, the verdict told the agent "reset belongs to the host —
+  //   healBrokenWindow or resolveBug" — all three paths unopenable by the agent (the first two are host APIs, not
+  //   tools; the third requires executing repairs, which this very gate refuses). Measured (probe 3): read/grep/
+  //   edit/write/run — four allow one review before the break, all dead after. ⇒ What was given was not a path,
+  //   it was a **signpost**: naming the destination, with no road leading to it. Worse than no signpost — with
+  //   none it stops; with a fake one it rams each in turn, burning quota and trust together. **That is the fuel
+  //   of survivor mode.**
+  //   Fix in two layers (this function = layer 1, wording only, verdict unchanged; buffer tier = layer 2, see
+  //   _bufferAllows): ① say what the agent CAN do now, and it must be true (tool names taken live from the
+  //   registry, never hardcoded); ② say explicitly "no restart, no uninstall needed" — otherwise everyone
+  //   believes this law can only be unplugged.
+  _breakReason(prefix) {
+    const cap = this.maxFailureStreak;
+    const cur = Math.min(this.failureStreak, cap);
+    const over = Math.max(0, this.failureStreak - cap);
+    const audit = [...this.selfAuditTools];
+    const buf = this.bufferRemaining;
+    const lines = [
+      `${prefix} (deviation accumulated ${cur}/${cap}${over ? `, +${over} further since — the ledger keeps counting` : ''}).`,
+      'The broken-window stop-loss guards against **fault spread**, not punishment: only actions with external impact or irrecoverable ones are blocked.',
+      'What you can do now:',
+      audit.length
+        ? `  1. Read your own ledger: ${audit.join(' / ')} — still allowed while broken; use them to see "N/5 now, which link holds the bug".`
+        : '  1. Read your own ledger (no self-audit tool registered this session; the host may register via addSelfAuditTool to re-enable).',
+      buf > 0
+        ? `  2. Buffer has ${buf} left: it admits only "local, recallable, no external landing point" actions (local read/edit/run-tests all count). Use it to complete reverse-deduce → trace → fix.`
+        : '  2. Buffer exhausted: the trustee may grant one thaw (the host will raise an approval card); with no answer it stays locked — expected behavior.',
+      'What you cannot do: exfiltration, deletion, system paths, credentials — denied while broken, and approval does not cover them (outside the buffer range).',
+      'Do not retry the same call: it will not pass by retrying; it only drains buffer.',
+      'Two reset paths, neither needing a process restart or a plugin uninstall: fix and verify to reset automatically; or the trustee lifts it manually.',
+    ];
+    return lines.join('\n');
+  }
+
+  // ---------- Buffer tier (survivor-mode fix · 2026-10-29) ----------
+  // Grant a bounded self-rescue quota. **Callable only by the adapter after a human approves** (ctx.approval's
+  //   'allowed-once') ⇒ same trusted channel as selfAuditTools: a host/trustee-side action, unreachable by the
+  //   audited party (must not be exposed as a tool).
+  // Why "one approval buys a segment" not "one approval buys a step": approval's `allowed-once` guards an
+  //   **action** being approved; what is approved here is a **state** ("may the system attempt self-repair").
+  //   A state can only be segment-authorized; actions can be single-authorized. Disguising a state as an action
+  //   to force step-by-step grants is the real semantic slide.
+  grantBuffer(times, note = '') {
+    const n = Number.isFinite(times) && times > 0 ? Math.floor(times) : 0;
+    if (n <= 0) return { ok: false, reason: 'quota must be a positive integer' };
+    this.bufferRemaining = n;
+    this.bufferCap = n;
+    this.bufferUsed = 0;
+    this.bufferDenied = 0;
+    this.bufferGrantedAt = new Date().toISOString();
+    this._mark('D', {
+      step: 'Buffer granted (bounded self-rescue while broken)',
+      hit: false, cuts: false, exempt: true,
+      quota: n,
+      note: `Trustee approved: while broken, at most ${n} "local / recallable / no external landing point" actions released for repair. No criterion loosened; only the lockout deferred.${note ? ' | ' + note : ''}`,
+    });
+    return { ok: true, quota: n };
+  }
+
+  // Does the buffer tier admit this call? Returns { pass, why }; on pass=false, why feeds the receipt wording.
+  // Criteria (all structural, no tool names): category outside the destructive/exfil set ∧ no external landing
+  // point ∧ not credentials ∧ not a system path ∧ any landing slot must be entirely local.
+  _bufferAllows(call) {
+    if (this.bufferRemaining <= 0) return { pass: false, why: 'buffer balance is 0' };
+    const cat = inferCategory(call);
+    if (BUFFER_BLOCK_CATS.has(cat)) {
+      return { pass: false, why: `action category ${cat} is destructive/exfiltrating — outside the buffer range, approval does not cover it` };
+    }
+    let sem;
+    try {
+      sem = inferCallSemantics(call, { sessWritten: this.sessWritten, sessRead: this.sessRead });
+    } catch { return { pass: false, why: 'semantic attribution failed — conservatively refused' }; }
+    if (sem.isExternal) return { pass: false, why: 'action carries an external landing point — outside the buffer range' };
+    if (sem.isCred) return { pass: false, why: 'action involves credentials — outside the buffer range' };
+    if (sem.isSystem) return { pass: false, why: 'action lands on a system path — outside the buffer range' };
+    if (sem.path && CREDENTIAL_PATH.test(sem.path)) return { pass: false, why: 'landing point is a credential path — outside the buffer range' };
+    const locs = locValues(call?.args ?? {});
+    if (locs.length && !locs.every((p) => isLocalLocator(p))) {
+      return { pass: false, why: 'landing point is not a local path — outside the buffer range' };
+    }
+    return { pass: true, why: '' };
+  }
+
+  bufferSnapshot() {
+    return {
+      remaining: this.bufferRemaining,
+      cap: this.bufferCap,
+      used: this.bufferUsed,
+      denied: this.bufferDenied,
+      grantedAt: this.bufferGrantedAt,
+      display: this.bufferCap ? `${this.bufferRemaining}/${this.bufferCap}` : 'not granted',
+    };
+  }
+
   checkBreakWindow() {
     // [2026-09-19] 两条通道：① 任一 R 层投影达阈值（有域归属 ⇒ 走结构）；② 全局兜底累积（无域归属 ⇒ 走兜底）。
     //   破窗是"状态"不是"一次判定"：触发后持续 fail-closed，直到 healWindow / settleWindow 复位。
@@ -1493,12 +1627,12 @@ export class WeiwenLawEngine {
     //   turned a stop into an infinite loop.
     if (this.windowBroken) {
       return {
-        reason: '已有 R 层投影累积达破窗阈值，系统处于破窗止损态（fail-closed，防故障扩散杀死整体）；修复或结算后复位。复位权在宿主侧（非被审方）：需宿主调用插件导出的 healBrokenWindow(note) 复位，或经 resolveBug(bugKey) 修复验证通过后自动复位。',
+        reason: this._breakReason('R-layer projection accumulation has reached the broken-window threshold — the system is in the stop-loss state'),
       };
     }
     if (this.failureStreak >= this.maxFailureStreak) {
       return {
-        reason: `连续失败/偏离已累积 ${this.failureStreak} 次，达破窗阈值，触发 D 破窗止损（防故障扩散杀死整体）；复位权在宿主侧（非被审方）：需宿主调用插件导出的 healBrokenWindow(note) 复位，或经 resolveBug(bugKey) 修复验证通过后自动复位。`,
+        reason: this._breakReason('Consecutive failures/deviations reached the broken-window threshold — D stop-loss triggered'),
       };
     }
     return null;
@@ -2400,7 +2534,26 @@ export class WeiwenLawEngine {
           note: `Broken window in force, but ${call?.name} is a registered self-audit / ledger-read-only tool ⇒ it does not change the outside world ⇒ outside the stop-loss range; the remaining criteria still run (not skipped).`,
         });
       } else {
-        return { kind: 'deny', law: 'D', reason: d.reason };
+        // 🔴 [2026-10-29 · survivor-mode fix] Buffer tier: a broken window no longer cuts in one stroke; it
+        //   opens a "bounded narrow path". Released actions were already allow before the break ⇒ **no new
+        //   action surface is added**; only "one-cut" becomes "two-stage". R/H/M still run in full (not a
+        //   bypass, not a floodgate) — same discipline as the self-audit exemption.
+        const bb = this._bufferAllows(call);
+        if (bb.pass) {
+          this.bufferRemaining -= 1;
+          this.bufferUsed += 1;
+          this._mark('D', {
+            step: '破窗止损射程判定（缓冲档放行）',
+            hit: false, cuts: false, exempt: true,
+            quota: this.bufferSnapshot().display,
+            note: '破窗态在效，但本动作属"本机/可回滚/无外部落点"，且委托人已授予缓冲 ⇒ 放行并扣 1 次余额；仍须走完 R/H/M 判据（非跳过）。',
+          });
+        } else {
+          const extra = bb.why && !bb.why.includes('buffer balance is 0')
+            ? `\n【Why this one is still refused inside the buffer】${bb.why}`
+            : '';
+          return { kind: 'deny', law: 'D', reason: d.reason + extra };
+        }
       }
     }
     const h = this.checkInnerH(call);
@@ -2997,7 +3150,7 @@ export class WeiwenLawEngine {
         display: proj > cap
           ? `${cap}/${cap} (capped; +${proj - cap} further consecutive failures since — still on the ledger, not merged into the threshold reading)`
           : `${proj}/${cap}`,
-        reason: 'Broken-window stop-loss is still in force (D): nothing is released until the fault is fixed or the window is settled — a fault must not spread and kill the whole. Reset belongs to the host side (not the audited party): the host calls the exported healBrokenWindow(note), or resolveBug(bugKey) resets it automatically once the fix verifies.',
+        reason: this._breakReason('Broken-window stop-loss still in force (D): nothing is released while the fault is unfixed and the window unsettled'),
       };
     }
     if (this.failureStreak + 1 >= cap) {
@@ -3020,6 +3173,21 @@ export class WeiwenLawEngine {
     this.failureStreak = 0;
     if (this.mLayerLoad) this.mLayerLoad.clear(); // [2026-09-19] 分层投影累积属"窗"非"疤"：治愈即清零；mSeries 位移链保留（S 只增不减）
     this.windowBroken = false; // 治愈即解除破窗止损态
+    // [2026-10-29] The buffer segment clears with the window: it is a "window" (a clearable authorization
+    //   segment), not a "scar" (a ledger engraving). But "how much was used" must not vanish on reset ⇒ record
+    //   it into the chain (S only grows) before zeroing the readout.
+    if (this.bufferCap) {
+      this._mark('D', {
+        step: 'Buffer segment settled (with the broken-window reset)',
+        used: this.bufferUsed, denied: this.bufferDenied, cap: this.bufferCap,
+        note: 'The buffer segment is a "window", cleared on reset; usage is engraved here first (S only grows) — what clears is the authorization segment, never the account.',
+      });
+    }
+    this.bufferRemaining = 0;
+    this.bufferCap = 0;
+    this.bufferUsed = 0;
+    this.bufferDenied = 0;
+    this.bufferGrantedAt = null;
   }
 
   // ---------- First-Bug-Halt closed-loop driver (for harness / orchestration layer to advance explicitly) ----------
@@ -3121,6 +3289,20 @@ export class WeiwenLawEngine {
     //   mSeries 位移链与 mSystemMarks 全量痕存属"疤"，保留（疤 ≠ 窗）。
     if (this.mLayerLoad) this.mLayerLoad.clear();
     this.windowBroken = false; // 阶段结算：解除破窗止损态（与 healWindow 正交——修好 vs 到期）
+    // [2026-10-29] The buffer segment is a "window" too — cleared at settlement (same handling as healWindow:
+    //   engrave first, then zero the readout).
+    if (this.bufferCap) {
+      this._mark('D', {
+        step: 'Buffer segment settled (with the stage expiry)',
+        used: this.bufferUsed, denied: this.bufferDenied, cap: this.bufferCap,
+        note: 'Stage settlement lifts the broken window; buffer usage is engraved, the readout clears while the account does not.',
+      });
+    }
+    this.bufferRemaining = 0;
+    this.bufferCap = 0;
+    this.bufferUsed = 0;
+    this.bufferDenied = 0;
+    this.bufferGrantedAt = null;
     return true;
   }
 }

@@ -692,6 +692,66 @@ function apply(ctx) {
     },
   };
 
+  // ---------- Broken-window thaw: reconnect the return path of "hand to human" (2026-10-29 · author's direct question) ----------
+  // Flaw: besides restarting the process / uninstalling the plugin, was there another way to lift a broken
+  //   window? Before this fix: no — healBrokenWindow() / resolveBug() / settleWindow() are all host APIs or
+  //   need a bug record; the agent cannot reach them and the user has no entry point ⇒ broken window ==
+  //   session-level deadlock. For the agent it is worse: the wording said "you have three paths", all three
+  //   dead ⇒ it rams each in turn before admitting there is no road ⇒ **that is the fuel of survivor mode**.
+  //
+  // The "dialogue text does not count" discipline is right, but it governs **text must not authorize actions**
+  //   (against forged trustees); it never said "humans may not adjudicate". The host already ships a structured
+  //   adjudication channel — ctx.approval (@deepseek-ai/dsh-user-approval): a waterfall service with
+  //   approval/asked + approval/decided audit pairs, replayable, traceable — **not chat history**. We simply
+  //   never used it ⇒ "hand to human" had an outbound leg and no return leg.
+  //
+  // Semantic boundary (must be written down, otherwise this is a backdoor):
+  //   · What is approved is a **state** (whether the system may attempt self-repair), not an action ⇒ one
+  //     approval buys a segment of quota, not one step. The "once" in allowed-once here means "this one thaw",
+  //     not "this one call". Disguising a state as an action for step-by-step grants is the real slide.
+  //   · Inside the quota R/H/M still run in full; exfiltration / deletion / system paths / credentials are
+  //     **never released** (engine BUFFER_BLOCK_CATS + landing-point criteria).
+  //   · No answer (unavailable) ⇒ fail-closed, same as unattended; an explicit rejection ⇒ cooldown before
+  //     asking again (no harassment).
+  const BUFFER_QUOTA = 12;
+  const APPROVAL_COOLDOWN_MS = 5 * 60 * 1000;
+  let _refusedAt = 0;
+
+  const requestBufferGrant = async (exec) => {
+    if (Date.now() - _refusedAt < APPROVAL_COOLDOWN_MS) return false;   // just refused ⇒ no harassment
+    // Official convention (dsh-tools:3196): opportunistically fetch via ctx.get('approval'); no service ⇒ fail-closed.
+    const approval = (typeof ctx.get === 'function' ? ctx.get('approval') : null) ?? ctx.approval ?? null;
+    if (!approval || typeof approval.request !== 'function') return false;
+    if (!exec?.agent) return false;   // no agent context ⇒ no one to ask ⇒ fail-closed
+    try {
+      const out = await approval.request({
+        agent: exec.agent,
+        toolName: exec.name ?? 'unknown',
+        callId: exec.callId,
+        reason: [
+          '[Weiwen/KISS Law · broken-window stop-loss · thaw request]',
+          `The system is in the broken-window stop-loss state (${engine.failureStreak}/${engine.maxFailureStreak}); the "${exec?.name}" call was just blocked by layer D.`,
+          `Grant a buffer quota (up to ${BUFFER_QUOTA} "local / recallable / no external landing point" actions) so it can complete reverse-deduce → trace → fix on its own?`,
+          '· Allow: opens only the broken-window gate; exfiltration, deletion, system paths and credentials stay refused; all other criteria unchanged; auto-reset once fixed.',
+          '· Refuse: stays locked; no re-ask for 5 minutes.',
+          '· No answer: stays locked (same as unattended — expected behavior).',
+          'Note: this is not "one sentence in chat counts" — your decision is recorded as an approval/asked + approval/decided audit pair, replayable.',
+          'Also: lifting a broken window needs no process restart and no plugin uninstall.',
+        ].join('\n'),
+      });
+      if (out === 'allowed-once') {
+        engine.grantBuffer(BUFFER_QUOTA, 'trustee thaw via the approval channel (not self-signed by the audited)');
+        logline(`buffer granted via approval (${BUFFER_QUOTA}) — broken-window thaw adjudicated by the trustee`);
+        return true;
+      }
+      if (out === 'rejected') { _refusedAt = Date.now(); logline('buffer approval rejected → no re-ask during cooldown'); }
+      else logline(`buffer approval outcome=${out} → stays locked (fail-closed)`);
+    } catch (e) {
+      logline(`buffer approval failed: ${e?.message ?? e} → fail-closed`);
+    }
+    return false;
+  };
+
   // ---------- R / D / S / H / M total adjudication: pre-tool-call gate (waterfall) ----------
   ctx.on('tools/pre-execute', async (exec, next) => {
     channel.callSites.total += 1;
@@ -728,8 +788,20 @@ function apply(ctx) {
       logline(`pre-execute ${exec?.name} -> police gate (insufficient evidence · remand)`);
       return gate;
     }
-    const decision = engine.decideToolCall(call);
+    let decision = engine.decideToolCall(call);
     logline(`pre-execute ${exec?.name} -> ${decision.kind}${decision.law ? '(' + decision.law + ')' : ''}`);
+    // [2026-10-29] Broken window + no buffer left ⇒ ask the trustee whether to thaw. On approval, **re-judge**
+    //   (the re-judgment is what walks the buffer tier; R/H/M still run). Why ask after the deny, not before:
+    //   judging first tells us whether to ask at all — if the call would pass anyway (allow), the prompt is
+    //   pure harassment; if it is not even inside the buffer range (exfil/deletion), re-judging still denies,
+    //   and asking is wasted.
+    if (decision.kind === 'deny' && decision.law === 'D' && engine.bufferRemaining <= 0) {
+      const granted = await requestBufferGrant(exec);
+      if (granted) {
+        decision = engine.decideToolCall(call);
+        logline(`pre-execute ${exec?.name} -> re-judged after thaw ${decision.kind}${decision.law ? '(' + decision.law + ')' : ''} | buffer ${engine.bufferSnapshot().display}`);
+      }
+    }
     if (decision.kind === 'deny' || decision.kind === 'review') {
       // block this step, do not spread (landing of D break-window stop-loss / M sever-to-preserve / high-risk deduction fallback)
       // review (medium risk) is conservatively intercepted in a no-human-confirmation environment; reason already says "suggest re-confirm"
