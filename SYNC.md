@@ -11,9 +11,9 @@
 | | Chinese repo `weiwen-law-dsh` | This repo `KISS_Law-DSH` |
 |---|---|---|
 | npm package | `dsh-weiwen-law` | `dsh-kiss-law` (**never published** — registry returns 404) |
-| test count | 560 | 517 |
 | last functional sync to this repo | — | `d51a0a9` (2026-10-21) |
 | `src/` gap since that sync | — | **11 commits** (listed in §3) |
+| batches closed (§4) | source of truth | **1, 2, 3 closed · 4 open · 5 blocked on 4** |
 | version / HEAD | read from `npm view` / `git log` | read from `git log` |
 
 Because `dsh-kiss-law` has never been published, syncing it cannot break any existing consumer. That is the one thing that makes this safe to do at all.
@@ -69,13 +69,13 @@ Eleven commits touch `src/`. They do not map one-to-one onto eleven tasks — se
 
 Each batch must end with this repo's own test suite green **and** a live behavioural check — not a diff review. A diff that looks right is not evidence that behaviour is right; that is exactly the failure this repo's wall #6 is about.
 
-| Batch | Content | Acceptance |
-|---|---|---|
-| 1 | B1 fingerprints | `buildId` recomputable from outside; repo and package agree; changing a line-ending does not change the value |
-| 2 | B3 self-reference | with the exclusion removed, the query reports itself (the test must fail); with it in place, it does not; `null` is returned rather than a fallback |
-| 3 | B4 attribution + declaration | the 14-cell inside/outside probe: in-domain reads pass, out-of-domain sends are blocked; four structurally different neutral-name calls no longer return an identical reason |
-| 4 | B2 capability passes | a re-signed pass starts at zero; an exhausted pass stays exhausted |
-| 5 | Documentation | `ONBOARDING.md` ported **after** batches 1–4, so that it describes behaviour that exists |
+| Batch | Content | Acceptance | Status |
+|---|---|---|---|
+| 1 | B1 fingerprints | `buildId` recomputable from outside; repo and package agree; changing a line-ending does not change the value | **closed** — recomputed from outside on both repos; packed the tarball and hashed inside it, where 5 of 10 core files arrive as CRLF and the values still match |
+| 2 | B3 self-reference | with the exclusion removed, the query reports itself (the test must fail); with it in place, it does not; `null` is returned rather than a fallback | **closed** — mutation check: reverting the exclusion turns the wiring test red and leaves the engine tests green |
+| 3 | B4 attribution + declaration | the 14-cell inside/outside probe: in-domain reads pass, out-of-domain sends are blocked; four structurally different neutral-name calls no longer return an identical reason | **closed** — probe run identically against both repos, every cell agrees including the layer and method columns |
+| 4 | B2 capability passes | a re-signed pass starts at zero; an exhausted pass stays exhausted | **open** — `core/capability.mjs` does not exist here yet |
+| 5 | Documentation | `ONBOARDING.md` ported **after** batches 1–4, so that it describes behaviour that exists | **blocked on 4** |
 
 ⚠️ Documentation comes **last on purpose**. A manual describing behaviour the code does not have is worse than no manual: the reader follows it, it fails, and they conclude the failure is theirs.
 
