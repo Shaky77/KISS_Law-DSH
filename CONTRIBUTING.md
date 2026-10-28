@@ -9,7 +9,7 @@ This project uses **dual licensing**:
 - **Open-source use**: AGPL-3.0
 - **Commercial integration / closed-source distribution / OEM**: a separate license agreement — contact 563003@qq.com
 
-Full statement: [License & security](./README.md#license--security) in the README.
+Full statement: [License & security](https://github.com/Shaky77/KISS_Law-DSH/blob/main/README.md#license--security) in the README.
 
 ## About the CLA
 

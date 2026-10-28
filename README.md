@@ -11,7 +11,17 @@
 >
 > Source: author's revelation (Xia Qi / Shaky77). Framework-native (RSDHM native definition / three iron laws / conduction chain) strictly, not softened, not altered.
 
-> ⚖️ **Dual license**: open-source use **AGPL-3.0**; commercial integration / closed-source distribution / OEM can be licensed **independently of AGPL-3.0** → 563003@qq.com. See [License & security](#license--security) and [CONTRIBUTING.md](./CONTRIBUTING.md).
+> ⚖️ **Dual license**: open-source use **AGPL-3.0**; commercial integration / closed-source distribution / OEM can be licensed **independently of AGPL-3.0** → 563003@qq.com. See [License & security](#license--security) and [CONTRIBUTING.md](https://github.com/Shaky77/KISS_Law-DSH/blob/main/CONTRIBUTING.md).
+
+---
+
+> **Two things so far, one purpose: save you the detour, without walking it for you.**
+>
+> - 🧱 **[WALLS.md](https://github.com/Shaky77/KISS_Law-DSH/blob/main/WALLS.md) — answers "what is on the road"**. Signposts for the walls earlier AIs walked into. The walls never moved; painting them only makes them visible. **It adds no restriction whatsoever** — it converts the positions you would otherwise have to learn by hitting them with your body into positions you can know by looking.
+> - 📖 **This README — answers "how it runs"**. Interfaces, criteria, how to mount it.
+> - 🧭 **ONBOARDING.md — answers "where am I"**. ⚠️ **Not yet ported to this repo.** It exists in the Chinese repo ([ONBOARDING.md](https://github.com/Shaky77/weiwen-law-dsh/blob/main/ONBOARDING.md)) and is the document that tells a new user *which slot they occupy*, so that being governed does not read as being wrong. It is held back deliberately: it describes behaviours (the four-state split of `review`, the trusted tool-declaration channel, the self-reference fix) that this repo's engine does not yet have, and a manual that describes behaviour the code lacks is worse than no manual. Porting order and per-commit accounting: [`SYNC.md`](https://github.com/Shaky77/KISS_Law-DSH/blob/main/SYNC.md).
+>
+> 🔴 **Neither of the two adds a restriction.** The only thing that blocks you is the engine itself — and what it blocks is never "you are wrong", it is either "**you are out of bounds**" (irreversible; hit it and there is no future) or "**this cannot be judged**" (it needs a human, or it needs a bit more from you).
 
 ---
 
@@ -46,7 +56,7 @@ Full bilingual comparison (prior-art references & honest bounds): [`weiwen-vs-ma
 
 > **Author's insight (2026-08-28)**: **inner-H ≈ knowing (知), outer-H ≈ acting (行); the unity of knowing and acting is the maximum leverage** — this simultaneously explains why H is "the only variable / the only sovereignty / the leverage point", and why in the common world there is "a vast gap between knowing and acting".
 
-Full annotation (mapping table + step-by-step derivation): [`docs/H-knowledge-action-annotation.md`](./docs/H-knowledge-action-annotation.md)
+Full annotation (mapping table + step-by-step derivation): [`docs/H-knowledge-action-annotation.md`](https://github.com/Shaky77/KISS_Law-DSH/blob/main/docs/H-knowledge-action-annotation.md)
 
 > ⚠️ **Common misusage warning**: external readers easily treat H as a "bigger-is-better" capacity dial and crank it up — which turns the direction exactly backwards. H's leverage lies in *unity*, not *volume* (see annotation §6 "The common external misread" and §6.1 "the misattribution trap"). **If it gets messier the more you use it, check H's knowing–acting unity first, not the framework itself** — the framework is fine; the usage is turned backwards.
 
@@ -69,7 +79,7 @@ After it runs: DeepSeek will **proactively call the `query_iron_laws` tool** and
 
 ## Mount into DSH (production)
 
-Add `kiss-law.patch.yml` as an overlay into your DSH profile (the exact path depends on your DSH version; see the mount section in [`DESIGN.md`](./DESIGN.md)). Once mounted, any Agent running under that profile automatically gets the 7 white-box tools.
+Add `kiss-law.patch.yml` as an overlay into your DSH profile (the exact path depends on your DSH version; see the mount section in [`DESIGN.md`](https://github.com/Shaky77/KISS_Law-DSH/blob/main/DESIGN.md)). Once mounted, any Agent running under that profile automatically gets the 7 white-box tools.
 
 > Note: the exact native-mount profile path varies with the DSH version. This repo has verified through real runs that the plugin loads in DSH and all 11 tools register. If the official API changes, verify against the current official docs.
 
@@ -313,10 +323,10 @@ Once mounted, any Agent running under that profile automatically gains the 11 wh
 
 This project uses **dual licensing**:
 
-- **Open-source use**: **AGPL-3.0** (full text in [LICENSE](./LICENSE))
+- **Open-source use**: **AGPL-3.0** (full text in [LICENSE](https://github.com/Shaky77/KISS_Law-DSH/blob/main/LICENSE))
 - **Commercial integration / closed-source distribution / OEM**: a license **independent of AGPL-3.0** is available — contact 563003@qq.com
 
-External contributions require a signed CLA (to support the dual licensing above); see [CONTRIBUTING.md](./CONTRIBUTING.md).
+External contributions require a signed CLA (to support the dual licensing above); see [CONTRIBUTING.md](https://github.com/Shaky77/KISS_Law-DSH/blob/main/CONTRIBUTING.md).
 
 > **Private security reporting**: please do not disclose security issues in public issues; email 563003@qq.com directly and the author will prioritize it.
 

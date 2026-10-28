@@ -16,7 +16,9 @@
     "DESIGN.md",
     "LICENSE",
     "examples",
-    "test"
+    "test",
+    "WALLS.md",
+    "SYNC.md"
   ],
   "scripts": {
     "test": "node --test \"test/*.test.mjs\"",
