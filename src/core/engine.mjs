@@ -1151,6 +1151,15 @@ export class WeiwenLawEngine {
     // [2026-09-24 · by-chain repair] Conduction-chain marks of the current decision (R→S→D→H→M),
     //   rebuilt on every decideToolCall. See _mark / _conductionSnapshot below.
     this.conduction = [];
+    // 🔴 [2026-10-27 · cure instrument self-reference] Decision history (including the name of the tool judged).
+    //   Keeping only "the most recent one" is a *structural* self-reference: an audit tool also passes through
+    //   the gate, and the moment it does, it overwrites "the most recent one" with itself — so what it reads
+    //   back is **its own** chain. (Measured by xiaoD: after glob → deny, querying the chain reported
+    //   allow / law:推演.)
+    //   ⇒ Keep a history, and let the layer above filter by "is this a self-audit tool". The engine does no
+    //   word-form judgement; it records facts as they are.
+    this.conductionHistory = [];
+    this._conductionSeq = 0;
   }
 
   // ---------- S steady-state reserve: dual attributes (time scar irreversible + current value can rise/fall) ----------
@@ -1759,6 +1768,7 @@ export class WeiwenLawEngine {
       note: `${res.kind} / ${res.law ?? '-'}：${res.reason ?? ''}`,
     });
     res.conduction = this._conductionSnapshot();
+    this._recordConduction(call, res, res.conduction); // decision history (cures instrument self-reference; see method header)
     return this._attachInnerH(res, call);
   }
 
@@ -1770,6 +1780,60 @@ export class WeiwenLawEngine {
   //      deny/review 记 sign='0' —— **中性刻痕：只留痕，不冒充增益**，不改 sBySubsystem 读数。
   // 为何放在出口而非各分支：分支是"枚举"（漏一个就断一处，实测已漏 10 处）；出口是"结构"（一处理，全出口覆盖）。
   //   分支内已记过的，靠 _interceptMarked / _settleMarked 幂等跳过 —— 故本方法对既有路径零影响。
+  // ---------- Decision history: letting the instrument see what it measured (2026-10-27, forced by xiaoD's measurement) ----------
+  // The defect, in one sentence: **storing only "the most recent" observation slot is necessarily self-referential
+  //   the moment the observation itself has to pass through the gate.**
+  //   Measured sequence: glob --deny/R--> then query_conduction_chain --allow-->
+  //   the query read back "allow / law:推演 / layer=file-read / vacuum / touched no anchor"
+  //   — that was not the chain of the previous deny, it was **the query's own chain this time**. The instrument
+  //   had measured itself.
+  // Why "take a snapshot before the query" does not solve it: a snapshot has the same "who took it" problem, and
+  //   does the act of taking a snapshot itself pass the gate?
+  //   ⇒ The structural answer is not "read before the contamination", it is **store the contaminated and the
+  //   uncontaminated separately, and pick by nature when reading**.
+  // Layering (important — do not mix the layers):
+  //   The engine does not know "which tools are self-audit tools" (that is knowledge the plugin only has at
+  //   registration time) ⇒ the engine only **records faithfully** (tool name included).
+  //   Who to filter is decided by an explicitly registered set on the index.js side ⇒ the engine side does not
+  //   recognise a `query_` prefix (word-form = enumeration, and it would miss new tools).
+  _recordConduction(call, res, snapshot) {
+    if (!Array.isArray(this.conductionHistory)) this.conductionHistory = [];
+    this._conductionSeq = (this._conductionSeq ?? 0) + 1;
+    this.conductionHistory.push({
+      seq: this._conductionSeq,
+      tool: call?.name ?? null,
+      kind: res?.kind ?? null,
+      law: res?.law ?? null,
+      at: new Date().toISOString(),
+      conduction: snapshot,
+    });
+    // Ring cap: keep only the most recent 32 steps available for look-back.
+    // ⚠️ This does not mean "only 32 decisions are recorded" — the ledger itself (S scars / bugKey counts /
+    //   mMark) is stored elsewhere and is not subject to this cap. What is capped here is only the *look-back
+    //   depth of chain landing points*. Do not read it as "history was lost".
+    const CAP = 32;
+    if (this.conductionHistory.length > CAP) {
+      this.conductionHistory.splice(0, this.conductionHistory.length - CAP);
+    }
+  }
+
+  /**
+   * Return "the most recent decision that is **not in** excludeTools".
+   * @param {Set<string>|string[]} [excludeTools] tool names to skip (self-audit / inspection tools)
+   * @returns {{seq:number, tool:string, kind:string, law:string|null, at:string, conduction:Array}|null}
+   *   Returns null when nothing is found — **null is a positive reading ("no decision to look at yet"), not an error**.
+   *   ⚠️ Do not fall back from null to "the most recent one": that is exactly the self-reference returning.
+   */
+  lastConductionExcluding(excludeTools = new Set()) {
+    const skip = excludeTools instanceof Set ? excludeTools : new Set(excludeTools);
+    const hist = Array.isArray(this.conductionHistory) ? this.conductionHistory : [];
+    for (let i = hist.length - 1; i >= 0; i -= 1) {
+      const e = hist[i];
+      if (!skip.has(e.tool)) return e;
+    }
+    return null;
+  }
+
   _settleExit(res, call) {
     let out = res;
     // ① 追责痕迹（非 allow 且该分支未记过）

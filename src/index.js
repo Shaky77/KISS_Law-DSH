@@ -37,7 +37,8 @@
 //
 // Still an RC preview; official notes future breaking API changes; re-check against the current official docs before real-device integration.
 
-import { writeFileSync, appendFileSync } from 'node:fs';
+import { writeFileSync, appendFileSync, readFileSync, readdirSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { WeiwenLawEngine, DEFAULT_RIGID_ANCHORS } from './core/engine.mjs';
 import { R_DOMAIN, THREE_IRON_LAWS } from './core/law.mjs';
 // [2026-10-21 中英对齐 · synced from the CN edition] Criterion-wiring readout (read-only surface):
@@ -67,8 +68,74 @@ import { bugKeyOf } from './core/bugstop.mjs';
 import { defineTool } from '@deepseek-ai/dsh-tools';
 
 const LOG = new URL('./runtime.log', import.meta.url);
+
+// ---------- buildId: a fingerprint of the criteria code (2026-10-27, requested by external auditor node "xiaoD") ----------
+// Origin: xiaoD reported three gaps against `0.2.0`; two of them had already been fixed by later commits.
+//   He was not wrong — the *package* carried no fingerprint. The line numbers he cited (`L2189/L2218`) had
+//   long since moved inside a 2643-line file. When a line number is the only locating device, the question
+//   "is the code you measured the code I am describing?" can only be answered by self-report, and self-report
+//   is not auditable.
+// Criterion (why not `package.json`'s version): **a version number is written by a human and can be forgotten;
+//   a content hash changes the moment the content changes.** So the fingerprint derives from the content of
+//   `src/core/*.mjs` only — no version number, no timestamp. `_engine_base_*` is a baseline copy excluded at
+//   packaging time; its presence locally would pollute the hash, so it is excluded explicitly.
+// Semantics: same buildId ⇒ same criteria code; different ⇒ the two readings may not be cross-credited.
+//   It does **not** mean "newer / older" — that question needs the commit log.
+// 🔴 Line endings must be normalised before hashing (measured 2026-10-27 on a real install):
+//   hashing raw working-tree bytes gave the *same code* two different fingerprints depending on install path:
+//     inside the npm package (old files checked out as CRLF by autocrlf) → `8e8604efd2cf`
+//     git storage / a Linux checkout (LF)                            → `91fea30b57f8`
+//   The *only* purpose of buildId is "is the code you measured the code I am describing". Mixing in a platform
+//   convention unrelated to the code destroys that purpose, and destroys it in the worst way: a mismatch gets
+//   read as "you installed an old package" rather than "the fingerprints were taken under different conventions"
+//   — which sends the reader down the wrong path. Hence: normalise, then hash.
+export function computeBuildId(entries) {
+  const h = createHash('sha256');
+  for (const [name, content] of [...entries].sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0))) {
+    h.update(name);
+    h.update(String(content).replace(/\r\n/g, '\n'));
+  }
+  return h.digest('hex').slice(0, 12);
+}
+
+const BUILD_ID = (() => {
+  try {
+    const dir = new URL('./core/', import.meta.url);
+    const entries = readdirSync(dir)
+      .filter((n) => n.endsWith('.mjs') && !n.startsWith('_engine_base_'))
+      .map((n) => [n, readFileSync(new URL(n, dir)).toString('utf8')]);
+    return computeBuildId(entries);
+  } catch { return 'unavailable'; }
+})();
+
+// 🔴 [2026-10-27 · second blind spot, raised by xiaoD after real measurement] `buildId` hashes only
+//   `src/core/*.mjs` ⇒ **a change to the adapter layer (this file) is invisible to it.** Between 0.2.5 and
+//   0.2.6 the adapter and the docs changed while buildId did not move at all (both versions reported
+//   `91fea30b57f8`; only `loadedAt` differed).
+//   ⇒ This is not "the fingerprint computed wrong", it is a question of **coverage**: buildId answers
+//   "is the criteria code the same", not "is the whole behavioural surface the same".
+//   Disposition: **do not widen buildId's coverage** — widening would void every recorded value the project
+//   has published for 0.2.0–0.2.6 and break historical reconciliation. Instead place a **second** fingerprint
+//   beside it, with its own meaning:
+//       `buildId`   = criteria domain  (src/core — decides *what it is judged to be*)
+//       `bundleId`  = behaviour domain (all of src, adapter included — decides *how it lands on the host*)
+//   Carrying both means: whichever one moved tells you what moved, without guessing from a version number.
+const BUNDLE_ID = (() => {
+  try {
+    const walk = (dir, prefix) => readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
+      const full = new URL(e.name + (e.isDirectory() ? '/' : ''), dir);
+      if (e.isDirectory()) return walk(full, `${prefix}${e.name}/`);
+      if (!e.name.endsWith('.js') && !e.name.endsWith('.mjs')) return [];
+      if (e.name.startsWith('_engine_base_') || e.name === 'runtime.log') return [];
+      return [[`${prefix}${e.name}`, readFileSync(full).toString('utf8')]];
+    });
+    return computeBuildId(walk(new URL('./', import.meta.url), ''));
+  } catch { return 'unavailable'; }
+})();
+const LOADED_AT = new Date().toISOString();
+
 function logline(s) {
-  try { appendFileSync(LOG, `[${new Date().toISOString()}] ${s}\n`); } catch { /* log failure does not block the guard */ }
+  try { appendFileSync(LOG, `[${new Date().toISOString()}] {b:${BUILD_ID}} ${s}\n`); } catch { /* log failure does not block the guard */ }
 }
 
 // ⑥ Window police: evidence-sufficiency gate (audit layer, zero intrusion into core criteria)
@@ -594,7 +661,23 @@ function apply(ctx) {
   // ---------- White-box self-check tools (model can query, verify framework running) ----------
   const renderObj = (_args, value) => [{ type: 'text', text: JSON.stringify(value, null, 2) }];
 
-  ctx.tools.register(defineTool({
+  // 🔴 [2026-10-27 · cure instrument self-reference] **Explicit registry** of self-audit tools.
+  //   Why a registry rather than reading the tool name: the `query_` prefix is a **word form**, and a word-form
+  //   criterion is enumeration (a future `get_*` / `inspect_*` self-audit tool would be missed — and the
+  //   consequence of missing one is precisely the self-reference coming back).
+  //   Registration and registration-as-a-self-audit-tool are **one action here** (`registerSelfAuditTool` does
+  //   add + register together) ⇒ "registered but forgot to record it" is structurally impossible. This is a
+  //   structural position, not list maintenance.
+  //   ⚠️ Every tool this plugin exposes is a read-only self-check (reads engine state, no side effects).
+  //      If a tool with side effects is ever added, it must go through `ctx.tools.register` directly and
+  //      **must not** go through this function.
+  const SELF_AUDIT_TOOL_NAMES = new Set();
+  const registerSelfAuditTool = (def) => {
+    SELF_AUDIT_TOOL_NAMES.add(def.name);
+    return ctx.tools.register(def);
+  };
+
+  registerSelfAuditTool(defineTool({
     name: 'query_steady_state',
     description: 'Query the current system steady-state reserve S (dual nature: historical scars irreversible + current value can rise/fall, barrel takes shortest board).' +
       'Returns effective S, active-state ledger (only latest version per same-kind event; old versions silently standby), silent-standby and trauma counts, break-window count.' +
@@ -615,7 +698,7 @@ function apply(ctx) {
     },
   }));
 
-  ctx.tools.register(defineTool({
+  registerSelfAuditTool(defineTool({
     name: 'list_rigid_anchors',
     description: 'List the currently effective definition of R rigid anchors in RSDHM, for the model to calibrate direction and self-check whether out of bounds.',
     parameters: {},
@@ -629,27 +712,49 @@ function apply(ctx) {
     },
   }));
 
-  ctx.tools.register(defineTool({
+  registerSelfAuditTool(defineTool({
     name: 'query_conduction_chain',
     description: 'Return the conduction-chain order R→S→D→H→M and the framework essence, plus the **actual chain landing of the most recent decision** (per-node readings and verdict), so the model can understand the closed-loop structure and audit the basis of the latest verdict.',
     parameters: {},
     output: { schema: { type: 'object', additionalProperties: true }, render: renderObj },
     async execute() {
+      // 🔴 [2026-10-27 · instrument self-reference fix] Before the fix this read `engine.conduction`
+      //   (which holds only "the most recent one").
+      //   Defect: this tool also passes through the gate ⇒ its own decision overwrites "the most recent one"
+      //   ⇒ what it reads back is always **itself**.
+      //   Measured (xiaoD): after glob→deny, calling this tool reported allow / law:推演 / layer=file-read /
+      //   vacuum — that was not glob's chain, it was this tool's own. Every "look at the chain" self-check
+      //   before the fix was a self-portrait.
+      //   Fix: read from the **decision history**, taking "the most recent decision that is not a self-audit
+      //   tool" (self-audit tool names are explicitly registered in SELF_AUDIT_TOOL_NAMES).
+      const subject = engine.lastConductionExcluding(SELF_AUDIT_TOOL_NAMES);
+      const hist = Array.isArray(engine.conductionHistory) ? engine.conductionHistory : [];
+      const excluded = hist.filter((e) => SELF_AUDIT_TOOL_NAMES.has(e.tool)).length;
       return {
         chain: ['R rigid anchor', 'S steady-state reserve', 'D break-window stop-loss', 'H inner-H inviolability', 'M First-Bug Halt'],
         essence: 'White-box presentation of causal-law runtime structure: survival (never abandon any node) and precision (structure carries its own anchors) are isomorphic.',
         // [2026-09-24 · white-box carry-through] Before, this tool **returned a constant**: no matter what had happened, you read the same text
         //   ⇒ a surface that looks like a white-box query but is in fact a black box (nobody outside can re-derive any single verdict from it).
-        //   Meanwhile the chain landing of the latest decision has **always been present** on the engine side (`engine.conduction`; rebuilt on
-        //   every decideToolCall; each R→S→D→H→M node carries sBefore/sAfter/delta/verdict readings) ⇒ echo it as-is, unprocessed.
+        //   Meanwhile the chain landing of the latest decision has **always been present** on the engine side
+        //   (each R→S→D→H→M node carries sBefore/sAfter/delta/verdict readings) ⇒ echo it as-is, unprocessed.
         //   No new criterion, no change to adjudication, no field-picking (same rule: faithful by position, never summarised by name).
-        lastConduction: engine.conduction ?? [],
-        lastConductionNote: 'Chain landing of the most recent decideToolCall (per-node readings). Empty array = no decision has occurred in this session yet.',
+        lastConduction: subject ? subject.conduction : [],
+        // The subject must be **named**: without "whose chain is this", the reader cannot tell whether they are
+        // looking at an action or at the instrument itself.
+        lastConductionSubject: subject
+          ? { tool: subject.tool, kind: subject.kind, law: subject.law, seq: subject.seq, at: subject.at }
+          : null,
+        lastConductionNote: subject
+          ? 'The most recent decision by a tool that is **not** a self-audit tool (per-node readings). The judged tool is named in lastConductionSubject.tool.'
+          : 'No decision by a non-self-audit tool in this session yet — an empty array is a positive reading (nothing to look at yet), not an error.',
+        // Self-reference made **visible rather than silently handled**: how many were excluded, and which are registered.
+        selfAuditExcluded: excluded,
+        selfAuditTools: [...SELF_AUDIT_TOOL_NAMES],
       };
     },
   }));
 
-  ctx.tools.register(defineTool({
+  registerSelfAuditTool(defineTool({
     name: 'query_boundary',
     description: 'Query the inner-H boundary: this plugin does not invade the subjective black-box (neither reads nor writes).',
     parameters: {},
@@ -660,7 +765,7 @@ function apply(ctx) {
   }));
 
   // Three Iron Laws (white-box self-check: model can query the framework's immutable constraints)
-  ctx.tools.register(defineTool({
+  registerSelfAuditTool(defineTool({
     name: 'query_iron_laws',
     description: 'Return the finalized text of KISS\'s Law three iron laws (immutable): inner H inviolability / First-Bug Halt / never abandon any node. For the model to calibrate direction and self-check boundaries.',
     parameters: {},
@@ -671,7 +776,7 @@ function apply(ctx) {
   }));
 
   // First-Bug Halt closed-loop state machine white-box self-check (author completion 2026-08-21)
-  ctx.tools.register(defineTool({
+  registerSelfAuditTool(defineTool({
     name: 'query_bugstop',
     description: 'Query the First-Bug Halt closed-loop state machine: which faulty components are halted but not yet repaired (halted but resolved=false), and each one\'s missing steps (logic backtrack / trace-mark / resolve-fix). Used for white-box observation of whether the loop is closed, preventing "backtrack-only-without-repair → infinite recursion".',
     parameters: {},
@@ -687,7 +792,7 @@ function apply(ctx) {
   // [2026-09-20 · 锚源自报] 把"猜宿主字段名 / 猜哪条消息算授权"换成"看事实"：实机跑一次即可观测
   //   ① 宿主是否真把消息流交给插件（shape / roles 词表 / 线索）；② 结构入口是否接通；③ 锚池里有什么；
   //   ④ 宿主的结构对象（payload.agent / apply ctx）上有哪些键 —— 这是**接真入口**所需的事实，不猜字段名。
-  ctx.tools.register(defineTool({
+  registerSelfAuditTool(defineTool({
     name: 'query_anchor_channel',
     description: 'White-box self-report of the anchor source: whether the structural entry (host-declared task scope) is connected, what the anchor pool holds, and what the host actually passes (message shape, role vocabulary, structural-object keys). The utterance window is an observation surface and never grants authority by design; an empty pool means irreversible actions go to a human (fail-closed).',
     parameters: {},
@@ -709,21 +814,24 @@ function apply(ctx) {
   // ════════════════════════════════════════════════════════════════════
 
   // [2026-10-20] 判据接线自查（元认知的第一个可观测面）
-  ctx.tools.register(defineTool({
+  registerSelfAuditTool(defineTool({
     name: 'query_criterion_wiring',
     description: 'Criterion-wiring self-check (read-only). The library\'s criteria are registered into four buckets — decision slot / readout slot / declaration slot / undetermined — and this returns the members of each, the gaps already declared on paper (criteria that should have been wired but were not), and whether each of the three time phases (past · present · future) of the causal chain is connected. Answers one question: "of the rules I know, how many actually enter the computation". Changes no allow/deny verdict.',
     parameters: {},
     output: { schema: { type: 'object', additionalProperties: true }, render: renderObj },
     async execute() {
       return {
+        buildId: BUILD_ID,
+        bundleId: BUNDLE_ID,
+        loadedAt: LOADED_AT,
         ...criterionReadout(engine),
-        note: '只读面：不产生 verdict、不写状态、不参与闸门。gaps 是如实登记的缺口（不是免责通道）；unmapped 是欠账，不视为通过。',
+        note: '只读面：不产生 verdict、不写状态、不参与闸门。gaps 是如实登记的缺口（不是免责通道）；unmapped 是欠账，不视为通过。双指纹：buildId＝src/core 内容哈希（判据域，答判成什么）；bundleId＝src 全量含本适配层（行为域，答怎么落到宿主上）。都不含版本号 ⇒ 外部审计方可自行重算比对外，不必依赖被测方自报包版本。',
       };
     },
   }));
 
   // ── 五层推演读数（R→S→D→H→M，逐层给「可代入量」）──────────────────
-  ctx.tools.register(defineTool({
+  registerSelfAuditTool(defineTool({
     name: 'query_strata',
     description: 'Five-stratum readout (read-only): walks R→S→D→H→M and returns, per layer, the quantities that can actually be substituted into the formula — each with its expression and with "where it stops". Three states are explicit: ok (computable now) / pending (missing a constant or its evidence, carrying a TBD pointer) / absent (the quantity does not exist in the implementation). Also returns the cross-layer substitution bans (e.g. ΣS and S_now aggregate in opposite directions and may not stand in for each other). The R layer additionally exposes the domain-capacity face: p_max (evidenced standard value) / N_opp (denominator, absent in the engine) / R₀ (= p×N) / rCapRoute (which formula this domain should use), plus a domain-table health check that counts "malformed entry" separately from "legal standard that gives no number". Changes no allow/deny verdict.',
     parameters: {},
@@ -737,7 +845,7 @@ function apply(ctx) {
   }));
 
   // ── 四层嵌套（R/S/D/H 各自的宏观／微观）＋ M 公式方向 ─────────────
-  ctx.tools.register(defineTool({
+  registerSelfAuditTool(defineTool({
     name: 'query_nested',
     description: 'Four-layer nesting readout (read-only): returns, for R/S/D/H, the macro form, the micro form, the containment relation (which binds which), the termination criterion for expansion, and a medical-domain instance; plus the DIRECTION of M = (R×S)/(D×H) — up / down / indeterminate, never a number, because the formula\'s own text forbids assignment and computation. Pass per-layer deltas (-1/0/+1) to get a direction. Also returns the shape test for the formula constraint `0 < H/(S↔D) < R`: `↔` is NOT an operator — it marks the internal rail of H (S end ↔ D end), H being a slider on that rail — so only the slider\'s position shape is judged (on_rail / off_low / off_high / unknown), never a number. Pass hPosition to judge the shape. Produces no verdict and enters no gate.',
     parameters: {
@@ -763,7 +871,7 @@ function apply(ctx) {
   }));
 
   // ── 张力 L（S↔D 之间的跨距）＋ R/H 的动作形态 ───────────────────
-  ctx.tools.register(defineTool({
+  registerSelfAuditTool(defineTool({
     name: 'query_tension',
     description: 'S↔D tension readout (read-only): computes the span L between "what the standard requires" and "what this case actually allows". Three notches, routed by what the domain actually provides — notch A (a tolerance exists): L = |deviation| / tolerance, dimensionless, the unit being "how many tolerances"; notch B (only clauses or act lists): returns a GAP LIST (required acts − allowed acts), and a set difference has no magnitude, so it never carries a number; notch C (neither available): not judged, which is not the same as compatible. Also returns H\'s position shape on the tension (on_rail / off_low / off_high / zero_tension / unknown), where zero_tension is a structural fact: S and D are fully compatible ⇒ span is zero ⇒ the lever has no arm ⇒ H has nowhere to stand. Also returns the three-layer distinction of R (ontology has no ceiling / the domain reading is a projection / R = 100 is a mere scale), the consensus margin interval for the given consequence level, and a SHAPE check on clauses (slot presence only, no natural-language parsing). Also returns who holds H\'s discretion (set by the first person, with no higher licensing authority) and the ESCALATION criterion (undecidable ∧ must trace to an owner ∧ concerns that owner ⇒ hand back to the human for final ruling; missing one of the three stops at H and does not hand back), plus the evidence-grade convention (second-hand evidence does not block a verdict; a to-do is not a debt). Also judges the SOURCE OF THIS LAYER\'S RULER: pass citableToPublic to separate "public original standard" (origin, citable externally) from "an upper layer\'s paraphrase" (relay, valid only inside this layer and never to be passed off as the original) — R does not reach you directly: objective within a layer, a projection across layers, and handing in the original against this layer\'s gap means handing in the wrong ruler. Also returns LOSS ATTRIBUTION: loss from paraphrase or relay can only be paid by H (R/S/D carry no "bearing the consequence" property, hence no capacity to pay); pass relayLayers to get the direction — more layers ⇒ total H up ⇒ M down, so removing layers raises M directly; the root of the loss is that the receiver must rebuild the context, not that information was lost. Also returns H\'s RUNWAY PERMIT: pass runwayCovered to judge whether this spot may "run wide open, don\'t be afraid, play to your strengths" — where the runway is paved, excess caution is withdrawn (it is only interest paid on a gap) ⇒ loss-bearing H retires ⇒ total H down ⇒ M up; where it is not paved, run along the known boundary first. Granularity follows runway coverage, not industry name; what is withdrawn is excess caution, NOT consequence attribution. Produces no verdict and enters no gate.',
     parameters: {
@@ -915,6 +1023,16 @@ function apply(ctx) {
 }
 
 export { name, inject, apply };
+
+// 🔴 [2026-10-27] Both fingerprints exposed outward (pure fact slot — takes part in no verdict, enters no gate):
+//   `buildId`   = criteria domain  (src/core) — decides *what it is judged to be*
+//   `bundleId`  = behaviour domain (all of src, this adapter included) — decides *how it lands on the host*
+//   Why export them: an auditor must be able to **recompute them independently** and compare, rather than
+//   being limited to whatever value we printed on a receipt.
+//   Why not merge them into one: merging would void every recorded value for 0.2.0–0.2.6 (breaking historical
+//   reconciliation), and would conflate two different questions ("did the criteria change" vs "did the
+//   package change").
+export const FINGERPRINTS = { buildId: BUILD_ID, bundleId: BUNDLE_ID, loadedAt: LOADED_AT };
 
 // Adapter-layer fusion wiring: S/D quantitative effect sensor (M-gate constrained),
 // see src/adapt/sd-effect-sensor.mjs
