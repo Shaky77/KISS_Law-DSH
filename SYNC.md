@@ -6,13 +6,15 @@
 
 ## 1. Where the two repos stand
 
+> ⚠️ **Only stable values are tabled here on purpose.** Version numbers and HEAD hashes change daily; a ledger that carries them is stale the moment it is written, and a stale ledger is worse than none because people trust it. Read those two from `npm view` and `git log`; the table carries only what does not move on its own.
+
 | | Chinese repo `weiwen-law-dsh` | This repo `KISS_Law-DSH` |
 |---|---|---|
 | npm package | `dsh-weiwen-law` | `dsh-kiss-law` (**never published** — registry returns 404) |
-| version | 0.2.9 | 0.1.0 |
-| tests | 560 / 560 green | 517 / 517 green |
-| last functional sync | — | `d51a0a9` (2026-10-21) |
-| latest commit | `7a05e3b` | `8d8b901` |
+| test count | 560 | 517 |
+| last functional sync to this repo | — | `d51a0a9` (2026-10-21) |
+| `src/` gap since that sync | — | **11 commits** (listed in §3) |
+| version / HEAD | read from `npm view` / `git log` | read from `git log` |
 
 Because `dsh-kiss-law` has never been published, syncing it cannot break any existing consumer. That is the one thing that makes this safe to do at all.
 
