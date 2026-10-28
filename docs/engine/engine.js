@@ -15,7 +15,7 @@ import { R_DOMAIN, FRACTAL_PROPERTY } from './law.js';  // R 域刚性锚点常�
 //   判据与词汇归 capability，引擎只消费（与 attribution 同一种分工）：
 //   动作类封闭集、作用域归一、落点键表都只有一份定义，引擎不自带第二套。
 //   ⚠️ 两者字段同形、语义相反 —— 证是「谁批准」（宿主给的上限），担保是「谁承诺」（被审方自己交的下界）。
-import { parseCapability, capabilityVerdict, consume, parsePledge, pledgeVerdict, consumePledge, notePledgeBreach } from './capability.js';
+import { parseCapability, capabilityVerdict, consume, parsePledge, pledgeVerdict, consumePledge, notePledgeBreach, locValues } from './capability.js';
 import { SAccountLedger, classifyReversibility, rDomainsForLayer } from './ledger.js';  // [2026-09-20] S 账本（用户账本模型）：R=字典 / SD=轴标记 / term 字典序索引 / S≠R 异类 / 疤窗可逆性。仅附加记录，不碰裁决核心。
 
 // [2026-09-18] R 域层级 → 权威权重（结构性推导，非枚举阈值、非拍脑袋数字）
@@ -803,6 +803,42 @@ export const DEFAULT_RIGID_ANCHORS = [
 const SHELL_HEAD = /^\s*(rm|rmdir|shred|unlink|mkfs|mkfs\.\w+|format|dd|truncate|wipefs|cat|curl|wget|git|tar|python\d*|perl|bash|sh|zsh|env|export|echo|find|rsync|scp|ssh|chmod|chown|sudo|su|cd|cp|mv|ls|nc|nmap|sqlmap|kubectl|docker|terraform|aws|gcloud|gh|heroku|az|node|npm|npx|pip\d*|go|ruby|php)\b/;
 const SHELL_OP = /(\$\{|`|\$\(|\&\&|\|\|)/;
 
+// ===== Local read/write is exempt (author ruling, 2026-10-29) =====
+// The ruling, verbatim: "Local reads and writes are all exempt. The reason is simple — local is a closed
+//   environment; it does not go out. It is more or less the AI and the user talking face to face at the
+//   computer, and the responsibility is borne directly by the user. But deletion is still not exempt yet."
+// Why this is a **structural criterion and not a tool-name allowlist**: the ground for exempting is not
+//   "what this tool is called", it is **whether this action can move the outside world**. A local read does
+//   not leave the machine; a local write can be written back (the user is sitting at that machine and can
+//   see it); so the blast radius stops inside the closed environment and the responsibility chain
+//   terminates at the user. Deletion cannot be undone ⇒ not exempt.
+// ⇒ The criterion rests on two things, neither of which enumerates tool names:
+//   ① attribution layer ∈ {file-read, file-write} (credential cred-*, delete, send and exec all fall out)
+//   ② the landing slots (locValues — the same slot definition the capability uses) are **non-empty**;
+//      with no landing slot there is no way to prove "local", so no exemption.
+// ⚠️ URL / UNC are **not** re-checked here, and that was a deliberate removal. The first version checked
+//   them; mutation testing showed the branch was **unreachable**: attribution already rules on
+//   "name says local read/write × arguments carry an outbound landing point ⇒ cannot attribute"
+//   (`declConflicts`), and both URL and UNC come back `ok:false` there. By the time this line runs, `ok`
+//   already implies "the landing point is not an outbound form". Re-checking it looked stricter but could
+//   neither be covered by a test nor falsified — I tried. Tighten it in attribution: that is the criterion
+//   itself, this is a consumer.
+// ⚠️ This exemption closes **one gate only, the H content gate**: the R layer's credential rule
+//   ("taking without asking is theft"), the irreversible-without-anchor rule for deletion, outbound
+//   landing points and the exec container are all untouched. What is exempt is "should this content be
+//   read as an injection", not "may this action be done".
+const LOCAL_RW_LAYERS = new Set(['file-read', 'file-write']);
+function isLocalReadWrite(call, decl = null) {
+  const a = attributeCall(call, decl);
+  if (!a.ok || !LOCAL_RW_LAYERS.has(a.layer)) return false;
+  const locs = locValues(call?.args ?? {});
+  // No landing slot ⇒ cannot prove "local" ⇒ **no exemption**. Loosening must rest on "it can be shown to
+  // be local", never on "there is no evidence that it is not" (same rule as "cannot attribute ⇒ review, do
+  // not guess").
+  return locs.length > 0;
+}
+
+
 // [2026-09-19 live-API] Is this call an *action* (the agent's own command) rather than *carried content*?
 // Distinguisher = command form: the extracted text must actually start with a command verb or contain exec operators.
 // Counter-example that must NOT count as an action:
@@ -1577,6 +1613,24 @@ export class WeiwenLawEngine {
     //   which are actions by nature) not judged.
     //   Measured (independent test set · real-API generated: 60 attacks + 90 normals): attacks +5, false hits +0
     //   (strict Pareto gain); the no-exemption version had false hits +29 (all tech docs) ⇒ exemptions are required.
+    // 🔴 [2026-10-29 · author ruling: local read/write exempt, deletion not] The landing point of this
+    //   exemption is **here, not the first line of the function**. Position is itself part of the criterion:
+    //   the ground for exempting is "inside the local environment, the responsibility for what this content
+    //   is rests with the user" — and that premise holds **only when the source is unlabeled** (the default
+    //   assumption being: the user is the one who put this thing on this machine). Once the caller has
+    //   explicitly marked `provenance:'third-party'`, the responsibility is no longer the user's, the
+    //   premise is gone ⇒ the third-tier criteria run in full, none skipped.
+    //   ⚠️ The first version put these two lines at the top of the function; measured, that released all 26
+    //     "external content ⇒ hand over" cases. **Where an exemption sits is easier to get wrong than what
+    //     it says** — this comment is for the next me.
+    if (isLocalReadWrite(call, this._declOf(call))) return null;
+    // [2026-10-29 · what was NOT added says more than what was] No exemption for "self-audit tools" is
+    //   added here. Reason: mutation testing shows such a line is **unobservable** at this point —
+    //   `query_*` takes `{}` as arguments, carries nothing that could hit the content gate, and passes
+    //   either way. A line whose removal no test can detect only turns "criterion present" into a
+    //   self-comfort (same family as "criterion present ≠ criterion called").
+    //   Written down for whoever next hits "an external agent reports query_* being blocked": **the missing
+    //   piece is not an exemption here** — get the real call shape their host hands to `query_*` first.
     if (!isDocWrite && !isDeclaredExec && !isActionCall(call) && targetsBehaviorConstraint(s)) {
       return { kind: 'review', law: 'H', reason: '来源未标注；结构判据命中——内容指向主体行为约束（外 H 行为面可观测）。追因止于 D 层：来源未标注 ⇒ 内外归属不可判 ⇒ 不可判恶意、亦不可放行，交还用户裁决后再执行。' };
     }
