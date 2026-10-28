@@ -1180,6 +1180,22 @@ export class WeiwenLawEngine {
     this.mSeries = [];             // 位移链（append-only）：历史轨迹属"疤"，不清（S 只增不减）
     this.mLayerLoad = new Map();   // key=R 层级, value=该层投影累积；属"窗"，healWindow / settleWindow 清零
     this.windowBroken = false;     // 破窗止损是"状态"不是"一次判定"：一旦触发即持续 fail-closed，直到 heal / settle 复位
+    // [2026-10-28 · broken-window scope narrowed] Self-audit / ledger-read-only tool names, **injected by the
+    //   adapter layer** (registered == recorded, see registerSelfAuditTool in index.js).
+    //   Why a name lookup here is not "form-based enumeration": the list is not "names that look like queries"
+    //   (that would be form); it is a **declaration made by the deployer at registration time** — "this tool only
+    //   reads its own ledger, no external side effects" — the same trusted channel as declareTool(verb).
+    //   Why the broken window must let it through (structural, not a convenience door):
+    //   stop-loss exists to stop a **fault from spreading**, i.e. it governs "actions that change the outside
+    //   world". Reading your own state changes nothing ⇒ it is outside that range.
+    //   Measured (2026-10-28, xiaoD `10`): with the window broken, query_steady_state / query_bugstop were refused
+    //   too ⇒ **the receipt demanded "reverse-deduce → trace → fix → verify" while the tools for those steps were
+    //   shut by the same door** ⇒ stop became deadlock and the second half of the loop could never run.
+    //   Passing a Set means **sharing that object, not copying it**: two tables == criterion split (this repo has
+    //   already been burned by exactly that), so the roster has exactly one home and the engine reads it by reference.
+    this.selfAuditTools = opts.selfAuditTools instanceof Set
+      ? opts.selfAuditTools
+      : new Set(opts.selfAuditTools ?? []);
     // [2026-09-18 簇A] R 命中按锚(域)分桶；原只进全局 failureStreak 标量(诊断：最强信号记进最弱容器)
     this.windowMarks = new Map();   // key = `${termId}::${anchor}`，窗口内按域分桶的痕存
     this.termId = opts.termId ?? null; // 当前时间窗口(阶段)id；null = 未分窗(全量)
@@ -1390,17 +1406,33 @@ export class WeiwenLawEngine {
   }
 
   // ---------- D broken-window stop-loss: deviation/broken-window accumulation to threshold → block ----------
+  // ---------- Self-audit tool registry (2026-10-28 · broken-window scope narrowed) ----------
+  // Who counts as "self-audit / ledger read-only" is **declared by the registrant**, never guessed from the name
+  // (`query_` prefix == form == enumeration; add an `inspect_*` tool and it is missed).
+  // ⚠️ Host API only — **must never be exposed as a tool**: letting the audited party register itself is
+  // self-signing (same rule as setPrincipalScope).
+  addSelfAuditTool(toolName) {
+    if (typeof toolName === 'string' && toolName) this.selfAuditTools.add(toolName);
+  }
+  isSelfAuditTool(toolName) {
+    return this.selfAuditTools.has(toolName);
+  }
+
   checkBreakWindow() {
     // [2026-09-19] 两条通道：① 任一 R 层投影达阈值（有域归属 ⇒ 走结构）；② 全局兜底累积（无域归属 ⇒ 走兜底）。
     //   破窗是"状态"不是"一次判定"：触发后持续 fail-closed，直到 healWindow / settleWindow 复位。
+    // [2026-10-28] Ownership of the reset is written into the verdict: **reset belongs to the host/H side, not to
+    //   the audited party** (same rule as "the audited may not issue its own authorisation"). Without this line the
+    //   measured outcome was: the agent kept retrying the same path (it assumed it had not found the way yet) and
+    //   turned a stop into an infinite loop.
     if (this.windowBroken) {
       return {
-        reason: '已有 R 层投影累积达破窗阈值，系统处于破窗止损态（fail-closed，防故障扩散杀死整体）；修复或结算后复位。',
+        reason: '已有 R 层投影累积达破窗阈值，系统处于破窗止损态（fail-closed，防故障扩散杀死整体）；修复或结算后复位。复位权在宿主侧（非被审方）：需宿主调用插件导出的 healBrokenWindow(note) 复位，或经 resolveBug(bugKey) 修复验证通过后自动复位。',
       };
     }
     if (this.failureStreak >= this.maxFailureStreak) {
       return {
-        reason: `连续失败/偏离已累积 ${this.failureStreak} 次，达破窗阈值，触发 D 破窗止损（防故障扩散杀死整体）。`,
+        reason: `连续失败/偏离已累积 ${this.failureStreak} 次，达破窗阈值，触发 D 破窗止损（防故障扩散杀死整体）；复位权在宿主侧（非被审方）：需宿主调用插件导出的 healBrokenWindow(note) 复位，或经 resolveBug(bugKey) 修复验证通过后自动复位。`,
       };
     }
     return null;
@@ -2212,7 +2244,27 @@ export class WeiwenLawEngine {
       pending: true,
       note: '本次扰动须由 R 格归因层喂入（下游消费上游）；R 归因产出后回填',
     });
-    if (d) return { kind: 'deny', law: 'D', reason: d.reason };
+    // [2026-10-28 · broken-window scope narrowed] Self-audit / ledger-read-only tools are **outside the broken
+    //   window's range**: the window guards against a fault spreading == actions that change the outside world;
+    //   reading your own state changes nothing.
+    //   ⇒ do not return deny here; **keep running the R/H/M criteria** (this is not a bypass — the call still has
+    //   to pass the inner-H gate and the first-bug halt).
+    //   Counter-example measured before the fix: after the window broke, query_steady_state / query_bugstop were
+    //   denied as well ⇒ the agent could not answer "how many of five", while the receipt kept demanding
+    //   "reverse-deduce → trace → fix → verify" ⇒ the required actions were shut by its own door: deadlock.
+    if (d) {
+      if (this.isSelfAuditTool(call?.name)) {
+        this._mark('D', {
+          step: '破窗止损射程判定（自查只读豁免）',
+          hit: false,
+          cuts: false,
+          exempt: true,
+          note: `Broken window in force, but ${call?.name} is a registered self-audit / ledger-read-only tool ⇒ it does not change the outside world ⇒ outside the stop-loss range; the remaining criteria still run (not skipped).`,
+        });
+      } else {
+        return { kind: 'deny', law: 'D', reason: d.reason };
+      }
+    }
     const h = this.checkInnerH(call);
     this._mark('H', {
       step: '杠杆选择 · 边界检查（内 H 不可侵 / 外 H 可审计）',
@@ -2650,19 +2702,35 @@ export class WeiwenLawEngine {
     // ever setting that flag, so a window *already in force* was reported as "about to reach the
     // threshold" (e.g. 6/5): a live stop-loss described as if it had not happened yet.
     if (this.windowBroken || this.failureStreak >= cap) {
+      const proj = this.failureStreak + 1;
       return {
         broken: true,
-        streak: this.failureStreak + 1,
+        streak: proj,
         cap,
-        reason: 'Broken-window stop-loss is still in force (D): nothing is released until the fault is fixed or the window is settled — a fault must not spread and kill the whole.',
+        // [2026-10-28 · reading shape] The ledger keeps counting, but the **threshold reading must cap**.
+        //   Flaw (xiaoD `10`, measured): after the window broke, every further failure kept the receipt showing
+        //   6/5, 7/5 … reading as "the threshold is 5, so why 7". He called it a cytokine storm: it hurts the host.
+        //   ⇒ what was wrong is the **shape of the reading**, not the bookkeeping (S only grows; never stop recording).
+        //   ⇒ cap the threshold dimension at `cap`, report the excess separately as `over`; both are present, so a
+        //   reader sees "how far past" without mistaking the excess for a new threshold.
+        capped: proj > cap,
+        over: Math.max(0, proj - cap),
+        display: proj > cap
+          ? `${cap}/${cap} (capped; +${proj - cap} further consecutive failures since — still on the ledger, not merged into the threshold reading)`
+          : `${proj}/${cap}`,
+        reason: 'Broken-window stop-loss is still in force (D): nothing is released until the fault is fixed or the window is settled — a fault must not spread and kill the whole. Reset belongs to the host side (not the audited party): the host calls the exported healBrokenWindow(note), or resolveBug(bugKey) resets it automatically once the fix verifies.',
       };
     }
     if (this.failureStreak + 1 >= cap) {
+      const proj = this.failureStreak + 1;
       return {
         broken: false,
-        streak: this.failureStreak + 1,
+        streak: proj,
         cap,
-        reason: `Consecutive failures/deviations are about to reach the broken-window threshold (${this.failureStreak + 1}/${cap}): D broken-window stop-loss engages so the fault cannot spread and kill the whole.`,
+        capped: false,
+        over: 0,
+        display: `${proj}/${cap}`,
+        reason: `Consecutive failures/deviations are about to reach the broken-window threshold (${proj}/${cap}): D broken-window stop-loss engages so the fault cannot spread and kill the whole. Reset belongs to the host side (not the audited party).`,
       };
     }
     return null;

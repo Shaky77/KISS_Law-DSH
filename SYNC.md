@@ -65,6 +65,17 @@ Eleven commits touch `src/`. They do not map one-to-one onto eleven tasks — se
   - On that conflict, **do not fall back to the name**. `fetch`'s name is also wrong; falling back lets two wrong paths corroborate each other.
 - ⚠️ Why parameter shape alone cannot replace the declaration: `glob{pattern}` and `delete_matching{pattern}` are **formally identical**. Form is one-to-many. This was attempted and reverted the same day — `tool_42{path:'/'}` turned into `allow`, because deletion needs a path, not content.
 
+### B5 · Broken-window range — why a stop turned into a deadlock (2026-10-28)
+- Files: `core/engine.mjs`, `index.js`, `test/break-window-scope.test.mjs` (7 tests, 2 of them counter-locks)
+- Buys: two things, same root — **a stop that has no exit is not a stop, it is a deadlock.**
+  1. **The window no longer shuts the tools that read its own state.** While broken, `query_steady_state` / `query_bugstop` / `query_conduction_chain` were denied like everything else ⇒ the receipt demanded "reverse → trace → fix → verify" while the tools for those steps were shut by the same door. The range of a stop-loss is **actions that change the outside world**; reading your own ledger changes nothing.
+  2. **The threshold reading caps; the ledger does not.** Past the cap the receipt showed 6/5, 7/5 (a "cytokine storm" — it hurts the host). The ledger must keep counting (S only grows); the *reading* must cap at `cap` and report the excess as `over`.
+- 🔴 Three locks:
+  - Who counts as self-audit is **declared at registration**, never guessed from a name (`query_` is form; add `inspect_*` and the criterion silently dies). The roster is **one Set shared by reference** with the engine — two tables is how a criterion splits, and this repo has been burned by that once already.
+  - **Exemption ≠ skipping criteria.** An exempt self-audit tool still runs R/H/M; it is only outside the D stop-loss.
+  - The exit must be named so the **receiver can actually call it**: the host can call the exported `healBrokenWindow(note)`, not the engine-internal `healWindow()`. Stating ownership without a reachable name only produces retries.
+- ⚠️ Measured, so it can be checked: five mutations (exemption off / exemption by prefix / reading uncapped / `capped` forced false / ownership note removed) each turn the suite red. Real DeepSeek API, five scenarios: the contrast case passes, the broken-window action stays denied, the model finds the self-audit tools on its own and reports honestly without retrying, and the receipt reads `5/5 (capped; +3 further…)` — never 6/5 or 7/5.
+
 ## 4. Order of work, and the acceptance test for each batch
 
 Each batch must end with this repo's own test suite green **and** a live behavioural check — not a diff review. A diff that looks right is not evidence that behaviour is right; that is exactly the failure this repo's wall #6 is about.
@@ -90,6 +101,7 @@ Done means: **the behavioural probe results are identical in both repos, while t
 ## 6. What is not covered by this file
 
 - **Documentation that exists only in the Chinese repo**: `ONBOARDING.md` (position statement), `RELEASES.md` (release ledger), `docs/41` and `docs/42` (the two-axes restructure and the false-block/false-pass unification), plus `docs/27`–`docs/40` — this repo's `docs/` stops at #26, so a single high-numbered file dropped in would be an island.
+- **`docs/43`** (the same broken-window-range write-up, Chinese only) — same numbering-island reason as above.
 - **npm publication**: `dsh-kiss-law` has never been published. Whether it ever should be, and under which version cadence, is an author decision, not an engineering one.
 
 ---

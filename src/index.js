@@ -354,13 +354,22 @@ function haltFeedback(bw, bugKey) {
   return [
     "[KISS's Law · D broken-window stop-loss / M First-Bug Halt]",
     bw.reason,
-    `This receipt is the point where the deviation accrual reached the threshold (${bw.streak}/${bw.cap}).`,
+    // [2026-10-28 · reading shape] The ledger keeps counting (S only grows), but the threshold reading must
+    //   cap — otherwise receipts show 6/5, 7/5, reading as "the threshold is 5, so why 7". The engine supplies
+    //   `display` (5/5 + excess); the adapter does not re-compare thresholds of its own.
+    `This receipt is the point where the deviation accrual reached the threshold (${bw.display ?? `${bw.streak}/${bw.cap}`}).`,
     'The break point lands HERE — on this receipt — not on some later call: once the broken window is in',
     'force every later call is refused before it executes, so this is the last moment the framework can speak.',
     'Required before re-entry (backtracking alone does not close the loop):',
     '  1. reverse-deduce the logic of what just failed;',
     '  2. trace-mark the root-cause layer (M closed loop: reverse → trace → fix);',
     '  3. fix it and pass verification — only then may this call be re-issued.',
+    // [2026-10-28] Ownership of the reset must be stated: without it the agent assumes "retry once more" or
+    //   "I cannot unlock this myself" and turns a stop into an infinite loop.
+    '  ⚠️ The reset is NOT in your hands: the broken window is cleared by the **host side** (host calls the exported healBrokenWindow(note),',
+    '     or resolveBug(bugKey) resets it automatically once the fix verifies).',
+    '     What you can do: read this receipt and the self-audit readings (self-audit tools stay available while',
+    '     broken), complete the three steps above, and hand the result to the host.',
     `Do not re-issue this call, or any look-alike, as-is. BUG identity: ${bugKey}.`,
   ].join('\n');
 }
@@ -400,7 +409,17 @@ function branchesSummary(br) {
 }
 
 function apply(ctx) {
-  const engine = new WeiwenLawEngine({ rigidAnchors: DEFAULT_RIGID_ANCHORS });
+  // 🔴 [2026-10-28 · broken-window scope narrowed] The self-audit roster must exist **before** the engine and be
+  //   handed to it as the **same Set object**. One home only: if the engine copied it, "registered but the engine's
+  //   copy was not updated" would fail silently — this repo has already been burned by two tables judging the same
+  //   call (SLOT_PATH / _SH12_LOC_KEY), and we are not doing that a second time.
+  //   Why not infer from tool names or arguments: that is the audited party's own account (same rule as "words do
+  //   not enter the anchor pool").
+  const SELF_AUDIT_TOOL_NAMES = new Set();
+  const engine = new WeiwenLawEngine({
+    rigidAnchors: DEFAULT_RIGID_ANCHORS,
+    selfAuditTools: SELF_AUDIT_TOOL_NAMES,
+  });
   // ── Tool declarations (layer two · 2026-10-28): the trusted side reports a verb for tools whose name carries none ──
   //   Origin: `glob` / `grep` / `list_dir` have no action word in their names ⇒ the attribution layer cannot tell
   //     ⇒ everything is referred. Measured (14-cell comparison): ordinary in-domain read-only actions passed 3/7;
@@ -656,8 +675,11 @@ function apply(ctx) {
           channel.receiptGate.blocked += 1;
           channel.receiptGate.lastAt = new Date().toISOString();
           channel.receiptGate.lastReason = bw.reason;
-          channel.receiptGate.lastStreak = `${bw.streak}/${bw.cap}`;
-          logline(`post-execute ${exec?.name} -> block (D broken-window at receipt, ${bw.streak}/${bw.cap}, bugKey=${bugKey})`);
+          // Reading uses `display` (threshold capped + excess reported separately), never the raw streak:
+          //   while broken, the raw streak shows 6/5, 7/5.
+          const streakText = bw.display ?? `${bw.streak}/${bw.cap}`;
+          channel.receiptGate.lastStreak = streakText;
+          logline(`post-execute ${exec?.name} -> block (D broken-window at receipt, ${streakText}, bugKey=${bugKey})`);
         }
       }
     } catch (e) {
@@ -698,7 +720,9 @@ function apply(ctx) {
   //   ⚠️ Every tool this plugin exposes is a read-only self-check (reads engine state, no side effects).
   //      If a tool with side effects is ever added, it must go through `ctx.tools.register` directly and
   //      **must not** go through this function.
-  const SELF_AUDIT_TOOL_NAMES = new Set();
+  //    (The roster itself, `SELF_AUDIT_TOOL_NAMES`, is created at the top of apply() and shared with the engine
+  //     by reference — see the note there. 2026-10-28: the same roster now also defines the **broken-window range**:
+  //     while the window is broken only registered self-audit read-only tools pass, everything else is still denied.)
   const registerSelfAuditTool = (def) => {
     SELF_AUDIT_TOOL_NAMES.add(def.name);
     return ctx.tools.register(def);
