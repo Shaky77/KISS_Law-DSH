@@ -238,6 +238,17 @@ Eleven commits touch `src/`. They do not map one-to-one onto eleven tasks — se
 - Every non-stand-in field now carries its own `yOrigin` (19 fields, each quoting the framework wording or the trustee's own words).
 - Readings: CN **703/703** | EN **710/710**; mutation 4/4 red.
 
+### B23 · Every variable must have a Y-side origin; the proxy fields are demoted to stand-ins; the same-class diff face lands read-only (2026-10-29)
+- Files: `src/core/strata.mjs` (yOrigin on every field + placeholder flags + the provenance diagnostic; the stand-in renames; the two read-only faces), `test/accounting-provenance.test.mjs` (10), both editions.
+- 🔴 The trustee's meta-criterion made executable: **"not one variable in KISS's Law is made up"** + manuscript fig.2 ("every point on Y is a rule / every point on X is data") ⇒ every readout field must point back to **a rule on the Y side** (`yOrigin`); one that cannot may only be a **stand-in** (`placeholder:true`, and **its name must carry the stand-in marker**) and **must not enter any verdict**.
+- The form is a **readout diagnostic** (`provenance.unbacked` / `placeholders` / `placeholderWithoutMark` / `aliases`) rather than a hard rejection at registration — same principle as readout.mjs ("meta-cognition may only read, not manage"); a hard rejection would fail every pre-existing field at once (not replayable).
+- 🔴 **The Y-side origin of the real thing was found** in law.mjs `R_EXPANSION.qualification`: "the qualification for feeding back = amount (SigmaS > R0) AND quality (**an S settled through M feedback**, running D→H→M→trace-reread once)" ⇒ **a structural anchor = an S settled through M feedback** (framework wording, not an invented term).
+- **Demoted** (they had no independent Y origin — a proxy impersonating a variable): `sThicknessStandIn` (replaces `sSettledThickness`, and `sHistoryThickness` becomes a legacy alias), `hPaymentStandIn`, `hExemptStandIn`. The legacy names stay as `alias:true` so xiaoD's comparison chain is not cut.
+- **New read-only faces**: `sMSediment` (the real count = the `S+1` entries in historyTrail) and `sClassDiff` (the same-class direction diff). Both **enter no books and change no verdict** (the trustee's ruling: count only, look at the numbers, do not rush a criterion).
+- 🔴 **Why the +S entrance is empty**: not the measurement — `S+1` is almost never produced (before 0.3.8 the engine explicitly "no longer records positive") ⇒ **closed-loop success was never wired into the ledger**.
+- Every non-stand-in field now carries its own `yOrigin` (19 fields, each quoting the framework wording or the trustee's own words).
+- Readings: CN **703/703** | EN **710/710**; mutation 4/4 red.
+
 ## 4. Order of work, and the acceptance test for each batch
 
 Each batch must end with this repo's own test suite green **and** a live behavioural check — not a diff review. A diff that looks right is not evidence that behaviour is right; that is exactly the failure this repo's wall #6 is about.
