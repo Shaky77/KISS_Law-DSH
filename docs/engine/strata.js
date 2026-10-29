@@ -104,15 +104,48 @@ export const STRATA = [
     formula: '扩容 ⟺ (ΣS > R₀) ∧ 质(S 经 M 沉淀)   ｜  R₀ = p_max × N_opp（RATE 类）；他类改走 |S_dev|>tol / 覆盖率 / 排序',
     quantities: [
       {
-        key: 'sSettledThickness',
-        label: 'ΣS settled thickness (finance reading = marks with a direction)',
-        expr: 'count(rStore where sign ∈ {+,−})  // unit = grounded steady-state changes',
+        key: 'sThicknessStandIn',
+        label: 'SigmaS thickness (**stand-in** = occupies the "structural anchor thickness" slot)',
+        expr: 'count(rStore where sign ∈ {+,-})  // unit = marks carrying a direction (**a proxy, not the real thing**)',
         status: QSTAT.OK,
         dim: 'time dimension · only grows',
-        note: '🔴 2026-10-29 (per the trustee\'s finance/accounting split): S = the finance ledger (what settled), the running ledger = accounting (temporarily mounted outside S). ⇒ settled thickness counts only marks that carry a **direction** (sign ∈ {+,−}); unknown / neutral events raise the event count, not the settled count. ⚠️ One step short of the trustee\'s wording: the carrier for "did H pay" does not exist yet ⇒ "has a direction" is a **proxy**, labelled as such.',
+        placeholder: true,
+        yOrigin: '🔴 **Stand-in field**: the Y-side origin of the real thing has been found — law.mjs `R_EXPANSION.qualification`: \'the qualification for feeding back = amount (SigmaS > R0) AND quality (**an S settled through M feedback**, running D → H → M → trace-reread once)\'. ⇒ **a structural anchor = an S settled through M feedback** (framework wording, not a self-invented term). ⚠️ This field currently reads a **proxy** (marks with a direction) ⇒ its relation to the real thing is \'stand-in\': the name carries the stand-in marker and never shares the real thing\'s name (naming discipline: a stand-in field must carry its own marker, never impersonate the real thing). ⚠️ **A stand-in must not enter any verdict.** The real count is `sMSediment` (read-only); the same-class diff is `sClassDiff`.',
+        note: '🔴 2026-10-29 (the trustee\'s ruling: \'not one variable in KISS\'s Law is made up\' + manuscript fig.2 \'every point on Y is a rule / every point on X is data\'): this field has **no** independent Y-side origin ⇒ by that meta-criterion it is demoted to a **stand-in** and no longer calls itself \'the finance reading\'. Before (0.3.6/0.3.7) it called itself \'structural anchor count / finance reading\' — that was **a proxy impersonating a variable**; corrected. Read from the full account (rStore), not historyTrail: the latter misses the scar derivation path (measured 4 marks, only 2 kept). Scars count too — that is the price of \'the ledger only grows\', but it does not mean the steady state improved.',
       },
       {
+        key: 'sHistoryThickness',
+        label: 'SigmaS historical thickness (**legacy alias** ⇒ read `sThicknessStandIn` instead)',
+        expr: 'count(rStore where sign ∈ {+,-})  // same value as sThicknessStandIn',
+        status: QSTAT.OK,
+        dim: 'time dimension · only grows',
+        placeholder: true,
+        alias: true,   // legacy alias (deliberately carries no stand-in marker: it is not a stand-in body, it is an old-name channel)
+        yOrigin: 'Same as sThicknessStandIn (stand-in; the real origin is in law.mjs R_EXPANSION.qualification).',
+        note: '⚠️ **Legacy-name alias** (kept so xiaoD\'s comparison chain is not cut) — the authoritative name is now `sThicknessStandIn` (the stand-in name carries its own marker). This is **not** an independent reading; reading it equals reading the stand-in field. Do not read it as the real thing.',
+      },
+      {
+        key: 'sMSediment',
+        label: 'S settled through M feedback (the real count of structural anchors · read-only)',
+        expr: 'count(historyTrail where type = "S+1")  // unit = marks settled through M',
+        status: QSTAT.OK,
+        dim: 'structural anchor · the real thing',
+        yOrigin: 'law.mjs `R_EXPANSION.qualification`: "the qualification for feeding back = amount (SigmaS > R0) AND quality (**an S settled through M feedback**, running D → H → M → trace-reread once)".',
+        note: '🔴 **This is the real thing** (it has a Y-side origin in the framework wording) — a different class from sThicknessStandIn (stand-in). ⚠️ `S+1` is currently almost never produced (before 0.3.8 the engine explicitly "no longer records positive") ⇒ **the real reason the +S entrance is empty is not the measurement, it is that "closed-loop success" was never wired into the ledger** ⇒ this count honestly shows 0/almost nothing. ⚠️ **Read-only**: it does not enter any verdict.',
+      },
+      {
+        key: 'sClassDiff',
+        label: 'same-class diff (**read-only observation face · not a criterion**)',
+        expr: 'group historyTrail by (subsystem, topic) ⇒ compare first vs last sign  // did this class change direction?',
+        status: QSTAT.OK,
+        dim: 'cross-time · read-only',
+        yOrigin: 'Framework wording (iron law #16): "the load cannot be observed at bookkeeping time (it is inner H) ⇒ it is inferred from whether the behaviour changes when the same class of D recurs".',
+        note: '🔴 **Read-only observation face** (the trustee\'s ruling: \'first build a read-only version — count only, do not enter the books, do not change verdicts; look at the numbers first, do not rush a criterion, or we make things up again\'). It reads the **direction diff of the same class** (failure → success = the path changed = the candidate shape of a structural anchor). ⚠️ **A big diff ≠ a structural anchor** — the real criterion is not landed yet ⇒ this number is for looking at shapes only, **it does not enter any verdict**.',
+      },
+
+      {
         key: 'sEventCount',
+        yOrigin: 'The trustee, 2026-10-29 (quoted in xiaoD #43): "S\'s accounting ledger records the running count" / "a running ledger can only count as an accounting ledger temporarily mounted outside S".',
         label: 'event count (accounting reading = all discrete events)',
         expr: 'count(sAccount.rStore)  // unit = discrete events (incl. unknown / neutral)',
         status: QSTAT.OK,
@@ -121,22 +154,17 @@ export const STRATA = [
       },
       {
         key: 'sOverdraft',
+        yOrigin: 'Framework law.mjs S: "a negative erosion takes the **absolute value** |S-1|, the running total is not resolved algebraically" / "historical marks are irreversible" + the trustee 2026-10-29: running dry (reserve 0) and being overdrawn differ causally ⇒ read apart.',
         label: 'overdraft amount (how much is owed)',
         expr: 'Σ max(0, −net_subsystem)  // read apart from the reserve',
         status: QSTAT.OK,
         dim: 'debt direction',
         note: '🔴 2026-10-29 (xiaoD #39/#40): running dry (reserve 0) and being overdrawn differ causally ⇒ the debt gets its own quantity.',
       },
-      {
-        key: 'sHistoryThickness',
-        label: 'ΣS（历史厚度）',
-        expr: 'count(sAccount.rStore)  // 单位＝离散事件数',
-        status: QSTAT.OK,
-        dim: '时间维度·只增',
-        note: '伤疤也计入厚度 —— 这是「记账只增」的应有之义，但**不代表稳态变好**。🔴 取自全量账（rStore），不取 historyTrail：后者漏 scar 推导路径（实测 4 笔只留 2 条）。🔴 2026-10-29 (xiaoD #41): this tap counts **events** (running ledger) — even sign=unknown ones (H paid nothing) ⇒ the accounting ledger was mixed into the finance ledger; **use sSettledThickness for the finance reading**.',
-      },
+
       {
         key: 'sNow',
+        yOrigin: 'Framework law.mjs S: "②the current-value dimension rises and falls with positive/negative influence" / "the bucket law: several systems take the min (the shortest board sets the overall ceiling)".',
         label: 'S_now（当前值）',
         expr: 'min over sBySubsystem',
         status: QSTAT.OK,
@@ -145,6 +173,7 @@ export const STRATA = [
       },
       {
         key: 'rCapPMax',
+        yOrigin: 'Framework law.mjs R_DOMAIN (a domain = the scope and magnitude scale set by the anchor) + rCapacity.mjs (aviation 1E-9/h, automotive 1E-8/h… each with a standard number, a value and a unit).',
         label: 'p_max（域常数·容许失效率）',
         expr: 'R_CAPACITY[domain].value',
         status: QSTAT.OK,
@@ -153,6 +182,7 @@ export const STRATA = [
       },
       {
         key: 'nOpportunities',
+        yOrigin: 'Framework law.mjs R_EXPANSION: "expansion ⟺ (SigmaS > R0)", where R0 = p_max × N_opp ⇒ N_opp is a denominator **carried by the formula itself** (not a self-invented quantity).',
         label: 'N_opp（总运行机会数·分母）',
         expr: 'engine.nOpportunities  // 飞行小时数／总输注次数／总交易笔数',
         status: QSTAT.ABSENT,
@@ -162,6 +192,7 @@ export const STRATA = [
       },
       {
         key: 'rNaught',
+        yOrigin: 'Framework law.mjs R_EXPANSION: "expansion ⟺ (SigmaS > R0) (strictly greater) triggers the R sub-chain expansion".',
         label: 'R₀（域容量阈值）',
         expr: 'p_max × N_opp  // 仅 RATE 类；其他量纲见 rCapRoute',
         status: QSTAT.PENDING,
@@ -171,6 +202,7 @@ export const STRATA = [
       },
       {
         key: 'rCapRoute',
+        yOrigin: 'Framework law.mjs R_EXPANSION.qualification: a different domain ⇒ **a different formula, not a different threshold** (the dimension sets the route, not the domain name).',
         label: '接入路由（该域该用哪条公式）',
         expr: 'rCapRoute(kind, sUnit)',
         status: QSTAT.OK,
@@ -179,6 +211,7 @@ export const STRATA = [
       },
       {
         key: 'sQualified',
+        yOrigin: 'Framework law.mjs R_EXPANSION.qualification: "the qualification for feeding back = amount (SigmaS > R0) AND quality (**an S settled through M feedback**, running D → H → M → trace-reread once)"; X-axis enumerations never hold it.',
         label: '质条件（是否经 M 沉淀）',
         expr: 'count(sAccount.sign ∈ {+,−}) > 0 ∧ 存在对应 M 落点',
         status: QSTAT.OK,
@@ -204,6 +237,7 @@ export const STRATA = [
     quantities: [
       {
         key: 'sNow',
+        yOrigin: 'Framework law.mjs S: "the current-value dimension rises and falls with positive/negative influence" / "the bucket law: several systems take the min (the shortest board sets the overall ceiling)".',
         label: 'S_now（当前值）',
         expr: 'min over sBySubsystem',
         status: QSTAT.OK,
@@ -211,6 +245,7 @@ export const STRATA = [
       },
       {
         key: 'sPositive',
+        yOrigin: 'Framework law.mjs S: "a positive influence takes the S path S→S+1" / "\'+1\' means one independent discrete event" + the trustee (quoted in xiaoD #43): "+S is the positive anchor".',
         label: '正向事件数',
         expr: "count(historyTrail.type === 'S+1')",
         status: QSTAT.OK,
@@ -218,6 +253,7 @@ export const STRATA = [
       },
       {
         key: 'sNegative',
+        yOrigin: 'Framework law.mjs S: "a negative influence takes the D path S→S-1 (the current value drops, but the erosion event itself is permanently recorded as a historical mark with an absolute value)" + the trustee: "|-S| is the negative anchor".',
         label: '负向侵蚀数',
         expr: "count(historyTrail.type === '|S-1|') + count('trauma')",
         status: QSTAT.OK,
@@ -225,6 +261,7 @@ export const STRATA = [
       },
       {
         key: 'sTrauma',
+        yOrigin: 'Manuscript wording (quoted by the trustee in xiaoD #43/#44): **|−S| = negative accumulation (trauma, failure, setback…)**.',
         label: 'trauma 计数',
         expr: 'traumaCount',
         status: QSTAT.OK,
@@ -232,6 +269,7 @@ export const STRATA = [
       },
       {
         key: 'sTrailCoverage',
+        yOrigin: 'Framework law.mjs S: "①time dimension — everything that happened cannot be changed or removed, it only settles as history, historical marks are irreversible".',
         label: '刻痕覆盖率（两源一致性）',
         expr: 'count(historyTrail) / count(sAccount.rStore)',
         status: QSTAT.OK,
@@ -254,6 +292,7 @@ export const STRATA = [
     quantities: [
       {
         key: 'dScarRate',
+        yOrigin: 'Framework law.mjs S: "a negative erosion takes the absolute value |S-1|… not resolved algebraically" (irreversibility is an **existing** reversibility classification, not a new criterion).',
         label: '不可逆占比',
         expr: 'count(sAccount.reversible === "scar") / count(sAccount)',
         status: QSTAT.OK,
@@ -262,6 +301,7 @@ export const STRATA = [
       },
       {
         key: 'dUnknownRate',
+        yOrigin: 'Framework: undecidable ≠ zero risk (it lands on the conservative side and must be reported explicitly) — "the unknown must not be folded into the known".',
         label: '可逆性不可判占比',
         expr: 'count(reversible === "unknown") / count(sAccount)',
         status: QSTAT.OK,
@@ -270,6 +310,7 @@ export const STRATA = [
       },
       {
         key: 'dMax',
+        yOrigin: 'Framework MULTI_SYSTEM_RULES.dMax (D takes the max over systems; **no implementation was found in the engine** ⇒ honestly reported as unimplemented, never faked with a single-system approximation).',
         label: 'D_max（多系统取最大）',
         expr: 'max over subsystems',
         status: QSTAT.ABSENT,
@@ -290,21 +331,49 @@ export const STRATA = [
     formula: 'H_load = 有依据刻痕 / 总刻痕（承担率）',
     quantities: [
       {
-        key: 'hPaymentRate',
-        label: '承担率',
-        expr: 'count(sign ∈ {+,−}) / count(sAccount)',
+        key: 'hPaymentStandIn',
+        label: 'load-bearing ratio (**stand-in** = occupies the "H load-bearing ratio" slot)',
+        expr: 'count(sign ∈ {+,-}) / count(sAccount)  // **a proxy**: share of marks carrying a direction',
         status: QSTAT.OK,
-        dim: '比例',
-        note: '载重是能动性唯一可观测的面（铁律 #16）：付了消耗才是满载。',
+        dim: 'ratio',
+        placeholder: true,
+        yOrigin: 'PLACEHOLDER: the real thing = "did H make a payment" (the trustee, 2026-10-29, quoted in xiaoD #43: "whether it can enter S, this finance ledger, depends on whether the subject H has made a payment"). ⚠️ The current tap is a **proxy** (using "has a direction" to stand in for "payment") — a payment action contains inner H (inviolable, unauditable), only outer H is observable ⇒ **not judgeable at the moment**; the real thing can only be **inferred across time** (framework wording: the load cannot be observed at bookkeeping time ⇒ inferred from whether the behaviour changes when the same class of D recurs). ⇒ The name carries its own stand-in marker and never impersonates the real thing. ⚠️ **A stand-in must not enter any verdict.**',
+        note: 'The load is the only observable face of agency (iron law #16): only a paid cost counts as full load. ⚠️ But "has a direction" ≠ "payment" (a direction can be derived from a scar; a payment requires H to acknowledge the cost) ⇒ this number is a stand-in; the real observation face is sClassDiff (read-only).',
+      },
+      {
+        key: 'hPaymentRate',
+        label: 'load-bearing ratio (**legacy alias** ⇒ read `hPaymentStandIn` instead)',
+        expr: 'same as hPaymentStandIn (identical value)',
+        status: QSTAT.OK,
+        dim: 'ratio',
+        placeholder: true,
+        alias: true,   // legacy alias (deliberately carries no stand-in marker)
+        yOrigin: 'Same as hPaymentStandIn (stand-in).',
+        note: '⚠️ **Legacy-name alias** (kept so xiaoD\'s comparison chain is not cut) — the authoritative name is now `hPaymentStandIn`.',
+      },
+      {
+        key: 'hExemptStandIn',
+        label: 'exemption ratio (**stand-in** = occupies the "H exemption ratio" slot)',
+        expr: 'count(sign === "unknown") / count(sAccount)  // **a proxy**: share of undecidable marks',
+        status: QSTAT.OK,
+        dim: 'ratio',
+        placeholder: true,
+        yOrigin: 'PLACEHOLDER: the real thing = "was H exempted" (inner H side, not judgeable at the moment) ⇒ the current tap (share of sign=unknown) is a proxy. ⚠️ The name carries its own stand-in marker; **a stand-in must not enter any verdict.**',
+        note: '🔴 A rising exemption ratio ⇒ the load has been taken off (the quantified shape of the v10 defect). It does not violate truthfulness, but it **produces no judgement power**. ⚠️ This number is a stand-in (proxy); the real observation face is sClassDiff (read-only).',
       },
       {
         key: 'hExemptRate',
-        label: '免责率',
-        expr: 'count(sign === "unknown") / count(sAccount)',
+        label: 'exemption ratio (**legacy alias** ⇒ read `hExemptStandIn` instead)',
+        expr: 'same as hExemptStandIn (identical value)',
         status: QSTAT.OK,
-        dim: '比例',
-        note: '🔴 免责率升高 ⇒ 载重被摘掉（v10 病灶的量化形态）。它不违反守真，但**不产生判断力**。',
+        dim: 'ratio',
+        placeholder: true,
+        alias: true,   // legacy alias (deliberately carries no stand-in marker)
+        yOrigin: 'Same as hExemptStandIn (stand-in).',
+        note: '⚠️ **Legacy-name alias** (kept so xiaoD\'s comparison chain is not cut) — the authoritative name is now `hExemptStandIn`.',
       },
+
+
     ],
     stopAt: [
       'H 只报「承担率」，**不报对错**：对错由 M 打回，不由本层自评。',
@@ -320,6 +389,7 @@ export const STRATA = [
     quantities: [
       {
         key: 'mConcentration',
+        yOrigin: 'Framework law.mjs CONVERGENCE: "convergence = the **monotonic direction** of the landing-point concentration (not a tolerance, not a threshold)" — the true chain: more observations ⇒ higher concentration.',
         label: '落点集中度',
         expr: '同 R 落点事件数 / 不同 R 落点数',
         status: QSTAT.OK,
@@ -328,6 +398,7 @@ export const STRATA = [
       },
       {
         key: 'mDirection',
+        yOrigin: 'Framework law.mjs CONVERGENCE.threshold (**explicitly forbids fixing a threshold/tolerance** ⇒ only the direction is reported, never a tolerance).',
         label: '方向（近/远/不动）',
         expr: 'sign(concentration_after − concentration_before)',
         status: QSTAT.PENDING,
@@ -337,6 +408,7 @@ export const STRATA = [
       },
       {
         key: 'mForwardWired',
+        yOrigin: 'Framework: the M first-bug stop + the forward-inference face (FORWARD_INFERENCE / M_TWO_TENSES; currently **zero wiring** ⇒ honestly reported as not wired, never as "convergence zero").',
         label: '未来格是否接线',
         expr: 'engine 内是否存在前向推演输出面',
         status: QSTAT.ABSENT,
@@ -414,8 +486,65 @@ export function dataSurface(engine) {
   const maxCluster = domains.size ? Math.max(...domains.values()) : 0;
   const concentration = total ? maxCluster / total : null;
 
+  // ═══ Read-only same-class diff face (2026-10-29 · the trustee's ruling: count only first) ═══
+  // 🔴 Why read-only: the trustee's ruling — the "same-class D recurrence diff" face is **first built
+  //   read-only** (counts only, never enters the books, never changes a verdict), so xiaoD can run it
+  //   and see what it looks like; "look at the numbers first, do not rush a criterion, or we make
+  //   things up again".
+  //
+  // The Y-side definition of the real thing (law.mjs `R_EXPANSION.qualification`, verbatim):
+  //   "the qualification for feeding back = amount (SigmaS > R0) AND quality (**an S settled through M
+  //   feedback**, running D → H → M → trace-reread once)"
+  //   ⇒ **a structural anchor = an S settled through M feedback**. Its carrier: **the `S+1` entries in
+  //   historyTrail** (the only positive settled marks).
+  //   ⇒ `S+1` is currently almost never produced (before 0.3.8 the engine explicitly "no longer records
+  //   positive") ⇒ **the real reason the +S entrance is empty is not the measurement, it is that
+  //   "closed-loop success" was never wired into the ledger**.
+  const mTrail = arr(engine.historyTrail);   // the name must not collide with the existing `trail` (historyTrail aggregate)
+  // "S settled through M feedback" count = positive settled marks (the real count; shows 0 if it is 0)
+  const mSediment = mTrail.filter((e) => e && e.type === 'S+1').length;
+  // Same-class diff: group by (subsystem, topic), compare the **first** and the **latest** mark.
+  //   🔴 "same class" = same topic (the topic is the discriminator for same-kind events, see law.mjs S
+  //   time-cycle model) ⇒ not a word-shape enumeration.
+  //   "diff" = whether the direction of the same class changed (failure → success = the path changed =
+  //   the candidate shape of a structural anchor).
+  //   ⚠️ This is **observation only**: a big diff ≠ a structural anchor; the real criterion is not landed
+  //   yet (only law.mjs's definition exists, no tap) ⇒ this number is for looking at shapes only.
+  const byClass = new Map();
+  for (const e of mTrail) {
+    if (!e) continue;
+    const key = `${e.subsystem ?? 'core'}::${e.topic ?? '∅'}`;
+    if (!byClass.has(key)) byClass.set(key, []);
+    byClass.get(key).push(e);
+  }
+  const classDiff = [];
+  for (const [key, list] of byClass) {
+    const ordered = list.slice().sort((a, b) => (a.ts ?? 0) - (b.ts ?? 0));
+    const first = ordered[0];
+    const last = ordered[ordered.length - 1];
+    const signOf = (e) => (e.type === 'S+1' ? '+' : (e.type === 'trauma' ? 'trauma' : (e.type === '|S-1|' ? '-' : '0')));
+    const fs = signOf(first);
+    const ls = signOf(last);
+    classDiff.push({
+      class: key,
+      marks: ordered.length,
+      firstSign: fs,
+      lastSign: ls,
+      changed: fs !== ls,                                   // the direction of this class changed
+      settled: ordered.some((e) => e.type === 'S+1'),      // this class has seen an S settled through M
+      lastTs: last.ts ?? null,
+    });
+  }
+  const classDiffSummary = {
+    classes: classDiff.length,
+    changed: classDiff.filter((c) => c.changed).length,
+    settled: classDiff.filter((c) => c.settled).length,
+    entries: classDiff,
+  };
+
   return {
     thickness, settledThickness, eventCount, trailEvents, trailCoverage, positives, negatives, sNow, sOverdraft,
+    mSediment, classDiff: classDiffSummary,
     traumaCount: num(engine.traumaCount) ?? 0,
     scar, unknown, paid, total, concentration, maxCluster,
     distinctDomains: domains.size,
@@ -443,7 +572,9 @@ export function compute(key, surface) {
     case 'sTrailCoverage': return s ? { status: QSTAT.OK, value: s.trailCoverage } : { status: QSTAT.PENDING, value: null, evidence: '未接 engine 实例' };
     case 'dScarRate': return s && s.total ? { status: QSTAT.OK, value: s.scar / s.total } : { status: QSTAT.PENDING, value: null, evidence: '账本为空或无实例' };
     case 'dUnknownRate': return s && s.total ? { status: QSTAT.OK, value: s.unknown / s.total } : { status: QSTAT.PENDING, value: null, evidence: '账本为空或无实例' };
+    case 'hPaymentStandIn': return s && s.total ? { status: QSTAT.OK, value: s.paid / s.total } : { status: QSTAT.PENDING, value: null, evidence: 'empty ledger or no instance' };
     case 'hPaymentRate': return s && s.total ? { status: QSTAT.OK, value: s.paid / s.total } : { status: QSTAT.PENDING, value: null, evidence: '账本为空或无实例' };
+    case 'hExemptStandIn': return s && s.total ? { status: QSTAT.OK, value: s.unknown / s.total } : { status: QSTAT.PENDING, value: null, evidence: 'empty ledger or no instance' };
     case 'hExemptRate': return s && s.total ? { status: QSTAT.OK, value: s.unknown / s.total } : { status: QSTAT.PENDING, value: null, evidence: '账本为空或无实例' };
     case 'mConcentration': return s ? { status: QSTAT.OK, value: s.concentration } : { status: QSTAT.PENDING, value: null, evidence: '未接 engine 实例' };
     // ── R 层：域常数 / 分母 / 路由（2026-10-20 重写）────────────────
@@ -508,8 +639,39 @@ export function strataReadout(engine = null) {
       stopAt: st.stopAt,
     };
   });
+  // ═══ Admission diagnostics (the executable form of the meta-criterion · 2026-10-29) ═══
+  // 🔴 The trustee's ruling: "not one variable in KISS's Law is made up" + manuscript fig.2 "every point
+  //   on Y is a rule / every point on X is data" ⇒ every readout field must point back to **a rule on
+  //   the Y side** (= has a yOrigin); one that cannot ⇒ it may only be a **stand-in**
+  //   (= placeholder:true, and **its name must carry the stand-in marker**), **and it must not enter
+  //   any verdict**.
+  //   ⚠️ Why a **readout diagnostic** rather than hard rejection at registration: same principle as
+  //     readout.mjs — "meta-cognition may only read, not manage"; a hard rejection would fail every
+  //     pre-existing field at once (not replayable). ⇒ the gap is **put on the readout face**, so
+  //     "which variables are made up" is visible right there.
+  //   ⇒ Companion discipline (testable): **a stand-in field name must carry the stand-in marker**
+  //     (stand-in / slot / 占位) ⇒ locked by a test.
+  const allQs = layers.flatMap((l) => l.quantities);
+  const PLACEHOLDER_MARK = /(stand[-_ ]?in|slot|占位|替身)/i;
+  const unbacked = allQs.filter((q) => !q.placeholder && !(q.yOrigin && String(q.yOrigin).trim()))
+    .map((q) => q.key);
+  const placeholders = allQs.filter((q) => q.placeholder && !q.alias).map((q) => ({
+    key: q.key,
+    markedInName: PLACEHOLDER_MARK.test(q.key),
+    yOrigin: q.yOrigin ?? null,
+  }));
+  const placeholderWithoutMark = placeholders.filter((p) => !p.markedInName).map((p) => p.key);
+  const aliases = allQs.filter((q) => q.alias).map((q) => q.key);   // legacy aliases (not stand-in bodies)
   return {
     layers,
+    // the admission diagnostic face: made-up variables are visible right there
+    provenance: {
+      unbacked,                                   // neither a Y origin nor marked as a stand-in ⇒ made up
+      placeholders,                               // the stand-in list (incl. "does the name carry the marker")
+      placeholderWithoutMark,                     // a stand-in without the marker in its name ⇒ breaks the discipline
+      aliases,                                    // legacy aliases (kept so comparison chains are not cut)
+      rule: 'every readout field needs a yOrigin (a Y-side rule); without one it may only be a stand-in (name carries a stand-in/slot/占位 marker) and must not enter any verdict.',
+    },
     bans: SUBSTITUTION_BAN,
     domain: {
       key: surface ? surface.domainKey : null,
