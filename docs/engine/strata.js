@@ -367,9 +367,6 @@ export function dataSurface(engine) {
   const subs = engine.sBySubsystem && typeof engine.sBySubsystem === 'object' ? engine.sBySubsystem : {};
   const store = arr(engine.sAccount && engine.sAccount.rStore);
 
-  // ΣS ＝ 历史刻痕总厚度，单位＝**离散事件数**（S 的「1」＝一次独立事件，见 law.mjs S_REFINEMENT）。
-  //   🔴 从 sAccount.rStore（全量账）取，不从 historyTrail 取 —— 后者漏 scar 推导路径（见文件头实测）。
-  const thickness = store.length;
   const trailEvents = trail.length;
   const trailCoverage = store.length ? trailEvents / store.length : null;
   const positives = trail.filter((e) => e && e.type === 'S+1').length;
@@ -392,6 +389,18 @@ export function dataSurface(engine) {
   //   unknown / neutral ones. ⚠️ One step short of the trustee's wording: the carrier for "did H pay"
   //   does not exist yet (xiaoD #40 §3) ⇒ "has a direction" is a **proxy**, labelled as such.
   const settledThickness = paid;
+  // ΣS ＝ 历史刻痕总厚度，单位＝**离散事件数**（S 的「1」＝一次独立事件，见 law.mjs S_REFINEMENT）。
+  //   🔴 从 sAccount.rStore（全量账）取，不从 historyTrail 取 —— 后者漏 scar 推导路径（见文件头实测）。
+  // 🔴 [2026-10-29 · the expansion criterion reads the finance ledger (the trustee's own
+  //   wording, quoted in xiaoD #43): before, thickness = store.length (**discrete events**)
+  //   ⇒ the expansion criterion took the **running ledger** as ΣS ⇒ "things with no energy
+  //   were counted into the energy account". The trustee: "+S is a positive anchor, |−S| is a
+  //   negative anchor, so the S ledger proper never becomes a negative ledger; S must fit the
+  //   system's evolution structure, not a running ledger" + "just keep two ledgers: S's finance
+  //   ledger records structural anchors, S's accounting ledger records the running count".
+  //   ⇒ **thickness (the outward ΣS) = the anchor count (finance reading)**; the running
+  //   count gets its own eventCount.
+  const thickness = settledThickness;     // finance reading: structural anchors (the outward ΣS)
   const eventCount = total;
 
   // 落点集中度 ＝ **最大簇占比**（0–1），不是"总数/落点数"。

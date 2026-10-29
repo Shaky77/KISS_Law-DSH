@@ -71,7 +71,11 @@ test('🔴 unknown events (H paid nothing) raise the event count, not the settle
   const d = dataSurface(e);
   assert.equal(d.eventCount, 3, 'accounting reading: three discrete events');
   assert.equal(d.settledThickness, 2, 'finance reading: only the two marks with a direction count as settled');
-  assert.equal(d.thickness, 3, 'thickness keeps the event count (accounting reading), but the name and note now say so');
+  // [2026-10-29 · the expansion criterion reads the finance ledger (the trustee's own wording, quoted in
+  //   xiaoD #43)] thickness (the outward ΣS) = **structural anchors** ⇒ the expansion criterion no
+  //   longer takes the running ledger as ΣS; the running count lives in eventCount.
+  assert.equal(d.thickness, 2, 'the outward ΣS (thickness) = the structural anchor count (finance reading)');
+  assert.equal(d.eventCount, 3, 'the running count lives in eventCount (accounting reading)');
 });
 
 test('🔴 sNow shares one source with the engine reserve reading (never 0 in one place and −1 in another)', async () => {

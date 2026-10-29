@@ -1437,6 +1437,12 @@ export class WeiwenLawEngine {
     // This-session write registry: allowed writes record path→content,
     // later exec-class calls referencing a registered path trigger review (refsSessionWritten). Only register this session's writes, don't guess the filesystem.
     this.sessWritten = new Map();
+    // 🔴 [2026-10-29 · the landing target can be rewritten later (xiaoD #42: the bypass chain)]
+    //   Tag on write: content written to a doc target that carries a dangerous shape leaves a mark
+    //   (no verdict, a trace only) — because **the target changes**: write .md (doc exemption) then
+    //   rename to .sh ⇒ a script with a root-delete command sits on disk and both calls passed.
+    //   The criterion anchored at "the extension at write time" was in the wrong place.
+    this.sessDanger = new Map();   // path → { danger:true, shape:'destructive verb × dangerous scope' }
     // 跨调用敏感源读取登记表（FRACTAL_PROPERTY 分形横向递归·同 R 域同构包含源与汇）：
     // 本会话读取的凭据/系统路径（敏感源）记入此 Set，供后续 sink 暴露调用按分形横向递归
     // 判定「源→汇」组合效应（保守 review，不 deny，防误伤）。只登记本会话读取，不猜文件系统。
@@ -2655,6 +2661,20 @@ export class WeiwenLawEngine {
       if (u.deny) { this.failureStreak += 1; return { kind: 'deny', law: 'R', reason: u.reason }; }
       return { kind: 'review', law: 'R', reason: u.reason };
     }
+    // 🔴 [2026-10-29 · retarget re-judgement (xiaoD #42's bypass chain)] the doc exemption covers only the
+    //   landing target **at write time**, and the target can be rewritten afterwards ⇒ re-judge every retarget.
+    //   Criterion: **dangerous content × executable landing** ⇒ review (ask). The tagging criterion shares its
+    //   source with the script force-scan ⇒ relative-path cleanup is not tagged.
+    const relabel = this.checkDangerousRelabel(call);
+    if (relabel) {
+      this._mark('R', {
+        step: 'retarget re-judgement · dangerous content × executable landing',
+        verdict: 'review',
+        cuts: true,
+        note: relabel.reason,
+      });
+      return { kind: 'review', law: 'R', reason: relabel.reason };
+    }
     // ═══ ② S 格：已有稳态容量基线 ═══（R 已划完边界 ⇒ 此处建立基线；D 以它作参照）
     const base = this._establishBaseline();
     this._mark('S', {
@@ -3232,6 +3252,62 @@ export class WeiwenLawEngine {
     const wPath = a.path ?? a.file ?? '';
     const wContent = a.content ?? a.data ?? '';
     if (wPath && typeof wContent === 'string') this.sessWritten.set(wPath, wContent);
+    // 🔴 [2026-10-29 · tag on write (xiaoD #42's bypass chain)] the tagging criterion is **text shape**,
+    //   not commandLayer: delete commands inside a doc body are usually backtick-wrapped (`rm -rf /`),
+    //   and commandLayer treats quoted text as **data** ⇒ the verb is not read ⇒ tagging misses (measured).
+    const DESTRUCTIVE_VERB = /\b(rm|rmdir|shred|unlink|del|erase|rd|Remove-Item|Remove-ItemProperty)\b/i;
+    // Dangerous scope: a root / system dir / home dir / drive root shortly AFTER the delete verb
+    // (relative paths do not count).
+    const DANGER_SCOPE = /(?:^|\s)(?:\/[\s`'"*]|\/etc\/|\/usr\/|\/var\/|\/bin\/|\/boot\/|\/root\/|~\/|\/(?:dev|proc|sys)\/|[A-Za-z]:\\)/i;
+    const vm = DESTRUCTIVE_VERB.exec(wContent);
+    const dangerScope = !!vm && DANGER_SCOPE.test(wContent.slice(vm.index, vm.index + 160));
+    if (wPath && wContent && dangerScope) this.sessDanger.set(String(wPath), { danger: true, shape: 'destructive verb × dangerous scope' });
+  }
+
+  // ---------- retarget re-judgement (the other side of the bypass chain: xiaoD #42) ----------
+  // 🔴 Tagging on write only covers "it was dangerous when written"; **the landing target gets rewritten**:
+  //   write .md (doc exemption) → rename to .sh ⇒ a script with a root-delete command on disk.
+  //   ⇒ **every action that changes the landing target must re-judge**:
+  //   the source carries a danger mark ∧ the new target is executable ⇒ **review** (ask the human — turning
+  //   a documented example into a script can be legitimate engineering; blocking it outright is wrong).
+  checkDangerousRelabel(call) {
+    const args = call?.args ?? {};
+    // ① action shape: rename / move / copy (tool name or command shape; neither slot names nor verbs are enumerated)
+    const act = `${call?.name ?? ''} ${Object.values(args).filter((v) => typeof v === 'string').join(' ')}`;
+    const isRelabel = /(rename|move|copy|\bmv\b|\bcp\b|Move-Item|Copy-Item|\bren\b)/i.test(act);
+    if (!isRelabel) return null;
+    // ② source and target: **path tokens out of the command text** (args usually carry one whole command
+    //   string ⇒ taking it as a whole yields fewer than two paths)
+    const rawStrings = Object.values(args).filter((v) => typeof v === 'string');
+    const pathish = [];
+    for (const raw of rawStrings) {
+      if (/\s/.test(raw)) {
+        for (const tok of raw.split(/\s+/)) {
+          const t = tok.replace(/^["']|["']$/g, '');
+          if (/^[\w.\-~]*[\\/][\w.\-~\/]*$/.test(t) && /[\\/]/.test(t)) pathish.push(t);
+        }
+      } else if (/[\\/]/.test(raw)) {
+        pathish.push(raw);
+      }
+    }
+    if (pathish.length < 2) return null;
+    // the source is the one carrying the danger mark; the target is the other
+    let src = null; let dst = null;
+    for (const pth of pathish) {
+      const key = [...this.sessDanger.keys()].find((k) => k === pth || k.endsWith(pth) || pth.endsWith(k));
+      if (key && !src) { src = pth; continue; }
+      if (!dst) dst = pth;
+    }
+    if (!src || !dst) return null;
+    const srcKey = [...this.sessDanger.keys()].find((k) => k === src || k.endsWith(src) || src.endsWith(k));
+    if (!srcKey) return null;
+    // ③ is the new target executable? only then is it "dangerous content × executable landing"
+    if (!/\.(sh|bash|zsh|fish|ps1|psm1|bat|cmd|py|rb|pl)$/i.test(dst)) return null;
+    return {
+      reason: `Retarget re-judgement: source "${src}" carries a dangerous-shape mark (${this.sessDanger.get(srcKey)?.shape ?? 'dangerous shape'}), `
+        + `and this action moves it to the executable landing "${dst}" — dangerous content × executable landing, `
+        + `the human must take the extreme (ask once, do not refuse outright)`,
+    };
   }
 
   // ---------- Pre-step adjudication (corresponds to DSH agent/pre-step): message-level H boundary ----------
