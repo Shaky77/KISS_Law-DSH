@@ -47,6 +47,47 @@ import { R_DOMAIN, THREE_IRON_LAWS } from './core/law.mjs';
 // 🔴 [2026-10-29] three namespaces, all three stepped on in one day: the command layer's
 //   commandLayer ⇒ 'exfil-net'; the attribution layer's attrib.layer ⇒ 'network-send';
 //   inferCategory(call) ⇒ tool-name-first (bash ⇒ 'exec'). Read the wrong name ⇒ the criterion misses.
+// 🔴 [2026-10-30 · 读数面出口规约（小D 47 号件第七节 / 48 号件第五条的复现）]
+//   病根（已定位到具体一行）：`_coalesce` 建条目时键名写 `detail`，而 `steadyLedger()` 读 `v.latest`
+//   ⇒ v.latest 恒 undefined ⇒ JSON 化**静默丢键** ⇒ 宿主判「value is not lossless JSON」
+//   ⇒ 表现为「**账本一有内容就坏、账本归 0 就恢复**」（小D 报的三次同一形状由此解释）。
+//   ⇒ 结构修法（不靠逐处小心）：**读数面出口统一过一道规约**——
+//     ① undefined 一律落 null（JSON 里 null 是「有值且为空」，undefined 是「没这个键」＝丢值）；
+//     ② 出口**机械自检**：JSON 往返后若内容不等 ⇒ 报出来（不静默）。
+//   ⚠️ 为什么放出口而不是逐处修：0.3.5 那次修的是 recordSteady 入口，漏了 _coalesce ⇒ **同形复发三次**
+//     ⇒ 逐路径修必漏 ⇒ 出口收口（与破窗态的 bumpFailureStreak 同款纪律）。
+function toLossless(value, depth = 0) {
+  if (value === undefined) return null;
+  if (value === null) return null;
+  const t = typeof value;
+  if (t === 'string' || t === 'number' || t === 'boolean') return value;
+  if (t === 'function' || t === 'symbol') return String(value);
+  if (t === 'bigint') return String(value);
+  if (value instanceof Date) return value.toISOString();
+  if (depth > 12) return '[depth-limit]';
+  if (Array.isArray(value)) return value.map((v) => toLossless(v, depth + 1));
+  if (value instanceof Map) return toLossless(Object.fromEntries(value), depth + 1);
+  if (value instanceof Set) return toLossless([...value], depth + 1);
+  if (t === 'object') {
+    const out = {};
+    for (const [k, v] of Object.entries(value)) out[k] = toLossless(v, depth + 1);
+    return out;
+  }
+  return String(value);
+}
+
+/** 读数面出口自检：JSON 往返无损？丢了什么？ */
+export function losslessAudit(value) {
+  const safe = toLossless(value);
+  try {
+    const s = JSON.stringify(safe);
+    const rt = JSON.parse(s);
+    const ok = JSON.stringify(rt) === s;
+    return { ok, bytes: s.length, note: ok ? 'JSON 往返无损' : '🔴 JSON 往返不等 ⇒ 有值被丢' };
+  } catch (e) {
+    return { ok: false, bytes: 0, note: `🔴 JSON 化失败：${e?.message ?? e}` };
+  }
+}
 import { commandLayer } from './core/attribution.mjs';
 // [2026-10-21 中英对齐 · synced from the CN edition] Criterion-wiring readout (read-only surface):
 //   makes "which criteria in the library actually enter the computation" auditable.
@@ -54,7 +95,7 @@ import { commandLayer } from './core/attribution.mjs';
 //   (docs/runway-and-criterion §4).
 import { readout as criterionReadout } from './core/readout.mjs';
 // [2026-10-21] Five-stratum readout (R→S→D→H→M, each layer given a substitutable quantity).
-import { strataReadout } from './core/strata.mjs';
+import { strataReadout, dataSurface as strataDataSurface, mComputability, FORMULA_VARS } from './core/strata.mjs';
 // [2026-10-21] Four-layer nesting (macro/micro inside R/S/D/H) + M's directional form.
 import { NESTED_VARS, M_CONSTRAINT, mDirection, mTwoLayer, mConstraintShape, nestAudit } from './core/nested.mjs';
 // [2026-10-21 12:0x · author ruling] Variables as acts: R = look-up (an act), H = observer stance
@@ -515,6 +556,10 @@ const _windowStateFile = () => (_stateDir ? join(_stateDir, 'window-state.json')
 
 /** Declare where the broken-window state is persisted (a directory outside the plugin's reach ⇒ a
  *  reinstall/restart cannot clear it). Pass null ⇒ back to memory only (the default). */
+// 🔴 [2026-10-30 · 账本落盘（小D 48 号件第一条）] 账本与破窗态**同层**（小D 第 3 条）——
+//   两者都是「发生过的事」，分开落盘会出现「破窗态在、账本没了」的割裂（各自可清 ⇒ 一起失效）。
+const _ledgerFile = () => (_stateDir ? join(_stateDir, 'ledger.json') : null);
+
 export function declareWindowStateDir(dir) {
   _stateDir = typeof dir === 'string' && dir.trim() ? dir.trim() : (process.env.WEIWEN_LAW_STATE_DIR || null);
   return _stateDir;
@@ -522,10 +567,69 @@ export function declareWindowStateDir(dir) {
 
 /** For the readout face: the current persistence state (has the host declared a landing location?). */
 export function windowStatePersistence() {
-  return { declared: !!_stateDir, dir: _stateDir, file: _windowStateFile(),
+  return { declared: !!_stateDir, dir: _stateDir, file: _windowStateFile(), ledgerFile: _ledgerFile(),
     note: _stateDir
       ? 'broken-window persistence is on (a host-declared directory ⇒ a reinstall/restart cannot clear it)'
       : '🔴 the broken-window state is **memory only** (the host declared no landing location) ⇒ a reinstall/restart clears it ⇒ interception strength is limited; to persist, have the host call declareWindowStateDir(dir)' };
+}
+
+// ---------- 账本落盘（小D 48 号件第一/二/三条） ----------
+// 🔴 小D 的原话（我核过，成立）：「**清零**必须是一次可审计的事件，不能是"进程结束"的副作用。
+//   现在它恰恰是副作用：**没有任何人同意，也没有任何人记得**。」
+// ⇒ 落法：**空账 ≠ 新账** —— 启动时若发现「应有账而无账」⇒ 按异常处理，不当作全新开始，并留痕。
+// ⚠️ 「应有账」的判据怎么落（不拍脑袋）：
+//   · 磁盘上**没有任何账本文件** ＋ 本次是**首次加载** ⇒ 视为新账（正常起点，与破窗态同款判据）；
+//   · 磁盘上**有账本文件但内容为空/损坏/校验不过** ⇒ **fail-closed**：按「账本被清空/被篡改」处理，
+//     不当新账 ⇒ 记账进入**降级只读**（不再往空账上追加，防止把「清零」伪装成「全新开始」），
+//     并把该事实写进 actorAudit（可审计：谁、何时、依据什么）。
+function ledgerDigest(lg) {
+  return createHash('sha256').update(JSON.stringify({
+    v: lg.v, seq: lg.seq, traumaCount: lg.traumaCount, failureStreak: lg.failureStreak,
+    windowBroken: lg.windowBroken,
+    storeLen: (lg.store ?? []).length, trailLen: (lg.historyTrail ?? []).length,
+    lastStoreSeq: (lg.store ?? []).length ? lg.store[lg.store.length - 1].seq : 0,
+  })).digest('hex').slice(0, 16);
+}
+
+function readLedgerFile() {
+  const file = _ledgerFile();
+  if (!file) return null;
+  try {
+    if (!existsSync(file)) return null;
+    const raw = JSON.parse(readFileSync(file, 'utf8'));
+    return raw && typeof raw === 'object' ? raw : null;
+  } catch { return { __corrupt: true, __reason: 'parse_failed' }; }
+}
+
+function persistLedger(lg) {
+  const file = _ledgerFile();
+  if (!file) return false;   // 未声明落盘位置 ⇒ 不写（默认仅内存；读数面明写）
+  try {
+    mkdirSync(_stateDir, { recursive: true });
+    const st = { ...lg, digest: ledgerDigest(lg) };
+    writeFileSync(file, JSON.stringify(st, null, 2), 'utf8');
+    return true;
+  } catch (e) {
+    logline(`ledger persist failed: ${e?.message ?? e} ⇒ 落盘不可用（内存态仍有效，重启即清——已记在案）`);
+    return false;
+  }
+}
+
+/**
+ * 启动时读回账本。**fail-closed**（小D 48 号件第二条）：空账 ≠ 新账。
+ * @returns {{status:'fresh'|'restored'|'fail-closed'|'memory-only', ledger?:object, note:string}}
+ */
+function restoreLedgerFile() {
+  const file = _ledgerFile();
+  if (!file) return { status: 'memory-only', note: '账本仅内存（宿主未声明落盘位置）⇒ 重启即消解' };
+  const raw = readLedgerFile();
+  if (raw === null) return { status: 'fresh', note: '无持久化账本记录（首次加载）' };
+  if (raw.__corrupt) return { status: 'fail-closed', note: '账本记录存在但无法解析（半截写入/被篡改）⇒ 按「账被清空」处理（fail-closed）' };
+  const expect = ledgerDigest(raw);
+  if (raw.digest !== expect) {
+    return { status: 'fail-closed', note: '账本记录校验不过（半截写入/被篡改）⇒ 按「账被清空」处理（fail-closed：记录缺失/损坏 ≠ 全新开始）' };
+  }
+  return { status: 'restored', ledger: raw, note: '账本从宿主侧状态目录恢复（append-only：只加不减）' };
 }
 
 function readWindowState() {
@@ -773,6 +877,9 @@ function apply(ctx) {
     onStreakChange: (streak, broken) => {
       persistWindowState(streak, broken || streak >= engine.maxFailureStreak);
     },
+    // 🔴 [2026-10-30 · 账本落盘（小D 48 号件第一条）] 挂在**记账的唯一收口**（recordSteady）上
+    //   ⇒ 覆盖全部路径（裁决落账 / 失败进账 / 外传记账…）。IO 留在适配层，引擎保持纯逻辑。
+    onLedgerChange: (lg) => { persistLedger(lg); },
   });
   // 🔴 [2026-10-29 · state layer (xiaoD #45 §7)] the broken-window state is restored from the **host-side
   //   state directory** (outside the plugin directory ⇒ a reinstall cannot clear it). If verification
@@ -784,6 +891,29 @@ function apply(ctx) {
     logline(`window state restored: ${_restored.note}`);
   } else if (_restored.source === 'restored') {
     logline(`window state restored: ${_restored.note}`);
+  }
+
+  // ── 账本恢复（小D 48 号件第一/二条 · 2026-10-30）────────────────────
+  // 🔴 病根：账本只在插件内存 ⇒ **重启/重装即清**（他实测：failureStreak 5→0、traumaCount 6→0、
+  //   ledgerSize 18→0、windowBroken false）⇒ 与 law.mjs S「历史刻痕不可逆（不可消解）」**直接冲突**
+  //   ⇒ 连带：ΣS 每次重启归零 ⇒ 永远攒不到 R₀ ⇒ **R 永远跃迁不了**（换不了规）。
+  // ⇒ 与破窗态**同层**（他第三条）：同一目录、同一套 fail-closed 恢复。
+  // ⇒ **空账 ≠ 新账**（他第二条）：磁盘上有账本文件却损坏/校验不过 ⇒ 按「账被清空」处理，
+  //   **不当全新开始** ⇒ 记账降级只读（不再往空账上追加），并把该事实写进 actorAudit（可审计）。
+  const _ledgerRestored = restoreLedgerFile();
+  if (_ledgerRestored.status === 'restored') {
+    engine.restoreLedger(_ledgerRestored.ledger);
+    logline(`ledger restored: ${_ledgerRestored.note}`);
+  } else if (_ledgerRestored.status === 'fail-closed') {
+    // fail-closed：账被清空/被篡改 ⇒ 不当新账。记账进入降级只读（停止追加），
+    //   破窗态按「不可信」处理（fail-closed 的同款理由：记录缺失/损坏 ≠ 状态干净）。
+    engine.ledgerWriteLocked = true;
+    engine.windowBroken = true;
+    recordActorAudit('ledger-restore-fail-closed', ACTOR_DECIDER,
+      `账本恢复校验不过 ⇒ 按「账被清空」处理：${_ledgerRestored.note}（记账已降级只读；破窗态按 fail-closed 处理）`);
+    logline(`ledger restore fail-closed: ${_ledgerRestored.note}`);
+  } else {
+    logline(`ledger restore: ${_ledgerRestored.note}`);
   }
   // ── Tool declarations (layer two · 2026-10-28): the trusted side reports a verb for tools whose name carries none ──
   //   Origin: `glob` / `grep` / `list_dir` have no action word in their names ⇒ the attribution layer cannot tell
@@ -1486,7 +1616,9 @@ function apply(ctx) {
     output: { schema: { type: 'object', additionalProperties: true }, render: renderObj },
     async execute() {
       // white-box self-check by default only exposes the aggregated view, not dumping full historyTrail (prevent context overload)
-      return {
+      // 🔴 [2026-10-30] the exit passes a lossless convention (undefined→null; Map/Set/Date→plain data) ⇒
+      //   the host's "not lossless JSON" lesion is blocked at the **exit**, not by per-site care.
+      return toLossless({
         effectiveS: engine.effectiveS(),   // reserve reading (down to 0)
         overdraft: engine.overdraft(),     // overdraft amount (owed, read apart from the reserve)
         ledger: engine.steadyLedger(),
@@ -1510,8 +1642,19 @@ function apply(ctx) {
         // 🔴 [2026-10-29 · state layer] persistence state (has the host declared a landing location?) —
         //   never pretend to be persistent.
         windowState: windowStatePersistence(),
+        // 🔴 [2026-10-30 · ledger state (xiaoD piece 48, items 1/2)] is the ledger persisted?
+        //   is it locked (fail-closed)?
+        ledgerState: {
+          persisted: !!_ledgerFile(),
+          writeLocked: !!engine.ledgerWriteLocked,
+          note: engine.ledgerWriteLocked
+            ? '🔴 The ledger is **read-only (downgraded)** (restore verification failed ⇒ treated as "the ledger was wiped" rather than a fresh start ⇒ nothing more is appended to the empty ledger)'
+            : (_ledgerFile()
+              ? 'Ledger persistence is on (host-declared directory ⇒ a restart/reinstall cannot wipe it; append-only restore)'
+              : '🔴 The ledger is **memory-only** (the host declared no landing location) ⇒ a restart wipes it ⇒ conflicts with "historical scars are irreversible (not dissolvable)"'),
+        },
         note: 'ledger=active state (latest version); standby=silent standby (old versions, append-only retained, not called). The full historyTrail is for deep audit only. ⚠️ effectiveS is the **reserve reading** (shortest bucket, floor 0: 0 = no reserve left); owing is read from overdraft (the overdraft amount) — a negative net is never folded into the reserve (2026-10-29, per xiaoD #39/#40: running dry and being overdrawn differ causally). ⚠️ actorAudit separates "the criterion auto-allowed (executor)" / "a human approved (decider)" / "nobody answered (none)" — any conclusion resting on "the action passed" must first check who opened the door.',
-      };
+      });
     },
   }));
 
@@ -1726,10 +1869,20 @@ function apply(ctx) {
     parameters: {},
     output: { schema: { type: 'object', additionalProperties: true }, render: renderObj },
     async execute() {
-      return {
+      // 🔴 [2026-10-30] M's **computability** made explicit (xiaoD piece 47, §5): when M cannot be
+      //   computed, report "undecidable (missing which item)" — **never substitute a quantity from
+      //   outside the formula**. ⇒ what is given here is the list of missing items, not a number
+      //   (the framework forbids assigning/computing values).
+      const surface = strataDataSurface(engine);
+      const mStatus = mComputability(surface);
+      return toLossless({
         ...strataReadout(engine),
-        note: '只读面：不产生 verdict、不写状态、不参与闸门。pending/absent 是如实登记，不是免责通道；pending 必带 evidence 线索，absent 必带缺口说明。',
-      };
+        // 🔴 M's decidability: when the main line is absent, the side branches may not substitute.
+        mComputability: mStatus,
+        note: '只读面：不产生 verdict、不写状态、不参与闸门。pending/absent 是如实登记，不是免责通道；pending 必带 evidence 线索，absent 必带缺口说明。'
+          + '⚠️ **M 不可算时报「不可判（缺哪项）」，不许拿公式外的量顶替**（厚度/透支/承担率/覆盖率都是**观测面**，一个都不进公式）。'
+          + '⚠️ 判据只允许用公式里的五个量（R/S/D/H/M）；公式外的量只能观测，不得进判定——见 sourceGate 诊断面。',
+      });
     },
   }));
 
