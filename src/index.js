@@ -456,6 +456,19 @@ export function clearReviewMemory(key) {
   return had ? 1 : 0;
 }
 
+// [2026-10-29 · defer must be meaningful: the human must not be frozen by the popup] popup deadline
+//   (on expiry the question is withdrawn ⇒ lands as "defer"). Default 120 s — enough to read and decide,
+//   short enough that nobody has to sit in front of the popup (measured by the trustee on 2026-10-29:
+//   while the popup was open she could not even send a message). Injectable: setReviewAskTimeout(ms).
+let _reviewAskTimeoutMs = 120000;
+/** Set the popup deadline (ms). A negative value is rejected (current value kept). */
+export function setReviewAskTimeout(ms) {
+  const n = Number(ms);
+  if (!Number.isFinite(n) || n < 0) return _reviewAskTimeoutMs;
+  _reviewAskTimeoutMs = n;
+  return _reviewAskTimeoutMs;
+}
+
 export function healBrokenWindow(note) {
   const at = new Date().toISOString();
   const text = typeof note === 'string' ? note.trim() : '';
@@ -829,10 +842,27 @@ function apply(ctx) {
     if (!approval || typeof approval.request !== 'function') return null;
     if (!exec?.agent) return null;   // no agent context ⇒ no one to ask ⇒ fail-closed
     try {
-      const out = await approval.request({
+      // 🔴 [2026-10-29 · defer must be meaningful: the human must not be frozen by the popup]
+      //   Measured (trustee, 2026-10-29; relayed in xiaoD #35): while the popup was pending **she could
+      //   not even send a message** — the popup froze the adjudicator itself (hostage state). "No answer ⇒
+      //   not executed" already suffices — nothing requires "the human may not move".
+      //   Fix: on expiry withdraw the question (contract: aborting withdraws it ⇒ settles 'cancelled') ⇒ it
+      //   lands as **defer**: the action stays unexecuted (neither refused nor released), the human is free,
+      //   and the answer can be supplied later (the same kind asks again next time).
+      //   ⚠️ This is the **necessary condition** for the defer state: without a deadline, "defer" is merely
+      //   "no answer" and the human is still stuck in front of the popup.
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => {
+        try { ctrl.abort(); } catch { /* abort failure degrades to the host's own timeout */ }
+        logline('review approval timed out → question withdrawn, lands as defer (action not executed, human not frozen)');
+      }, _reviewAskTimeoutMs);
+      let out;
+      try {
+        out = await approval.request({
         agent: exec.agent,
         toolName: exec.name ?? 'unknown',
         callId: exec.callId,
+        signal: ctrl.signal,
         reason: [
           '[Weiwen/KISS Law · your adjudication is needed] (an authorization request, not a notification)',
           `The "${exec?.name}" call was judged "uncertain" by the engine${decision.law ? ' (layer ' + decision.law + ')' : ''} — this layer's criteria are exhausted; returned to the human by structure:`,
@@ -843,8 +873,12 @@ function apply(ctx) {
           '· Defer: not executed this round, kept for reconsideration — **not a refusal**, no cooldown; the same kind will ask again.',
           '· No answer: not executed this round (same as unattended — expected behavior).',
           'Note: your decision is recorded as an approval/asked + approval/decided audit pair, replayable — not "one sentence in chat counts".',
+          `⚠️ You need not stay here: no answer within ${Math.round(_reviewAskTimeoutMs / 1000)}s ⇒ the question is withdrawn and lands as "defer" (action not executed, not counted as a refusal, answerable later).`,
         ].filter(Boolean).join('\n'),
-      });
+        });
+      } finally {
+        clearTimeout(timer);   // an answer arrived ⇒ drop the deadline timer (withdrawal is only for "no answer")
+      }
       // [2026-10-29 · four states] the contract's outcome vocabulary is closed at four:
       //   allowed-once / rejected / cancelled / unavailable ⇒ allow once / refuse / **defer** / no answer.
       //   ⚠️ "Always allow" is NOT in the outcome vocabulary — ApprovalRequest has no options field and the
@@ -876,6 +910,12 @@ function apply(ctx) {
       logline(`review approval outcome=${out} → silent deny (fail-closed, same as unattended)`);
       return null;
     } catch (e) {
+      // Deadline withdrawal ⇒ the host usually throws an abort-class error ⇒ land as **defer** (not a
+      // refusal, no cooldown); other exceptions stay fail-closed (no answering surface ≠ human suspending).
+      if (e?.name === 'AbortError' || /abort/i.test(String(e?.message ?? ''))) {
+        logline('review approval aborted (timeout) → defer: action not executed, human not frozen');
+        return 'deferred';
+      }
       logline(`review approval failed: ${e?.message ?? e} → fail-closed`);
       return null;
     }
