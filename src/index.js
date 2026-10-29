@@ -437,6 +437,25 @@ const _windowHeals = [];
  * @returns {{at:string, note:string|null, kind:string, instances:number, wereBroken:number}}
  *          `wereBroken` = how many instances were actually in the broken state before the reset
  */
+// [2026-10-29 · four states] the "always allow" memory (module-level; the host can revoke it via
+//   clearReviewMemory). The key is the **adjudication object**, not global: the trustee approves
+//   "this kind of question", not "never ask this machine again".
+//   ⚠️ Entries arrive only from a host outcome of always/session; the plugin does not fabricate a
+//   fourth button the contract does not have (the outcome vocabulary is closed at four).
+const _reviewAlways = new Set();
+/** Revoke an "always allow": pass a key to revoke one kind, omit to clear all. Returns how many were revoked. */
+export function clearReviewMemory(key) {
+  if (key === undefined || key === null) {
+    const n = _reviewAlways.size;
+    _reviewAlways.clear();
+    logline(`clearReviewMemory(all) — revoked ${n} always-allow entries`);
+    return n;
+  }
+  const had = _reviewAlways.delete(String(key));
+  logline(`clearReviewMemory(${String(key).slice(0, 60)}) — ${had ? 'revoked' : 'not found'}`);
+  return had ? 1 : 0;
+}
+
 export function healBrokenWindow(note) {
   const at = new Date().toISOString();
   const text = typeof note === 'string' ? note.trim() : '';
@@ -795,6 +814,9 @@ function apply(ctx) {
 
   const requestReviewVerdict = async (exec, decision) => {
     const rk = reviewKeyOf(exec, decision);
+    // "Always allow" memory hit ⇒ the same kind is not asked again (this is the effect side of the fourth
+    // state); the receipt still records where the approval came from.
+    if (_reviewAlways.has(rk)) return { always: true, key: rk };
     const refused = _reviewRefused.get(rk);
     if (refused && Date.now() - refused.at < REVIEW_COOLDOWN_MS) {
       // No harassment during cooldown — but **it must carry attribution**: silence has to be visible
@@ -815,15 +837,36 @@ function apply(ctx) {
           '[Weiwen/KISS Law · your adjudication is needed] (an authorization request, not a notification)',
           `The "${exec?.name}" call was judged "uncertain" by the engine${decision.law ? ' (layer ' + decision.law + ')' : ''} — this layer's criteria are exhausted; returned to the human by structure:`,
           decision.reason ?? '',
-          '· Allow: lets through this one call only (the next identical call will ask you again).',
-          '· Refuse: not executed this round; no re-ask for 5 minutes.',
+          '· Allow once: lets through this one call only (the next identical call will ask you again).',
+          '· Always allow: never ask this kind again — taken over by the host-side "always allow in this session" control (that memory lives on the host side; this plugin does not fabricate a semantic the approval channel lacks).',
+          '· Refuse: not executed this round; no re-ask **of this kind** for 5 minutes (other kinds still ask).',
+          '· Defer: not executed this round, kept for reconsideration — **not a refusal**, no cooldown; the same kind will ask again.',
           '· No answer: not executed this round (same as unattended — expected behavior).',
           'Note: your decision is recorded as an approval/asked + approval/decided audit pair, replayable — not "one sentence in chat counts".',
         ].filter(Boolean).join('\n'),
       });
-      if (out === 'allowed-once') {
-        logline(`review verdict via approval: allowed-once — trustee let this one call through`);
+      // [2026-10-29 · four states] the contract's outcome vocabulary is closed at four:
+      //   allowed-once / rejected / cancelled / unavailable ⇒ allow once / refuse / **defer** / no answer.
+      //   ⚠️ "Always allow" is NOT in the outcome vocabulary — ApprovalRequest has no options field and the
+      //     outcome set is closed, so the plugin cannot tell which button was pressed. If the host UI offers
+      //     "always allow in this session" (the one in the trustee's screenshot), that memory lives on the
+      //     host side: once it remembers, it stops asking us — we never receive it and must not pretend we did.
+      //     Hence an **extension slot only**: a future always/session outcome activates the memory; otherwise
+      //     behaviour degrades to allowed-once, unchanged (no fifth value is fabricated).
+      if (out === 'allowed-once' || out === 'always' || out === 'session') {
+        if (out !== 'allowed-once') {
+          _reviewAlways.add(rk);   // same kind no longer asked (key = adjudication object, not global)
+          logline(`review verdict: ${out} ⇒ kind (adjudication object ${rk}) recorded as always-allow`);
+        }
+        logline(`review verdict via approval: ${out} — trustee let this one call through`);
         return 'allowed-once';
+      }
+      if (out === 'cancelled') {
+        // 【Defer】withdrawn/suspended: not executed this round, but **not a refusal** ⇒ no cooldown
+        // (the human never ruled; it must not be recorded as a refusal). Contrast: unavailable = no
+        // answering surface at all (fail-closed).
+        logline('review approval cancelled → deferred: not executed this round, kept for reconsideration (no cooldown)');
+        return 'deferred';
       }
       if (out === 'rejected') {
         _reviewRefused.set(rk, { at: Date.now(), note: String(decision.reason ?? '').slice(0, 80) });
@@ -908,7 +951,17 @@ function apply(ctx) {
           reason: `${decision.reason}\n[Trustee's verdict] Refused to execute this call (approval/asked + approval/decided audit pair on record, replayable).`,
         };
       }
-      // During cooldown: don't disturb the trustee, but **silence must carry attribution** — otherwise the
+      if (verdict && verdict.always) {
+        logline(`pre-execute ${exec?.name} -> review(trustee previously approved "always" for this kind) -> next | whitebox ${JSON.stringify({ ...decision, humanVerdict: 'always', key: verdict.key })}`);
+        return next();
+      }
+      if (verdict === 'deferred') {
+        decision = {
+          ...decision,
+          kind: 'deny',
+          reason: `${decision.reason}\n[Trustee: deferred] Not executed this round, kept for reconsideration (this is not a refusal, no cooldown; the same kind will ask again).`,
+        };
+      }
       // trustee believes "I approved everything" while the audited party only sees a bare denial.
       if (verdict && verdict.cooldown) {
         const minsAgo = Math.max(1, Math.round((Date.now() - verdict.refusedAt) / 60000));
