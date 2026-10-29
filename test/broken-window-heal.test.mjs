@@ -35,12 +35,27 @@ const accrueFailures = (handlers, n) => { for (let i = 0; i < n; i += 1) handler
 const streakOf = async (tools) => (await toolNamed(tools, 'query_steady_state').execute({}, {})).failureStreak;
 const probeCall = () => exec('read', { file_path: '/tmp/ok.txt' });   // 无害调用：唯一可能被拒的理由只有破窗
 
+// 🔴 [2026-10-29 · identity layer (xiaoD #45 §6 · the trustee's definition)] A reset must be triggered by
+//   the **decider**: host = the executing AI (executor) | the decider and the reset authority = the user
+//   (decider). ⇒ the reset entry now takes an actor; no actor = treated as the executor = **refused**
+//   (fail-closed). Every reset in this group is made **as the decider** (the host acting for the user).
+const DECIDER = 'decider';
+
 // 这一条先跑：到此刻为止本进程内不应有任何实例处于破窗态（后面的用例自会制造，并各自收尾）。
 test('复位如实记数：无实例破窗时 wereBroken = 0（不虚报"治了"）', () => {
-  const rec = healBrokenWindow('cleanup check: nothing should be broken yet');
+  const rec = healBrokenWindow('cleanup check: nothing should be broken yet', DECIDER);
   assert.equal(rec.kind, 'heal-window');
   assert.equal(rec.wereBroken, 0, '未破窗不得报成治好（先读后治）');
   assert.equal(rec.note, 'cleanup check: nothing should be broken yet', '复位必须留痕（何时因何解除）');
+  assert.equal(rec.actor, DECIDER, 'the reset record must carry the actor (who cleared it)');
+});
+
+test('🔴 越权复位被拒：执行方（被审的 AI）不能给自己签复位', () => {
+  const denied = healBrokenWindow('executor self-reset', 'executor');
+  assert.equal(denied.kind, 'heal-window-denied', 'the executor (the audited AI) cannot sign its own reset');
+  assert.match(denied.reason, /reset belongs to the decider/, 'the refusal must state the ownership');
+  const noActor = healBrokenWindow('no actor declared', undefined);
+  assert.equal(noActor.kind, 'heal-window-denied', 'no actor declared ⇒ fail-closed (treated as the executor ⇒ refused)');
 });
 
 test('破窗成立 ⇒ pre-execute 拒绝一切调用；宿主复位后同一调用被放行（止损不是死锁）', async () => {
@@ -53,7 +68,7 @@ test('破窗成立 ⇒ pre-execute 拒绝一切调用；宿主复位后同一调
   assert.equal(denied?.kind, 'deny', '破窗成立后未达终局的调用必须在执行前被拒');
   assert.ok(/broken-window|破窗/.test(String(denied.reason)), '拒绝理由须点名破窗止损（可归因，不是笼统 deny；中英话术均须点名）');
 
-  const rec = healBrokenWindow('fault fixed and verified (test)');
+  const rec = healBrokenWindow('fault fixed and verified (test)', DECIDER);
   assert.ok(rec.wereBroken >= 1, '复位报告须承认此前确有实例在破窗态');
 
   const released = await handlers['tools/pre-execute'](probeCall(), next);
@@ -71,8 +86,8 @@ test('复位入口不是工具：模型面看不到它（结构入口 ≠ 工具
 });
 
 test('复位留痕：同一入口多次调用持续可溯（不静默清空）', () => {
-  healBrokenWindow('trace check #1');
-  const rec = healBrokenWindow('trace check #2');
+  healBrokenWindow('trace check #1', DECIDER);
+  const rec = healBrokenWindow('trace check #2', DECIDER);
   assert.equal(rec.note, 'trace check #2');
   assert.ok(rec.at, '留痕须带时间（"何时解除的"必须查得出）');
 });

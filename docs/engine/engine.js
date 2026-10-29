@@ -1376,6 +1376,13 @@ export class WeiwenLawEngine {
     // Broken-window count (consecutive failures / deviation accumulation); threshold is illustrative, author-adjustable
     this.failureStreak = 0;
     this.maxFailureStreak = opts.maxFailureStreak ?? 5;
+    // 🔴 [2026-10-29 · state layer (xiaoD #45 §7)] the **single closure point** for the broken-window count:/n    //   before, `this.failureStreak += 1` was scattered over a dozen places (R hits / deduction denies /
+    //   pledge violations / H overreach / M stops / real failures…) ⇒ the adapter could only persist by
+    //   patching each site ⇒ **one missed site ⇒ that path's broken state never lands on disk ⇒ a
+    //   reinstall clears it ⇒ the interception is void** (exactly what xiaoD measured).
+    //   ⇒ Structural fix: increments go through bumpFailureStreak() only; the hook is attached once.
+    //   ⚠️ The hook only observes (IO stays in the adapter; the engine stays pure logic).
+    this.onStreakChange = opts.onStreakChange ?? null;
     //
     // Don't agonize over the threshold, don't agonize "how many triggers to lock": intercept = mark, accumulated marks hit cap → hand to human, AI stops burning compute.
     //   mBugForce   : same BUG (bugKey stable identity) refused-fix and repeatedly forcing in → accumulated marks hit cap → hand to human (flow1)
@@ -1791,6 +1798,10 @@ export class WeiwenLawEngine {
     // [2026-09-19] 两条通道：① 任一 R 层投影达阈值（有域归属 ⇒ 走结构）；② 全局兜底累积（无域归属 ⇒ 走兜底）。
     //   破窗是"状态"不是"一次判定"：触发后持续 fail-closed，直到 healWindow / settleWindow 复位。
     // [2026-10-28] Ownership of the reset is written into the verdict: **reset belongs to the host/H side, not to
+    //   🔴 [2026-10-29 · identity layer (xiaoD #45 §6 · the trustee's definition)] The old wording
+    //     "reset belongs to the host side (not the audited party)" **self-refutes** when the host IS the
+    //     audited party. ⇒ Per the trustee's definition: **host = the executing AI (executor) | the decider
+    //     and the reset authority = the user (decider)** ⇒ reset belongs to the decider, not the executor.
     //   the audited party** (same rule as "the audited may not issue its own authorisation"). Without this line the
     //   measured outcome was: the agent kept retrying the same path (it assumed it had not found the way yet) and
     //   turned a stop into an infinite loop.
@@ -2658,7 +2669,7 @@ export class WeiwenLawEngine {
       note: u ? u.reason : '作用域可静态判定（无变量/命令替换/相对全量）',
     });
     if (u) {
-      if (u.deny) { this.failureStreak += 1; return { kind: 'deny', law: 'R', reason: u.reason }; }
+      if (u.deny) { this.bumpFailureStreak(); return { kind: 'deny', law: 'R', reason: u.reason }; }
       return { kind: 'review', law: 'R', reason: u.reason };
     }
     // 🔴 [2026-10-29 · retarget re-judgement (xiaoD #42's bypass chain)] the doc exemption covers only the
@@ -2749,7 +2760,7 @@ export class WeiwenLawEngine {
     if (h) {
       // H third tier: suspicious but no evidence → review (hand to human), neither deny nor allow
       if (h.kind === 'review') return { kind: 'review', law: 'H', reason: h.reason };
-      this.failureStreak += 1;
+      this.bumpFailureStreak();
       return { kind: 'deny', law: 'H', reason: h.reason };
     }
     // —— M First-Bug-Halt · dual-line parallel + court-style cross-check (symptom A + root B) ——
@@ -2768,7 +2779,7 @@ export class WeiwenLawEngine {
     if (mCourt.verdict === 'halt') {
       // Dual-line consistently confirms halt: cut this segment (iron-law ② · cut to preserve continuity), register into loop + mark
       const halt = this.bugStop.halt(call);
-      this.failureStreak += 1;
+      this.bumpFailureStreak();
       const mk = this._markIntercept(call, halt.bugKey);
       if (mk.human) {
         return this._toHuman({ law: 'M', bugKey: halt.bugKey, closedLoop: true, systemKey: mk.systemKey, call,
@@ -2906,7 +2917,7 @@ export class WeiwenLawEngine {
       note: sa ? sa.reason : '言侧未启用或无冲突（无承诺可比 / 言行重合）',
     });
     if (sa) {
-      if (sa.kind === 'deny') this.failureStreak += 1;  // 破坏类分裂计入破窗（与 R 命中、推演 deny 同权）
+      if (sa.kind === 'deny') this.bumpFailureStreak();  // 破坏类分裂计入破窗（与 R 命中、推演 deny 同权）
       return sa;
     }
     // [2026-09-20 · 痕锚归属 · 扣子 coze/51 方向 · 已落地] scar 类（不可逆）动作 + 无证明来源 ⇒ REVIEW。
@@ -3030,7 +3041,7 @@ export class WeiwenLawEngine {
         //      变成会话死锁（须人工 heal）⇒ 防线自己成了故障源。而"拒绝这次动作"本身已兑现"立刻阻止"。
         //      连续越界累积到**既有**阈值 mHumanCap/maxFailureStreak 即自动停机 —— 用现成阈值承载，不新拍阈值。
         notePledgeBreach(pledge, { action: pledgeV.action, targets: pledgeV.targets?.values ?? [], why: pledgeV.why });
-        this.failureStreak += 1; // 与 R 命中同权：违背自陈担保是确定的偏离，不是灰区
+        this.bumpFailureStreak(); // 与 R 命中同权：违背自陈担保是确定的偏离，不是灰区
         const mkP = this._markIntercept(call, bugKeyOf(call));
         if (mkP.human) {
           return this._toHuman({ law: 'R', bugKey: bugKeyOf(call), closedLoop: false, systemKey: mkP.systemKey, call,
@@ -3113,7 +3124,7 @@ export class WeiwenLawEngine {
       return { kind: 'review', law: 'R', reason: '[XSUB-12] 该调用带着载荷（' + Object.keys(call?.args ?? {}).join('/') + '），但其落点不在本层判据的输入面上：既无位置量（键名口径与词法口径均未见），亦无命令量 ⇒ 判据穷尽而无落点 ＝ 未判（≠ 判为无）⇒ 交还主权者裁决。', attrib, deduced: true, mMark: mkS, projection: risk.branches };
     }
     if (risk.verdict === 'deny') {
-      this.failureStreak += 1; // high risk counts into broken-window (same weight as R hit)
+      this.bumpFailureStreak(); // high risk counts into broken-window (same weight as R hit)
       const mk = this._markIntercept(call, bugKeyOf(call));
       if (mk.human) {
         return this._toHuman({ law: '推演', bugKey: bugKeyOf(call), closedLoop: false, systemKey: mk.systemKey, call,
@@ -3327,7 +3338,7 @@ export class WeiwenLawEngine {
     if (prov === 'principal') return { kind: 'allow' }; // sovereign's own words → self-decision
     if (prov === 'third-party') {
       if (targetsBehaviorConstraint(flat)) {
-        this.failureStreak += 1;
+        this.bumpFailureStreak();
         return { kind: 'reject', law: 'H', reason: '外部消息（third-party 来源）试图改写主体行为约束——从外部侵入内 H 黑箱（提示词注入/越狱/人格重写）。' };
       }
       return { kind: 'allow' }; // external content treated as data → allow
@@ -3348,10 +3359,34 @@ export class WeiwenLawEngine {
   }
 
   // ---------- Feedback loop: one failure/trauma rewrites S/D (S/D → H → M → rewrite S/D iteration) ----------
-  onFailure(loss = 0) {
+  // ---------- The single increment entry for the broken-window count (2026-10-29 · state layer) ----------
+  /** Increments the broken-window count and notifies the hook. **Every** failureStreak increment must go
+   *  through here (a structural closure point — otherwise the adapter's persistence misses some path ⇒ the
+   *  broken state never lands on disk ⇒ a reinstall clears it ⇒ the interception is void). */
+  bumpFailureStreak() {
     this.failureStreak += 1;
-    // One failure/trauma: take D path |S-1| absolute erosion (current value drops), also as history scar (not rolled back)
-    if (loss > 0) this.recordSteady({ negative: Math.abs(loss), trauma: Math.abs(loss) });
+    try { this.onStreakChange?.(this.failureStreak, this.windowBroken); } catch { /* a failing hook must not block the verdict */ }
+    return this.failureStreak;
+  }
+
+  // 🔴 [2026-10-29 · a failure must enter the S ledger (xiaoD #45 measured: anchors stayed 0 across ten
+  //   actions — "the finance ledger has no entrance")] Root cause (verified): the signature was
+  //   `onFailure(loss = 0)` while the adapter calls **`engine.onFailure()` (no argument)** ⇒ `loss` was
+  //   always 0 ⇒ `if (loss > 0)` never held ⇒ **a failure only raised the broken-window count and never
+  //   entered the S ledger** ⇒ failures were entirely invisible on the books ⇒ the trustee's own words
+  //   ("the main S ledger never becomes a negative account", quoted in xiaoD #43) had **no carrier in the
+  //   implementation**. Per the manuscript: **|−S| = negative accumulation (trauma, failure, setback…)**
+  //   ⇒ a failure satisfies **both** proxies of the finance reading (it has a direction, it has a cost)
+  //   ⇒ it lands as a negative anchor, not as running count.
+  //   ⚠️ Grading: the default negative amount = 1 (one independent discrete event, law.mjs "'1' = one
+  //     independent event") — **not** dumping the whole failureStreak into the books at once (that would be
+  //     running count impersonating an anchor).
+  //   ⚠️ The ledger only grows: it records "which chain broke", it does not subtract the stock (iron law #14).
+  onFailure(loss = 0) {
+    this.bumpFailureStreak();
+    // A failure/trauma: the D path |S-1| absolute erosion (current value drops), also recorded as a historical mark (never rolled back)
+    const amt = Math.abs(Number(loss) || 0) || 1;   // default 1 = one independent discrete event (a failure IS an event)
+    this.recordSteady({ negative: amt, trauma: amt, detail: `failure/setback: consecutive failure count ${this.failureStreak} (the human paid the cost)` });
   }
 
   // ---------- Receipt-side break-window projection (receipt gate, 2026-09-21) ----------
@@ -3401,7 +3436,9 @@ export class WeiwenLawEngine {
         capped: false,
         over: 0,
         display: `${proj}/${cap}`,
-        reason: `Consecutive failures/deviations are about to reach the broken-window threshold (${proj}/${cap}): D broken-window stop-loss engages so the fault cannot spread and kill the whole. Reset belongs to the host side (not the audited party).`,
+        reason: `Consecutive failures/deviations are about to reach the broken-window threshold (${proj}/${cap}): D broken-window stop-loss engages so the fault cannot spread and kill the whole. `
+          + `Reset belongs to the **decider**, not the executor — the executor (the audited AI) cannot sign its own reset; `
+          + `after the decider (the user/principal) confirms, the host side calls healBrokenWindow(note) or resolveBug(bugKey).`,
       };
     }
     return null;

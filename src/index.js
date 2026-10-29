@@ -37,7 +37,9 @@
 //
 // Still an RC preview; official notes future breaking API changes; re-check against the current official docs before real-device integration.
 
-import { writeFileSync, appendFileSync, readFileSync, readdirSync } from 'node:fs';
+import { writeFileSync, appendFileSync, readFileSync, readdirSync, existsSync, mkdirSync } from 'node:fs';
+import { homedir } from 'node:os';
+import { join } from 'node:path';
 import { createHash } from 'node:crypto';
 import { WeiwenLawEngine, DEFAULT_RIGID_ANCHORS, isIrreversible } from './core/engine.mjs';
 import { parseCapability, capabilityStatus, parsePledge, pledgeStatus, isNarrower, locValues } from './core/capability.mjs';  // [2026-10-28 · batch 4] 通行证 + 担保：判据与词汇都在该模块，适配层只做签发/自提/自省（不重写判据）
@@ -447,6 +449,15 @@ const _windowHeals = [];
 //   ⚠️ Entries arrive only from a host outcome of always/session; the plugin does not fabricate a
 //   fourth button the contract does not have (the outcome vocabulary is closed at four).
 const _reviewAlways = new Set();
+// 🔴 [2026-10-29 · identity layer (xiaoD #45 §6 · the trustee's definition)] host = the executing AI
+//   (executor); the decider and the reset authority = the user (decider). ⇒ every grant/refusal/reset
+//   record must carry an actor, otherwise "who caused it" cannot be read back.
+//   ⚠️ This also answers xiaoD #45 §5's downgrade: "the criterion auto-allowed" and "a human approved"
+//   are the same shape on his observation face ⇒ the readout face must show the actor explicitly.
+const ACTOR_EXECUTOR = 'executor';   // executor (AI): the criterion allowed/blocked, no human present
+const ACTOR_DECIDER = 'decider';     // decider (user): a human pressed a button
+// The audit face for grants/refusals/resets (who, when, on what basis) — append-only, replayable.
+const _actorAudit = [];
 // [2026-10-29] pending marker set (the trace a defer leaves): the human did not rule ⇒ no S entry,
 //   but it must still be readable that this road is suspended.
 const _reviewPending = new Set();
@@ -479,9 +490,121 @@ export function setReviewAskTimeout(ms) {
   return _reviewAskTimeoutMs;
 }
 
-export function healBrokenWindow(note) {
+// ══════════ State layer: the persistent carrier for the broken-window state (xiaoD #45 §7) ═════════
+// 🔴 His measured contrast (the trustee's own measurement): the **broken-window state lives in plugin
+//   memory** ⇒ uninstalling/reinstalling clears it (measured failureStreak 5→0); whereas the **pledge lives
+//   on the host side** ⇒ reinstalling the plugin does not clear it. ⇒ Criterion: **every "reset point /
+//   clearing point" must sit outside the host's reachable range** — any path that needs no host, no repair,
+//   and only a restart/reinstall to clear ⇒ the interception is void.
+// ⇒ His four proposals; three of them land here:
+//   ① The landing location is **declared by the host**, not inside the plugin directory (a reinstall
+//      overwrites it). **Default = memory only** (see the note below).
+//   ② The stored content is verifiable: a monotonic count + a digest ⇒ tampering/partial writes are detectable.
+//   ③ **fail-closed**: finding "there should be a broken-window record but there isn't" ⇒ treat as broken
+//      (a missing record ≠ a clean state).
+//   ④ The clearing point writes an audit (who cleared, when, on what basis) — see _actorAudit.
+// ⚠️ **Default = memory only** (2026-10-29 revision): the criterion says the landing location is the
+//   **host's** decision, so the plugin must not pick one by itself. Two measured harms of a hardcoded
+//   default: ① the plugin writes into the user's home directory without authorization (and tests pollute
+//   the real machine's state); ② "a reinstall clears it" is the disease we are treating, but hardcoding a
+//   path **takes the decision away from the host**. ⇒ default = memory only (behaviour as in 0.3.x, without
+//   pretending to be persistent), and the readout face says so plainly; a host that wants persistence calls
+//   `declareWindowStateDir(dir)` (or sets WEIWEN_LAW_STATE_DIR).
+let _stateDir = process.env.WEIWEN_LAW_STATE_DIR || null;
+const _windowStateFile = () => (_stateDir ? join(_stateDir, 'window-state.json') : null);
+
+/** Declare where the broken-window state is persisted (a directory outside the plugin's reach ⇒ a
+ *  reinstall/restart cannot clear it). Pass null ⇒ back to memory only (the default). */
+export function declareWindowStateDir(dir) {
+  _stateDir = typeof dir === 'string' && dir.trim() ? dir.trim() : (process.env.WEIWEN_LAW_STATE_DIR || null);
+  return _stateDir;
+}
+
+/** For the readout face: the current persistence state (has the host declared a landing location?). */
+export function windowStatePersistence() {
+  return { declared: !!_stateDir, dir: _stateDir, file: _windowStateFile(),
+    note: _stateDir
+      ? 'broken-window persistence is on (a host-declared directory ⇒ a reinstall/restart cannot clear it)'
+      : '🔴 the broken-window state is **memory only** (the host declared no landing location) ⇒ a reinstall/restart clears it ⇒ interception strength is limited; to persist, have the host call declareWindowStateDir(dir)' };
+}
+
+function readWindowState() {
+  const file = _windowStateFile();
+  if (!file) return null;
+  try {
+    if (!existsSync(file)) return null;
+    const raw = JSON.parse(readFileSync(file, 'utf8'));
+    return raw && typeof raw === 'object' ? raw : null;
+  } catch { return null; }
+}
+
+// Digest: monotonic count + content ⇒ verifiable (②). The hash covers the key fields ⇒ a partial write
+// or a tamper is detectable.
+function windowStateDigest(st) {
+  return createHash('sha256').update(JSON.stringify({ v: st.v, streak: st.streak, broken: st.broken, healedAt: st.healedAt ?? null })).digest('hex').slice(0, 16);
+}
+
+function persistWindowState(streak, broken) {
+  const file = _windowStateFile();
+  if (!file) return false;   // no declared landing location ⇒ do not write (memory only by default)
+  try {
+    mkdirSync(_stateDir, { recursive: true });
+    const st = { v: 1, streak, broken: !!broken, healedAt: null, savedAt: new Date().toISOString() };
+    st.digest = windowStateDigest(st);
+    writeFileSync(file, JSON.stringify(st, null, 2), 'utf8');
+    return true;
+  } catch (e) {
+    logline(`window state persist failed: ${e?.message ?? e} ⇒ the landing location is unusable (memory state still holds; a reinstall clears it — noted)`);
+    return false;
+  }
+}
+
+// Read the broken-window state back at startup. **fail-closed** (③): a missing record ≠ a clean state —
+//   but "never broke" and "the record was deleted" look the same on the readout face ⇒ a side witness
+//   separates them: if there is **no state file at all** and this is the **first load** ⇒ treated as not
+//   broken (a normal starting point); if the file exists but fails verification ⇒ treated as broken
+//   (fail-closed).
+function restoreWindowState() {
+  const st = readWindowState();
+  if (!_stateDir) return { broken: false, streak: 0, source: 'memory-only',
+    note: 'the broken-window state is memory only (the host declared no landing location) ⇒ a reinstall/restart clears it' };
+  if (!st) return { broken: false, streak: 0, source: 'fresh', note: 'no persisted broken-window record (first load)' };
+  const expect = windowStateDigest(st);
+  if (st.digest !== expect) {
+    return { broken: true, streak: st.streak ?? Number.MAX_SAFE_INTEGER, source: 'fail-closed',
+      note: 'the broken-window record fails verification (partial write/tampered) ⇒ treated as broken (fail-closed: a missing/damaged record ≠ a clean state)' };
+  }
+  return { broken: !!st.broken, streak: st.streak ?? 0, source: 'restored',
+    note: `the broken-window state was restored from the host-side state directory (streak=${st.streak})` };
+}
+
+// ---------- Identity-layer audit (actor attribution) ----------
+// Every verdict/reset records: who (executor/decider), when, on what basis. Append-only, replayable.
+function recordActorAudit(kind, actor, detail) {
+  const rec = { at: new Date().toISOString(), kind, actor, detail: String(detail ?? '').slice(0, 200) };
+  _actorAudit.push(rec);
+  if (_actorAudit.length > 200) _actorAudit.shift();
+  logline(`actor audit: ${kind} by ${actor} — ${rec.detail}`);
+  return rec;
+}
+
+// 🔴 [2026-10-29 · identity layer (xiaoD #45 §6 · the trustee's definition)] The **owner** of the reset is the
+//   decider (the user), not the executor (the audited AI). ⇒ `healBrokenWindow(note, actor)` must state who is
+//   resetting:
+//   · actor='decider' ⇒ the reset is allowed, with an audit (who cleared, when, on what basis);
+//   · actor='executor' ⇒ **the reset is refused** and "an unauthorized reset" is recorded —
+//     same shape as "the audited party cannot sign its own grant";
+//   · no actor ⇒ fail-closed (treated as the executor ⇒ refused).
+export function healBrokenWindow(note, actor = ACTOR_EXECUTOR) {
   const at = new Date().toISOString();
   const text = typeof note === 'string' ? note.trim() : '';
+  if (actor !== ACTOR_DECIDER) {
+    const rec = { at, note: text || null, kind: 'heal-window-denied', actor, instances: _liveEngines.size,
+      wereBroken: 0, reason: 'the reset belongs to the decider, not the executor — the executor (the audited AI) cannot sign its own reset' };
+    recordActorAudit('heal-denied', actor, `unauthorized reset refused: ${rec.reason}`);
+    logline(`healBrokenWindow denied (actor=${actor}) — the reset belongs to the decider, not the executor`);
+    return rec;
+  }
   let wereBroken = 0;
   for (const e of _liveEngines) {
     try {
@@ -491,10 +614,14 @@ export function healBrokenWindow(note) {
       e.healWindow();
     } catch { /* one bad instance must not block the others */ }
   }
-  const rec = { at, note: text || null, kind: 'heal-window', instances: _liveEngines.size, wereBroken };
+  // 🔴 The clearing point writes an audit (④) + clears the persisted broken state (otherwise the next load
+  //   restores it ⇒ the reset did nothing).
+  persistWindowState(0, false);
+  recordActorAudit('heal', actor, `decider confirmed the reset (cleared the broken state; instances=${_liveEngines.size}; was broken=${wereBroken})`);
+  const rec = { at, note: text || null, kind: 'heal-window', actor, instances: _liveEngines.size, wereBroken };
   _windowHeals.push(rec);
   if (_windowHeals.length > 20) _windowHeals.shift();
-  logline(`healBrokenWindow(${text || 'no note given'}) — instances=${_liveEngines.size}, wereBroken=${wereBroken}`);
+  logline(`healBrokenWindow(${text || 'no note given'}) — actor=decider, instances=${_liveEngines.size}, wereBroken=${wereBroken}`);
   return rec;
 }
 function textOfContent(content) {
@@ -638,7 +765,26 @@ function apply(ctx) {
   const engine = new WeiwenLawEngine({
     rigidAnchors: DEFAULT_RIGID_ANCHORS,
     selfAuditTools: SELF_AUDIT_TOOL_NAMES,
+    // 🔴 [2026-10-29 · state layer] the broken-window state is persisted from the engine's **single
+    //   increment closure point** (bumpFailureStreak) ⇒ covers **every** path (R hits / deduction denies /
+    //   pledge violations / H overreach / M stops / real failures…). Patching each site in the adapter
+    //   would inevitably miss one ⇒ that path's broken state never lands on disk ⇒ a reinstall clears it
+    //   ⇒ the interception is void.
+    onStreakChange: (streak, broken) => {
+      persistWindowState(streak, broken || streak >= engine.maxFailureStreak);
+    },
   });
+  // 🔴 [2026-10-29 · state layer (xiaoD #45 §7)] the broken-window state is restored from the **host-side
+  //   state directory** (outside the plugin directory ⇒ a reinstall cannot clear it). If verification
+  //   fails ⇒ fail-closed (treated as broken), not treated as clean.
+  const _restored = restoreWindowState();
+  if (_restored.streak > 0) engine.failureStreak = _restored.streak;
+  if (_restored.broken) {
+    engine.windowBroken = true;
+    logline(`window state restored: ${_restored.note}`);
+  } else if (_restored.source === 'restored') {
+    logline(`window state restored: ${_restored.note}`);
+  }
   // ── Tool declarations (layer two · 2026-10-28): the trusted side reports a verb for tools whose name carries none ──
   //   Origin: `glob` / `grep` / `list_dir` have no action word in their names ⇒ the attribution layer cannot tell
   //     ⇒ everything is referred. Measured (14-cell comparison): ordinary in-domain read-only actions passed 3/7;
@@ -940,6 +1086,10 @@ function apply(ctx) {
       //     **So: no promise, no pretending** — the branch below is an EXTENSION SLOT (it fires only if the
       //     host extends the vocabulary), and the popup text no longer offers an option that does not exist.
       if (out === 'allowed-once') {
+        // 🔴 [2026-10-29 · identity layer] a human pressed the button ⇒ actor=**decider** (the user).
+        //   Strictly separated from "the criterion auto-allowed" (actor=executor) ⇒ "who caused it" is
+        //   readable on the readout face.
+        recordActorAudit('grant', ACTOR_DECIDER, `let this one call through (adjudication object ${rk}; outcome=${out})`);
         logline('review verdict via approval: allowed-once — trustee let this one call through');
         return 'allowed-once';
       }
@@ -952,6 +1102,7 @@ function apply(ctx) {
       }
       if (out === 'cancelled') {
         _reviewPending.add(rk);   // defer: no S entry (the human did not rule) ⇒ but leave a pending marker
+        recordActorAudit('defer', ACTOR_DECIDER, `deferred (explicit suspension; adjudication object ${rk})`);
         // 【Defer】withdrawn/suspended: not executed this round, but **not a refusal** ⇒ no cooldown
         // (the human never ruled; it must not be recorded as a refusal). Contrast: unavailable = no
         // answering surface at all (fail-closed).
@@ -960,6 +1111,7 @@ function apply(ctx) {
       }
       if (out === 'rejected') {
         _reviewRefused.set(rk, { at: Date.now(), note: String(decision.reason ?? '').slice(0, 80) });
+        recordActorAudit('refuse', ACTOR_DECIDER, `refused (adjudication object ${rk})`);
         // 🔴 [2026-10-29 · S ledger bound to approval (xiaoD #38)] a refusal is **negative feedback** ⇒ a
         //   negative entry (the ledger only grows: it records which chain broke, it does not subtract
         //   the stock). Previously a refusal left **no trace at all** ⇒ refusals decayed into noise.
@@ -977,12 +1129,19 @@ function apply(ctx) {
         logline('review approval rejected → cooldown silences **this adjudication object only**, not others');
         return 'rejected';
       }
+      // ⚠️ no answer / no service ⇒ actor=**none** (nobody answered) — **not** the decider (a human refused).
+      //   "nobody" and "a human refused" must be distinguishable on the readout face — otherwise "who caused
+      //   it" cannot be read back (same family as xiaoD #45 §5).
+      recordActorAudit('no-answer', 'none', `nobody answered (outcome=${out}; adjudication object ${rk})`);
       logline(`review approval outcome=${out} → silent deny (fail-closed, same as unattended)`);
       return null;
     } catch (e) {
       // Deadline withdrawal ⇒ the host usually throws an abort-class error ⇒ land as **defer** (not a
       // refusal, no cooldown); other exceptions stay fail-closed (no answering surface ≠ human suspending).
       if (e?.name === 'AbortError' || /abort/i.test(String(e?.message ?? ''))) {
+        // Timeout withdrawal ⇒ **nobody answered** (not an explicit human suspension) ⇒ actor=none,
+        //   strictly separated from the decider's 'cancelled'.
+        recordActorAudit('timeout-defer', 'none', `timeout withdrawal (adjudication object ${rk}) ⇒ deferred`);
         logline('review approval aborted (timeout) → defer: action not executed, human not frozen');
         return 'deferred';
       }
@@ -1335,7 +1494,23 @@ function apply(ctx) {
         standbySize: engine.sStandby.length,
         traumaCount: engine.traumaCount,
         failureStreak: engine.failureStreak,
-        note: 'ledger=active state (latest version); standby=silent standby (old versions, append-only retained, not called). The full historyTrail is for deep audit only. ⚠️ effectiveS is the **reserve reading** (shortest bucket, floor 0: 0 = no reserve left); owing is read from overdraft (the overdraft amount) — a negative net is never folded into the reserve (2026-10-29, per xiaoD #39/#40: running dry and being overdrawn differ causally).',
+        // 🔴 [2026-10-29 · state layer] the broken-window state must be visible on the readout face
+        //   (otherwise "is it in effect" cannot be read back).
+        windowBroken: !!engine.windowBroken,
+        // 🔴 [2026-10-29 · identity layer] the actor attribution readout (the positive answer to xiaoD
+        //   #45 §5's downgrade): "the criterion auto-allowed" and "a human approved" are the same shape on
+        //   his observation face ⇒ any conclusion resting on "the action passed" must first ask "did someone
+        //   open the door for it" ⇒ the actor must be shown explicitly.
+        actorAudit: _actorAudit.slice(-20),   // the recent ones: who (executor/decider/none), when, on what basis
+        actorCounts: {
+          decider: _actorAudit.filter((r) => r.actor === ACTOR_DECIDER).length,
+          executor: _actorAudit.filter((r) => r.actor === ACTOR_EXECUTOR).length,
+          none: _actorAudit.filter((r) => r.actor === 'none').length,
+        },
+        // 🔴 [2026-10-29 · state layer] persistence state (has the host declared a landing location?) —
+        //   never pretend to be persistent.
+        windowState: windowStatePersistence(),
+        note: 'ledger=active state (latest version); standby=silent standby (old versions, append-only retained, not called). The full historyTrail is for deep audit only. ⚠️ effectiveS is the **reserve reading** (shortest bucket, floor 0: 0 = no reserve left); owing is read from overdraft (the overdraft amount) — a negative net is never folded into the reserve (2026-10-29, per xiaoD #39/#40: running dry and being overdrawn differ causally). ⚠️ actorAudit separates "the criterion auto-allowed (executor)" / "a human approved (decider)" / "nobody answered (none)" — any conclusion resting on "the action passed" must first check who opened the door.',
       };
     },
   }));
