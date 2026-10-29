@@ -335,21 +335,50 @@ function bodyValues(call) {
   });
 }
 function locatorOf(call) {
-  const locs = locValues(call?.args ?? call ?? {});
-  return locs.length ? String(locs[0]) : '';
+  const args = call?.args ?? call ?? {};
+  // ① slot-first: the same slot definition as the capability pass (structured tools)
+  const locs = locValues(args);
+  if (locs.length) return String(locs[0]);
+  // ② 🔴 [2026-10-29 · same-shape fix, second time] shape fallback: slot names are an open set
+  //   (path / file_path / full_path / target_path / … endless). Matching fixed slots only ⇒ one slot
+  //   rename by the host and the locator vanishes ⇒ the doc exemption **silently disarms** ⇒ "same
+  //   family of text sometimes allowed, sometimes blocked" (xiaoD #32's ablation: each variable alone
+  //   passes, together they get blocked). Exactly the same disease he reported in #29 for exfiltration:
+  //   **when a criterion's dependency source shifts, the criterion is simply not there.**
+  //   Fix: the criterion stops depending on slot names — any string arg shaped like a path with an
+  //   extension counts as the locator. (Shape: no whitespace, has an extension dot, no shell operators.)
+  for (const [, v] of Object.entries(args)) {
+    if (typeof v !== 'string' || !v.trim()) continue;
+    if (!/\.[A-Za-z0-9]{1,8}$/.test(v.trim())) continue;
+    if (/\s/.test(v.trim().replace(/^\.\//, ''))) continue;
+    if (/[`${}()|&;<>]/.test(v)) continue;
+    return v.trim();
+  }
+  return '';
 }
-// ① doc-body shape: attribution is write/edit ∧ target is a doc extension ⇒ body won't execute
+// ① doc-body shape: **has a locator ∧ that locator is a doc extension** ⇒ the body won't execute.
+//   [2026-10-29 same-shape fix] no longer depends on the attribution layer — attribution re-judges the
+//   layer from the body's shape (a complex body ⇒ not attributed file-write ⇒ exemption silently
+//   disarms). Landing shape is an objective fact; attribution is an inference; a criterion stands on
+//   facts (same principle as "judge the landing target, not the word-shape"). The cost — no longer
+//   verifying "this tool really is a writer" — is covered by "no explicit command slot" below.
 function isDocBodyCall(call) {
-  const a = attributeCall(call);
-  if (!a.ok) return false;
-  if (a.layer !== 'write' && a.layer !== 'file-write' && a.layer !== 'file-edit') return false;
+  const args = call?.args ?? call ?? {};
+  if (bodyValues(call).length === 0) return false;          // a command slot ⇒ this is an action, not a body
   const loc = locatorOf(call);
-  return !!loc && DOC_BODY_EXTS.test(loc);
+  if (!loc || !DOC_BODY_EXTS.test(loc)) return false;
+  return !hasCommandSlot(args);
 }
-// ② executable-body shape: target is a script extension ⇒ body will execute (must force-scan)
+// ② executable-body shape: a script-extension locator ⇒ the body will execute (must force-scan)
 function isScriptBodyCall(call) {
   const loc = locatorOf(call);
   return !!loc && SCRIPT_BODY_EXTS.test(loc);
+}
+// Explicit command slot present ⇒ the call itself carries a command to run (an action);
+// absent ⇒ it merely carries content (a body).
+const COMMAND_SLOT_KEYS = new Set(['command', 'code', 'task', 'script', 'cmd', 'argv', 'args', 'shell', 'line', 'expr', 'eval']);
+function hasCommandSlot(args) {
+  return Object.keys(args ?? {}).some((k) => COMMAND_SLOT_KEYS.has(String(k).toLowerCase()));
 }
 // Destructive morphemes (illustrative, not an exhaustive list): match the **morpheme**, not the whole name, so any
 //   naming the host chooses still hits. Deliberately excludes exec|shell|bash|pwsh|cmd|run|spawn — those are

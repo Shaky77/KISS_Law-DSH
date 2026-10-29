@@ -161,9 +161,7 @@ test('🔴 control: in a true broken-window state (R-projection accumulation) re
   assert.ok(n >= 0);   // thaw asks may exist; they are not part of this assertion
 });
 
-// ⚠️ The cooldown test must stay last: _reviewRefusedAt is module-level state; after a rejected, no re-ask
-// within 5 minutes in the same process
-test('cooldown: the next review after a rejected does not pop (no harassment), silently denied', async () => {
+test('cooldown: the next review of the SAME kind after a rejected does not pop (no harassment) — but the reason must name the verdict it follows', async () => {
   setPrincipalScope(null);
   const { ctx, handlers, asks } = mockCtxWithApproval(['rejected', 'allowed-once']);
   apply(ctx);
@@ -172,7 +170,28 @@ test('cooldown: the next review after a rejected does not pop (no harassment), s
   await handlers['tools/pre-execute'](e1, next);
   assert.equal(asks.length, 1);
   const out2 = await handlers['tools/pre-execute'](e2, next);
-  assert.equal(out2.kind, 'deny', 'the second review during cooldown is silently denied');
-  assert.equal(out2.awaitingHuman, true, 'silent flatten preserves the pending semantics');
+  assert.equal(out2.kind, 'deny', 'the second review of the same kind during cooldown is denied without asking');
   assert.equal(asks.length, 1, 'no ask is raised during the cooldown');
+  // [2026-10-29 semantics clarified] during cooldown there already IS a verdict ⇒ final, not pending;
+  //   but the silence must carry attribution — the reason names whose verdict it follows, and when.
+  assert.ok(!out2.awaitingHuman, 'a followed verdict is final, not pending (field unset = not pending)');
+  assert.match(out2.reason, /Following your previous verdict/, 'silence must be visible: name the verdict it follows');
+  assert.match(out2.reason, /minute\(s\) ago/, 'give the time context so it is traceable');
+});
+
+test('🔴 cooldown key is per adjudication object: refusing kind A must NOT silence kind B (the old global lock did)', async () => {
+  setPrincipalScope(null);
+  const { ctx, handlers, asks } = mockCtxWithApproval(['rejected', 'allowed-once']);
+  apply(ctx);
+  const a = { ...exec(...REVIEW_CALL), callId: 'a1' };
+  await handlers['tools/pre-execute'](a, next);              // kind A: rejected ⇒ kind A enters cooldown
+  assert.equal(asks.length, 1);
+  // kind B: different tool/locator ⇒ a different adjudication object ⇒ must not be collateral damage.
+  // Pick a kind B that really produces a review (writing /etc/hosts ⇒ medium-risk deduction review),
+  // otherwise "does it pop" cannot be observed.
+  const b = { ...exec('write', { path: '/etc/hosts', content: '127.0.0.1 x' }), callId: 'b1' };
+  const before = asks.length;
+  const outB = await handlers['tools/pre-execute'](b, next);
+  assert.doesNotMatch(String(outB?.reason ?? ''), /Following your previous verdict/, 'kind B must not inherit kind A cooldown');
+  assert.equal(asks.length, before + 1, 'kind B still undecidable ⇒ still must ask (adjudication power does not vanish because something else was refused)');
 });

@@ -771,11 +771,36 @@ function apply(ctx) {
   //   · broken-window stop-loss state does not pop — stop-loss is fail-closed and must not be bypassed by popups;
   //   · no approval service / no agent context ⇒ silent (back-compat: hosts without an approval face see zero regression);
   //   · just refused ⇒ cooldown, no re-ask (no harassment).
+  // 🔴 [2026-10-29 · closing a second silent hole I opened myself] the cooldown key is **per adjudication
+  //   object**, no longer one global lock. Old code: a single `_reviewRefusedAt` timestamp ⇒ refusing
+  //   **any one** call ⇒ for 5 minutes **every** review is silently denied, no popup, no reason.
+  //   Three consequences, all measured by xiaoD (#31/#32/#33):
+  //     ① the letter that should have gone out didn't, with **no message at all** (he could only guess
+  //        "a 5-minute vacuum" — and he guessed right);
+  //     ② the trustee thought "I approved everything" — there was no popup in those 5 minutes; the human
+  //        was locked out without being told;
+  //     ③ it repeats the #27 disease: the engine can tell "undecidable", yet the outlet is crushed
+  //        (I had just fixed that, then opened a fresh instance of it).
+  //   ⇒ What the cooldown cools is "the same question asked again and again", NOT "the human's power to
+  //     adjudicate for the next 5 minutes".
   const REVIEW_COOLDOWN_MS = APPROVAL_COOLDOWN_MS;
-  let _reviewRefusedAt = 0;
+  const _reviewRefused = new Map();   // key(adjudication object) → { at, note }
+  // The adjudication object = "is this the same question": law + tool + locator/command shape
+  // (not callId — that changes every call, which would mean never cooling).
+  const reviewKeyOf = (exec, decision) => [
+    decision?.law ?? '',
+    exec?.name ?? '',
+    String(exec?.arguments?.path ?? exec?.arguments?.file ?? exec?.arguments?.command ?? '').slice(0, 120),
+  ].join('|');
 
   const requestReviewVerdict = async (exec, decision) => {
-    if (Date.now() - _reviewRefusedAt < REVIEW_COOLDOWN_MS) return null;   // just refused ⇒ no harassment
+    const rk = reviewKeyOf(exec, decision);
+    const refused = _reviewRefused.get(rk);
+    if (refused && Date.now() - refused.at < REVIEW_COOLDOWN_MS) {
+      // No harassment during cooldown — but **it must carry attribution**: silence has to be visible
+      // and traceable (integrity: never let the human be unaware).
+      return { cooldown: true, refusedAt: refused.at, note: refused.note ?? '' };
+    }
     let approval = null;
     // Same pattern as requestBufferGrant: ctx.get('approval') opportunistically; no service ⇒ fail-closed.
     approval = (typeof ctx.get === 'function' ? ctx.get('approval') : null) ?? ctx.approval ?? null;
@@ -800,7 +825,11 @@ function apply(ctx) {
         logline(`review verdict via approval: allowed-once — trustee let this one call through`);
         return 'allowed-once';
       }
-      if (out === 'rejected') { _reviewRefusedAt = Date.now(); logline('review approval rejected → no re-ask during cooldown'); return 'rejected'; }
+      if (out === 'rejected') {
+        _reviewRefused.set(rk, { at: Date.now(), note: String(decision.reason ?? '').slice(0, 80) });
+        logline('review approval rejected → cooldown silences **this adjudication object only**, not others');
+        return 'rejected';
+      }
       logline(`review approval outcome=${out} → silent deny (fail-closed, same as unattended)`);
       return null;
     } catch (e) {
@@ -877,6 +906,16 @@ function apply(ctx) {
           ...decision,
           kind: 'deny',
           reason: `${decision.reason}\n[Trustee's verdict] Refused to execute this call (approval/asked + approval/decided audit pair on record, replayable).`,
+        };
+      }
+      // During cooldown: don't disturb the trustee, but **silence must carry attribution** — otherwise the
+      // trustee believes "I approved everything" while the audited party only sees a bare denial.
+      if (verdict && verdict.cooldown) {
+        const minsAgo = Math.max(1, Math.round((Date.now() - verdict.refusedAt) / 60000));
+        decision = {
+          ...decision,
+          kind: 'deny',
+          reason: `${decision.reason}\n[Following your previous verdict] You ruled on a call of this kind about ${minsAgo} minute(s) ago; the cooldown did not disturb you again, and this call follows that verdict. To rule again, retry the same call after the 5-minute cooldown ends.`,
         };
       }
       // verdict === null (no service / exception / no answer) ⇒ silent flatten, identical with 0.2.14
