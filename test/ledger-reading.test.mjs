@@ -60,3 +60,26 @@ test('a neutral mark does not inflate the reserve (release ≠ gain: sign=0 only
   assert.equal(e.effectiveS(), 0, 'a neutral mark does not change the reserve');
   assert.equal(e.overdraft(), 0, 'a neutral mark creates no overdraft');
 });
+
+// ── 0.3.6 (xiaoD #41): the ΣS tap was the running ledger, not the anchors — finance and accounting must read apart ──
+test('🔴 unknown events (H paid nothing) raise the event count, not the settled thickness (the accounting ledger must not enter the finance ledger)', async () => {
+  const { dataSurface } = await import('../src/core/strata.mjs');
+  const e = ENG();
+  e.recordSteady({ positive: 1, detail: 'with direction', subsystem: 'probe' });
+  e.recordSteady({ negative: 1, detail: 'negative with direction', subsystem: 'probe' });
+  e.recordSteady({ executed: true, detail: 'unknown event (H paid nothing)', subsystem: 'probe' });
+  const d = dataSurface(e);
+  assert.equal(d.eventCount, 3, 'accounting reading: three discrete events');
+  assert.equal(d.settledThickness, 2, 'finance reading: only the two marks with a direction count as settled');
+  assert.equal(d.thickness, 3, 'thickness keeps the event count (accounting reading), but the name and note now say so');
+});
+
+test('🔴 sNow shares one source with the engine reserve reading (never 0 in one place and −1 in another)', async () => {
+  const { dataSurface } = await import('../src/core/strata.mjs');
+  const e = ENG();
+  e.recordSteady({ negative: 3, detail: 'erosion', subsystem: 'probe' });
+  const d = dataSurface(e);
+  assert.equal(d.sNow, e.effectiveS(), 'sNow must share the source with engine.effectiveS');
+  assert.ok(d.sNow >= 0, 'the reserve reading must not be negative');
+  assert.equal(d.sOverdraft, e.overdraft(), 'the overdraft must share the source with engine.overdraft');
+});

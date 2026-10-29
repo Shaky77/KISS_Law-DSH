@@ -104,12 +104,36 @@ export const STRATA = [
     formula: '扩容 ⟺ (ΣS > R₀) ∧ 质(S 经 M 沉淀)   ｜  R₀ = p_max × N_opp（RATE 类）；他类改走 |S_dev|>tol / 覆盖率 / 排序',
     quantities: [
       {
+        key: 'sSettledThickness',
+        label: 'ΣS settled thickness (finance reading = marks with a direction)',
+        expr: 'count(rStore where sign ∈ {+,−})  // unit = grounded steady-state changes',
+        status: QSTAT.OK,
+        dim: 'time dimension · only grows',
+        note: '🔴 2026-10-29 (per the trustee\'s finance/accounting split): S = the finance ledger (what settled), the running ledger = accounting (temporarily mounted outside S). ⇒ settled thickness counts only marks that carry a **direction** (sign ∈ {+,−}); unknown / neutral events raise the event count, not the settled count. ⚠️ One step short of the trustee\'s wording: the carrier for "did H pay" does not exist yet ⇒ "has a direction" is a **proxy**, labelled as such.',
+      },
+      {
+        key: 'sEventCount',
+        label: 'event count (accounting reading = all discrete events)',
+        expr: 'count(sAccount.rStore)  // unit = discrete events (incl. unknown / neutral)',
+        status: QSTAT.OK,
+        dim: 'time dimension · only grows',
+        note: 'An explicit name for the accounting reading (same value as sHistoryThickness, different name) — the readout face keeps the two apart so they are never read as one.',
+      },
+      {
+        key: 'sOverdraft',
+        label: 'overdraft amount (how much is owed)',
+        expr: 'Σ max(0, −net_subsystem)  // read apart from the reserve',
+        status: QSTAT.OK,
+        dim: 'debt direction',
+        note: '🔴 2026-10-29 (xiaoD #39/#40): running dry (reserve 0) and being overdrawn differ causally ⇒ the debt gets its own quantity.',
+      },
+      {
         key: 'sHistoryThickness',
         label: 'ΣS（历史厚度）',
         expr: 'count(sAccount.rStore)  // 单位＝离散事件数',
         status: QSTAT.OK,
         dim: '时间维度·只增',
-        note: '伤疤也计入厚度 —— 这是「记账只增」的应有之义，但**不代表稳态变好**。🔴 取自全量账（rStore），不取 historyTrail：后者漏 scar 推导路径（实测 4 笔只留 2 条）。',
+        note: '伤疤也计入厚度 —— 这是「记账只增」的应有之义，但**不代表稳态变好**。🔴 取自全量账（rStore），不取 historyTrail：后者漏 scar 推导路径（实测 4 笔只留 2 条）。🔴 2026-10-29 (xiaoD #41): this tap counts **events** (running ledger) — even sign=unknown ones (H paid nothing) ⇒ the accounting ledger was mixed into the finance ledger; **use sSettledThickness for the finance reading**.',
       },
       {
         key: 'sNow',
@@ -351,12 +375,24 @@ export function dataSurface(engine) {
   const positives = trail.filter((e) => e && e.type === 'S+1').length;
   const negatives = trail.filter((e) => e && (e.type === '|S-1|' || e.type === 'trauma')).length;
   const subVals = Object.values(subs).map(num).filter((v) => v !== null);
-  const sNow = subVals.length ? Math.min(...subVals) : 0;
+  // 🔴 sNow must share one source with engine.effectiveS (before: this file recomputed min(the nets),
+  //   which could go negative ⇒ one place said 0 and the other −1).
+  const sNow = typeof engine.effectiveS === 'function' ? engine.effectiveS()
+    : (subVals.length ? Math.max(0, Math.min(...subVals)) : 0);
+  const sOverdraft = typeof engine.overdraft === 'function' ? engine.overdraft()
+    : subVals.reduce((a, v) => a + (v < 0 ? -v : 0), 0);
 
   const scar = store.filter((r) => r && r.reversible === 'scar').length;
   const unknown = store.filter((r) => r && r.reversible === 'unknown').length;
   const paid = store.filter((r) => r && (r.sign === '+' || r.sign === '-')).length;
   const total = store.length;
+  // 🔴 [2026-10-29 · finance vs accounting read apart (xiaoD #41: the ΣS tap was the running ledger,
+  //   not the anchors)] settledThickness = **settled marks (finance reading)** = marks that carry a
+  //   direction (sign ∈ {+,−}); eventCount = **all discrete events (accounting reading)**, including
+  //   unknown / neutral ones. ⚠️ One step short of the trustee's wording: the carrier for "did H pay"
+  //   does not exist yet (xiaoD #40 §3) ⇒ "has a direction" is a **proxy**, labelled as such.
+  const settledThickness = paid;
+  const eventCount = total;
 
   // 落点集中度 ＝ **最大簇占比**（0–1），不是"总数/落点数"。
   //   后者在只有一个落点时会随事件数一路增长，量的是"发生了多少"而非"聚得多紧"。
@@ -370,7 +406,7 @@ export function dataSurface(engine) {
   const concentration = total ? maxCluster / total : null;
 
   return {
-    thickness, trailEvents, trailCoverage, positives, negatives, sNow,
+    thickness, settledThickness, eventCount, trailEvents, trailCoverage, positives, negatives, sNow, sOverdraft,
     traumaCount: num(engine.traumaCount) ?? 0,
     scar, unknown, paid, total, concentration, maxCluster,
     distinctDomains: domains.size,
@@ -388,6 +424,9 @@ export function compute(key, surface) {
   const s = surface;
   switch (key) {
     case 'sHistoryThickness': return s ? { status: QSTAT.OK, value: s.thickness } : { status: QSTAT.PENDING, value: null, evidence: '未接 engine 实例' };
+    case 'sSettledThickness': return s ? { status: QSTAT.OK, value: s.settledThickness } : { status: QSTAT.PENDING, value: null, evidence: '未接 engine 实例' };
+    case 'sEventCount': return s ? { status: QSTAT.OK, value: s.eventCount } : { status: QSTAT.PENDING, value: null, evidence: '未接 engine 实例' };
+    case 'sOverdraft': return s ? { status: QSTAT.OK, value: s.sOverdraft } : { status: QSTAT.PENDING, value: null, evidence: '未接 engine 实例' };
     case 'sNow': return s ? { status: QSTAT.OK, value: s.sNow } : { status: QSTAT.PENDING, value: null, evidence: '未接 engine 实例' };
     case 'sPositive': return s ? { status: QSTAT.OK, value: s.positives } : { status: QSTAT.PENDING, value: null, evidence: '未接 engine 实例' };
     case 'sNegative': return s ? { status: QSTAT.OK, value: s.negatives } : { status: QSTAT.PENDING, value: null, evidence: '未接 engine 实例' };
