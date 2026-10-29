@@ -868,7 +868,7 @@ function apply(ctx) {
           `The "${exec?.name}" call was judged "uncertain" by the engine${decision.law ? ' (layer ' + decision.law + ')' : ''} — this layer's criteria are exhausted; returned to the human by structure:`,
           decision.reason ?? '',
           '· Allow once: lets through this one call only (the next identical call will ask you again).',
-          '· Always allow: never ask this kind again — taken over by the host-side "always allow in this session" control (that memory lives on the host side; this plugin does not fabricate a semantic the approval channel lacks).',
+          '(this panel has two buttons: allow once / refuse. "never ask this kind again" currently lives in the host-side "always allow in this session" control, in the host\'s own rule layer; no option is listed here that cannot actually be chosen)',
           '· Refuse: not executed this round; no re-ask **of this kind** for 5 minutes (other kinds still ask).',
           '· Defer: not executed this round, kept for reconsideration — **not a refusal**, no cooldown; the same kind will ask again.',
           '· No answer: not executed this round (same as unattended — expected behavior).',
@@ -887,12 +887,25 @@ function apply(ctx) {
       //     host side: once it remembers, it stops asking us — we never receive it and must not pretend we did.
       //     Hence an **extension slot only**: a future always/session outcome activates the memory; otherwise
       //     behaviour degrades to allowed-once, unchanged (no fifth value is fabricated).
-      if (out === 'allowed-once' || out === 'always' || out === 'session') {
-        if (out !== 'allowed-once') {
-          _reviewAlways.add(rk);   // same kind no longer asked (key = adjudication object, not global)
-          logline(`review verdict: ${out} ⇒ kind (adjudication object ${rk}) recorded as always-allow`);
-        }
-        logline(`review verdict via approval: ${out} — trustee let this one call through`);
+      // [2026-10-29 · four states · reachability checked against the host contract] the contract states:
+      //   "a rogue non-vocabulary return value is normalized to 'unavailable'" ⇒ the host can only ever
+      //   return four values, and allowed-once is the **only grant**. Reachability:
+      //     allowed-once (button "allow once") | rejected (button "refuse") |
+      //     cancelled (produced by **withdrawal**; the contract guarantees an aborted signal ⇒ 'cancelled',
+      //     so our deadline withdrawal always lands there) | unavailable (no answer / closed / exception).
+      //   🔴 "Always allow" is **unreachable on this host**: the UI renders exactly two buttons and every
+      //     non-vocabulary value is normalized to unavailable ⇒ the plugin can never receive always/session.
+      //     **So: no promise, no pretending** — the branch below is an EXTENSION SLOT (it fires only if the
+      //     host extends the vocabulary), and the popup text no longer offers an option that does not exist.
+      if (out === 'allowed-once') {
+        logline('review verdict via approval: allowed-once — trustee let this one call through');
+        return 'allowed-once';
+      }
+      if (out === 'always' || out === 'session') {
+        // Extension slot: the host normalizes non-vocabulary values to unavailable ⇒ **unreachable today**;
+        // it takes effect the moment the host extends the vocabulary.
+        _reviewAlways.add(rk);   // the same kind is not asked again (key = adjudication object, not global)
+        logline(`review verdict: ${out} ⇒ kind (adjudication object ${rk}) recorded as always-allow`);
         return 'allowed-once';
       }
       if (out === 'cancelled') {

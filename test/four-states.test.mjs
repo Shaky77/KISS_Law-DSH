@@ -33,16 +33,32 @@ test('state ① allow once (allowed-once): this call goes through, the same kind
   assert.equal(asks.length, 2, 'allow once ≠ permanent: the same kind must ask again');
 });
 
-test('state ② always allow (outcome=always): the same kind is not asked again, and it is revocable', async () => {
+test('🔴 "always allow" is **unreachable on this host**: the host normalizes any non-vocabulary outcome to unavailable, so the memory must not take effect', async () => {
   setPrincipalScope(null);
   clearReviewMemory();
+  // Simulate the **real host behaviour**: a non-vocabulary outcome (always/session) is normalized to 'unavailable'.
+  const { ctx, handlers, asks } = mockCtx(['normalized-unavailable', 'allowed-once']);
+  apply(ctx);
+  await handlers['tools/pre-execute'](REVIEW(), next);
+  assert.equal(asks.length, 1, 'normalized to unavailable ⇒ not a grant (fail-closed)');
+  const o2 = await handlers['tools/pre-execute'](REVIEW(), next);
+  assert.equal(asks.length, 2, '"always allow" unreachable ⇒ the same kind must still ask (no silent reuse)');
+  assert.equal(o2, 'NEXT');
+});
+
+test('extension slot: if the host extends the vocabulary (outcome=always), the same kind is not asked again — and it is revocable', async () => {
+  setPrincipalScope(null);
+  clearReviewMemory();
+  // Note: this uses an outcome the **host does not currently provide** (the mock hands us 'always') ⇒ it
+  //   locks "the extension slot works once triggered", not "the host supports it" — the host normalizes
+  //   'always' to 'unavailable' today (see the previous test).
   const { ctx, handlers, asks } = mockCtx(['always', 'always']);
   apply(ctx);
   await handlers['tools/pre-execute'](REVIEW(), next);
   assert.equal(asks.length, 1);
   const o2 = await handlers['tools/pre-execute'](REVIEW(), next);
-  assert.equal(o2, 'NEXT', 'the same kind follows the always-allow');
-  assert.equal(asks.length, 1, 'always allow ⇒ the same kind is not asked again (effect side of the fourth state)');
+  assert.equal(o2, 'NEXT', 'extension slot triggered ⇒ the same kind is reused');
+  assert.equal(asks.length, 1, 'the same kind is not asked again while the extension slot applies');
   assert.ok(clearReviewMemory() >= 1, 'always-allow must be revocable');
   await handlers['tools/pre-execute'](REVIEW(), next);
   assert.equal(asks.length, 2, 'after revocation the same kind asks again');
