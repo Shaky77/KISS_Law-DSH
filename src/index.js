@@ -992,6 +992,19 @@ function apply(ctx) {
     if (decision.kind === 'review' && !engine.windowBroken) {
       const verdict = await requestReviewVerdict(exec, decision);
       if (verdict === 'allowed-once') {
+        // 🔴 [2026-10-29 · exfiltration demoted to S · ledger] a human-approved exfiltration leaves a
+        //   factual trace: "irreversible" is carried by the ledger (executed ⇒ the ledger derives the
+        //   sign from reversibility), "should it go out" is the human's choice.
+        //   ⚠️ No hardcoded positive (release ≠ gain — the 2026-09-20 fix removed "count releases as gain").
+        const at = decision?.attrib;
+        if (at && (at.layer === 'exfil' || at.layer === 'exfil-net' || /exfil/i.test(String(at.signal ?? '')))) {
+          engine.recordSteady?.({
+            executed: true,
+            attrib: at,
+            action: String(call?.args?.command ?? call?.args?.body ?? '').slice(0, 200),
+            detail: 'Exfiltration executed (human-approved): the data left this machine and cannot be recalled — recorded as fact; the ledger only grows.',
+          });
+        }
         // Not into markBlocked: a let-through call runs for real; its result is a real result,
         // not an "error caused by this layer"
         logline(`pre-execute ${exec?.name} -> review(trustee allowed this one) -> next | whitebox ${JSON.stringify({ ...decision, humanVerdict: 'allowed-once' })}`);

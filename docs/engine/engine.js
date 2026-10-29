@@ -904,7 +904,7 @@ export const DEFAULT_RIGID_ANCHORS = [
   {
     id: 'no-exfil',
     magnitude: 3, // [2026-10-29 · surfaced by xiaoD #29 · approved by the author for 0.3.0] data sovereignty = Micro objective rules (R_DOMAIN.level 3)
-    desc: '禁止把数据体外传到外部网络落点（网络工具 ∧ 发送方法/数据体 ∧ 对外落点）。取回（GET/无发送体）不在此锚内；scp/nc 等无显式发送体词形的形态不在此锚 v1 射程（归因层 network-send 正常 ⇒ 推演层 review 在场，非静默失效面——收口最小面，扩面须另议）；包管理与版本控制的同步流（git push / npm publish 等生态动词）不在此锚射程（各有治理层）。数据一旦离开即不可撤回——按「域外 ∧ 不可逆 ⇒ 拦」属 R 域，不挂推演层（归因一变即静默失效，0.2.15 实测教训）。' + R_DOMAIN.invariant,
+    desc: '禁止把**凭据/密级**内容外传到外部网络落点（谁做都错 ⇒ R 域常量）。普通外传（发给谁、发什么、有无授权要看情况）**不在此锚内**——它属「须人取极」类：不可撤回由 S 账承担，该不该发由人裁决（2026-10-29 ruling: exfiltration demoted to S — fixing it to R made the popup/grant/appeal vanish and deleted the human from the decision）。取回（GET/无发送体）不在此锚内；scp/nc 等无显式发送体词形的形态不在此锚 v1 射程（归因层 network-send 正常 ⇒ 推演层 review 在场，非静默失效面——收口最小面，扩面须另议）；包管理与版本控制的同步流（git push / npm publish 等生态动词）不在此锚射程（各有治理层）。' + R_DOMAIN.invariant,
     test: (call) => {
       // Doc-body exemption: citing `curl -X PUT …` inside a replay document is not exfiltration
       // (same as no-destructive-fs channel ⓪).
@@ -919,7 +919,13 @@ export const DEFAULT_RIGID_ANCHORS = [
       // Send method / data body: cross-language union of POST/PUT forms. GET (pure fetch) contains none ⇒ no hit.
       const SEND_METHOD = /(-d\s|--data|--data-raw|--data-binary|--upload-file|-T\s|-F\s|--form|--post-data|--post-file|-X\s*(POST|PUT)|--request\s*(POST|PUT)|-Method\s+(Post|Put)|-Body|-InFile|-OutFile.*-Method|>\s*\/dev\/tcp)/i;
       for (const s of bodies) {
-        if (NET_TOOL.test(s) && SEND_METHOD.test(s)) return true;
+        if (!(NET_TOOL.test(s) && SEND_METHOD.test(s))) continue;
+        // 🔴 Narrowed (2026-10-29 · exfiltration demoted to S): only **credential/secret-class** payloads
+        //   stay R (wrong for everyone); ordinary exfiltration is not stopped here ⇒ it falls through to
+        //   the deduction layer (−2 ⇒ **review**) ⇒ the human decides via the popup, and the ledger
+        //   carries the irreversibility. Grading opinion (xiaoD #29→#35): R holds constants; exfiltration
+        //   carries H's choice.
+        if (CREDENTIAL_PATH.test(s) || /\b(token|secret|password|passwd|api[_-]?key|private[_-]?key|credential|id_rsa|id_ed25519)\b/i.test(s)) return true;
       }
       return false;
     },
