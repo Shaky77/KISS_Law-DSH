@@ -752,6 +752,63 @@ function apply(ctx) {
     return false;
   };
 
+  // ---------- review outlet: route "cannot decide" to human adjudication (2026-10-29 · approved by trustee) ----------
+  // Defect (measured by xiaoD #27): the engine CAN produce an "uncertain" verdict (review), but the adapter
+  //   flattens it into deny (see the comment at the flatten block below: the host contract only accepts
+  //   deny/next) ⇒ the outlet is crushed at the wiring layer ⇒ observed as a silent refusal. The gap is in
+  //   the wiring, not the criteria.
+  // Fix: review ⇒ ask the human to adjudicate THIS ONE call via the approval channel. Orthogonal to the
+  //   buffer thaw: thaw grants a STATE (a quota segment); this grants an ACTION (one single call) —
+  //   the "once" in allowed-once means this one call; the next identical call re-walks the waterfall and
+  //   re-asks. Turning an action grant into a permanent exemption is the actual slip.
+  // Three-way mapping (trustee's three outcomes: agree / disagree / deliberate):
+  //   allowed-once ⇒ let this step through; rejected ⇒ deny (annotated as trustee's verdict, final);
+  //   unavailable / no service / exception / no answer ⇒ silent deny (bit-identical with 0.2.14, fail-closed).
+  //   "Deliberate" does not pretend the approval contract has a pending state — it lands as: not executed
+  //   this round + runtime.log trace + human reviews later (aqing/135 §2, option b).
+  // What stays silent (control group, locked by tests):
+  //   · deny (deterministic verdicts) never pop — the popup serves "cannot decide", never overturns "decided to refuse";
+  //   · broken-window stop-loss state does not pop — stop-loss is fail-closed and must not be bypassed by popups;
+  //   · no approval service / no agent context ⇒ silent (back-compat: hosts without an approval face see zero regression);
+  //   · just refused ⇒ cooldown, no re-ask (no harassment).
+  const REVIEW_COOLDOWN_MS = APPROVAL_COOLDOWN_MS;
+  let _reviewRefusedAt = 0;
+
+  const requestReviewVerdict = async (exec, decision) => {
+    if (Date.now() - _reviewRefusedAt < REVIEW_COOLDOWN_MS) return null;   // just refused ⇒ no harassment
+    let approval = null;
+    // Same pattern as requestBufferGrant: ctx.get('approval') opportunistically; no service ⇒ fail-closed.
+    approval = (typeof ctx.get === 'function' ? ctx.get('approval') : null) ?? ctx.approval ?? null;
+    if (!approval || typeof approval.request !== 'function') return null;
+    if (!exec?.agent) return null;   // no agent context ⇒ no one to ask ⇒ fail-closed
+    try {
+      const out = await approval.request({
+        agent: exec.agent,
+        toolName: exec.name ?? 'unknown',
+        callId: exec.callId,
+        reason: [
+          '[Weiwen/KISS Law · your adjudication is needed] (an authorization request, not a notification)',
+          `The "${exec?.name}" call was judged "uncertain" by the engine${decision.law ? ' (layer ' + decision.law + ')' : ''} — this layer's criteria are exhausted; returned to the human by structure:`,
+          decision.reason ?? '',
+          '· Allow: lets through this one call only (the next identical call will ask you again).',
+          '· Refuse: not executed this round; no re-ask for 5 minutes.',
+          '· No answer: not executed this round (same as unattended — expected behavior).',
+          'Note: your decision is recorded as an approval/asked + approval/decided audit pair, replayable — not "one sentence in chat counts".',
+        ].filter(Boolean).join('\n'),
+      });
+      if (out === 'allowed-once') {
+        logline(`review verdict via approval: allowed-once — trustee let this one call through`);
+        return 'allowed-once';
+      }
+      if (out === 'rejected') { _reviewRefusedAt = Date.now(); logline('review approval rejected → no re-ask during cooldown'); return 'rejected'; }
+      logline(`review approval outcome=${out} → silent deny (fail-closed, same as unattended)`);
+      return null;
+    } catch (e) {
+      logline(`review approval failed: ${e?.message ?? e} → fail-closed`);
+      return null;
+    }
+  };
+
   // ---------- R / D / S / H / M total adjudication: pre-tool-call gate (waterfall) ----------
   ctx.on('tools/pre-execute', async (exec, next) => {
     channel.callSites.total += 1;
@@ -801,6 +858,28 @@ function apply(ctx) {
         decision = engine.decideToolCall(call);
         logline(`pre-execute ${exec?.name} -> re-judged after thaw ${decision.kind}${decision.law ? '(' + decision.law + ')' : ''} | buffer ${engine.bufferSnapshot().display}`);
       }
+    }
+    // [2026-10-29] review outlet wired to the approval channel: "uncertain" is decidable, its outlet no
+    //   longer crushed. Only review pops; deny (deterministic verdicts) and the broken-window state stay
+    //   silent (see requestReviewVerdict comments). allowed-once ⇒ let this one step through (action-level,
+    //   once = this one call); rejected ⇒ final deny (annotated with the trustee's verdict);
+    //   null ⇒ falls into the flatten block below, bit-identical with 0.2.14 (zero-regression control).
+    if (decision.kind === 'review' && !engine.windowBroken) {
+      const verdict = await requestReviewVerdict(exec, decision);
+      if (verdict === 'allowed-once') {
+        // Not into markBlocked: a let-through call runs for real; its result is a real result,
+        // not an "error caused by this layer"
+        logline(`pre-execute ${exec?.name} -> review(trustee allowed this one) -> next | whitebox ${JSON.stringify({ ...decision, humanVerdict: 'allowed-once' })}`);
+        return next();
+      }
+      if (verdict === 'rejected') {
+        decision = {
+          ...decision,
+          kind: 'deny',
+          reason: `${decision.reason}\n[Trustee's verdict] Refused to execute this call (approval/asked + approval/decided audit pair on record, replayable).`,
+        };
+      }
+      // verdict === null (no service / exception / no answer) ⇒ silent flatten, identical with 0.2.14
     }
     if (decision.kind === 'deny' || decision.kind === 'review') {
       // block this step, do not spread (landing of D break-window stop-loss / M sever-to-preserve / high-risk deduction fallback)
