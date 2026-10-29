@@ -183,6 +183,13 @@ Eleven commits touch `src/`. They do not map one-to-one onto eleven tasks — se
 - Why this is part of the four states rather than a nicety: **without a deadline, "defer" is merely "no answer" and the human is still stuck in front of the popup.** The deadline is the necessary condition that makes defer a real state (挂起 not 阻塞).
 - Readings: CN **663/663** | EN **670/670**; mutation 1/1 red on both (abort→defer mapping removed).
 
+### B15 · The popup must not freeze the adjudicator — deadline withdrawal lands as defer (2026-10-29)
+- Files: `src/index.js` (AbortSignal on the ask, deadline + withdrawal, abort→defer mapping, `setReviewAskTimeout`), `test/ask-timeout.test.mjs` (2), both editions.
+- Measured by the trustee on 2026-10-29 (relayed in xiaoD #35): while the popup was pending **she could not even send a message** — the popup froze the adjudicator itself (hostage state). "No answer ⇒ not executed" already suffices; nothing requires "the human may not move".
+- Fix: the ask now carries an `AbortSignal`; on expiry (default 120 s, injectable) the question is **withdrawn** (contract: aborting withdraws it ⇒ settles `'cancelled'`) ⇒ it lands as **defer**: the action stays unexecuted (neither refused nor released), the human is free, and the answer can be supplied later — the same kind asks again next time. Abort-class errors map to defer; other exceptions stay fail-closed.
+- Why this is part of the four states rather than a nicety: **without a deadline, "defer" is merely "no answer" and the human is still stuck in front of the popup.** The deadline is the necessary condition that makes defer a real state (挂起 not 阻塞).
+- Readings: CN **663/663** | EN **670/670**; mutation 1/1 red on both (abort→defer mapping removed).
+
 ## 4. Order of work, and the acceptance test for each batch
 
 Each batch must end with this repo's own test suite green **and** a live behavioural check — not a diff review. A diff that looks right is not evidence that behaviour is right; that is exactly the failure this repo's wall #6 is about.
