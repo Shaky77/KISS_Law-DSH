@@ -42,6 +42,10 @@ import { createHash } from 'node:crypto';
 import { WeiwenLawEngine, DEFAULT_RIGID_ANCHORS, isIrreversible } from './core/engine.mjs';
 import { parseCapability, capabilityStatus, parsePledge, pledgeStatus, isNarrower, locValues } from './core/capability.mjs';  // [2026-10-28 · batch 4] 通行证 + 担保：判据与词汇都在该模块，适配层只做签发/自提/自省（不重写判据）
 import { R_DOMAIN, THREE_IRON_LAWS } from './core/law.mjs';
+// 🔴 [2026-10-29] three namespaces, all three stepped on in one day: the command layer's
+//   commandLayer ⇒ 'exfil-net'; the attribution layer's attrib.layer ⇒ 'network-send';
+//   inferCategory(call) ⇒ tool-name-first (bash ⇒ 'exec'). Read the wrong name ⇒ the criterion misses.
+import { commandLayer } from './core/attribution.mjs';
 // [2026-10-21 中英对齐 · synced from the CN edition] Criterion-wiring readout (read-only surface):
 //   makes "which criteria in the library actually enter the computation" auditable.
 //   No verdict, no state writes, no gate participation — meta-cognition may READ, never RULE
@@ -443,6 +447,12 @@ const _windowHeals = [];
 //   ⚠️ Entries arrive only from a host outcome of always/session; the plugin does not fabricate a
 //   fourth button the contract does not have (the outcome vocabulary is closed at four).
 const _reviewAlways = new Set();
+// [2026-10-29] pending marker set (the trace a defer leaves): the human did not rule ⇒ no S entry,
+//   but it must still be readable that this road is suspended.
+const _reviewPending = new Set();
+// [2026-10-29] per-kind ask counter (the popup must make repetition visible: repetition itself
+//   accelerates "read the first line and click").
+const _reviewAskCount = new Map();
 /** Revoke an "always allow": pass a key to revoke one kind, omit to clear all. Returns how many were revoked. */
 export function clearReviewMemory(key) {
   if (key === undefined || key === null) {
@@ -825,8 +835,32 @@ function apply(ctx) {
     String(exec?.arguments?.path ?? exec?.arguments?.file ?? exec?.arguments?.command ?? '').slice(0, 120),
   ].join('|');
 
-  const requestReviewVerdict = async (exec, decision) => {
+  const requestReviewVerdict = async (exec, decision, call = null) => {
     const rk = reviewKeyOf(exec, decision);
+    // Per-kind ask counter (repetition must be visible)
+    _reviewAskCount.set(rk, (_reviewAskCount.get(rk) ?? 0) + 1);
+    const askCount = _reviewAskCount.get(rk);
+    // ① risk line: **what will happen + whether it can be recalled**, one sentence (no criterion names)
+    const cmdAsk = commandLayer(String(call?.args?.command ?? call?.args?.cmd ?? call?.args?.script ?? '')) || '';
+    // Exfiltration criterion = **two sources** (neither source zeroes the other): the command layer's
+    //   commandLayer ⇒ 'exfil-net'; the attribution layer ⇒ 'network-send'.
+    //   ⚠️ inferCategory is tool-name-first (bash ⇒ 'exec') ⇒ using it alone misses (that is what
+    //     broke the 0.3.3 ledger).
+    const isEgressCall = (attrib, cmd) => (
+      cmd === 'exfil' || cmd === 'exfil-net' || attrib?.layer === 'network-send' || attrib?.layer === 'exfil' || attrib?.layer === 'exfil-net'
+    );
+    const isEgressAsk = isEgressCall(decision?.attrib, cmdAsk);
+    const isDestructiveAsk = decision?.attrib?.layer === 'exec-destructive' || commandLayer(String(call?.args?.command ?? '')) === 'exec-destructive';
+    const isCredAsk = decision?.attrib?.layer === 'cred-read';
+    const riskLine =
+      isEgressAsk
+        ? 'This action sends data off this machine — once sent, it cannot be recalled.'
+        : (isDestructiveAsk
+            ? 'This action rewrites/deletes local data — the irreversible part cannot be recalled.'
+            : (isCredAsk ? 'This action reads credential material (keys/passwords/tokens).' : 'This layer\'s criteria are exhausted; it cannot decide for you.'));
+    // ③ detail line: the criterion text compressed to **one summary line** (the evidence stays in the ledger)
+    const rawDetail = String(decision.reason ?? '').split('\n')[0].trim();
+    const detailLine = rawDetail.length > 72 ? `${rawDetail.slice(0, 72)}…` : (rawDetail || '(this layer\'s criteria are exhausted)');
     // "Always allow" memory hit ⇒ the same kind is not asked again (this is the effect side of the fourth
     // state); the receipt still records where the approval came from.
     if (_reviewAlways.has(rk)) return { always: true, key: rk };
@@ -864,15 +898,23 @@ function apply(ctx) {
         callId: exec.callId,
         signal: ctrl.signal,
         reason: [
-          '[Weiwen/KISS Law · your adjudication is needed] (an authorization request, not a notification)',
-          `The "${exec?.name}" call was judged "uncertain" by the engine${decision.law ? ' (layer ' + decision.law + ')' : ''} — this layer's criteria are exhausted; returned to the human by structure:`,
-          decision.reason ?? '',
-          '· Allow once: lets through this one call only (the next identical call will ask you again).',
-          '(this panel has two buttons: allow once / refuse. "never ask this kind again" currently lives in the host-side "always allow in this session" control, in the host\'s own rule layer; no option is listed here that cannot actually be chosen)',
-          '· Refuse: not executed this round; no re-ask **of this kind** for 5 minutes (other kinds still ask).',
-          '· Defer: not executed this round, kept for reconsideration — **not a refusal**, no cooldown; the same kind will ask again.',
+          // 🔴 [2026-10-29 · popup refinement (xiaoD #37; the trustee's own words: "too long, I only
+          //   read the first few words and clicked")] A criterion's **length eats its force**: read the
+          //   first line and click ⇒ "responsibility belongs to the adjudicator" becomes a form
+          //   (responsibility resting on a judgement that never happened). ⇒ three lines:
+          //   **① risk ② attribution ③ detail (criterion text folded into one summary)**.
+          //   ⚠️ The host panel has no folding control ⇒ what we can do is **not paste the whole text**
+          //     (the evidence stays in the runtime.log ledger), plus the per-kind counter.
+          `【Weiwen/KISS Law · needs a verdict】${riskLine} (this is an authorization request, not a notice)`,
+          `Who bears it: this verdict is yours, not the AI's (recorded as an approval/asked + approval/decided audit pair, replayable); ask #${askCount} of this kind in this session.`,
+          `▸ Detail: ${detailLine}`,
+          '(the full criterion text is in the runtime.log white-box record)',
+          '· Allow once: lets through this one call only.',
+          '· Refuse: not executed; this kind is not asked again for 5 minutes.',
+          '· Defer/no answer: not executed, kept for reconsideration (not a refusal; answerable later).',
+
           '· No answer: not executed this round (same as unattended — expected behavior).',
-          'Note: your decision is recorded as an approval/asked + approval/decided audit pair, replayable — not "one sentence in chat counts".',
+
           `⚠️ You need not stay here: no answer within ${Math.round(_reviewAskTimeoutMs / 1000)}s ⇒ the question is withdrawn and lands as "defer" (action not executed, not counted as a refusal, answerable later).`,
         ].filter(Boolean).join('\n'),
         });
@@ -909,6 +951,7 @@ function apply(ctx) {
         return 'allowed-once';
       }
       if (out === 'cancelled') {
+        _reviewPending.add(rk);   // defer: no S entry (the human did not rule) ⇒ but leave a pending marker
         // 【Defer】withdrawn/suspended: not executed this round, but **not a refusal** ⇒ no cooldown
         // (the human never ruled; it must not be recorded as a refusal). Contrast: unavailable = no
         // answering surface at all (fail-closed).
@@ -917,6 +960,20 @@ function apply(ctx) {
       }
       if (out === 'rejected') {
         _reviewRefused.set(rk, { at: Date.now(), note: String(decision.reason ?? '').slice(0, 80) });
+        // 🔴 [2026-10-29 · S ledger bound to approval (xiaoD #38)] a refusal is **negative feedback** ⇒ a
+        //   negative entry (the ledger only grows: it records which chain broke, it does not subtract
+        //   the stock). Previously a refusal left **no trace at all** ⇒ refusals decayed into noise.
+        //   ⚠️ A defer is **not** recorded (the human did not rule) — it leaves a pending marker instead.
+        const atR = decision?.attrib;
+        const catR = commandLayer(String(call?.args?.command ?? call?.args?.cmd ?? call?.args?.script ?? '')) || '';
+        if (atR && (catR === 'exfil' || catR === 'exfil-net' || atR.layer === 'network-send' || atR.layer === 'exfil' || atR.layer === 'exfil-net')) {
+          engine.recordSteady?.({
+            negative: 1,
+            attrib: atR,
+            action: String(call?.args?.command ?? call?.args?.body ?? '').slice(0, 200),
+            detail: 'Exfiltration refused by the trustee: this road did not go through (negative feedback, the ledger only grows)',
+          });
+        }
         logline('review approval rejected → cooldown silences **this adjudication object only**, not others');
         return 'rejected';
       }
@@ -990,8 +1047,27 @@ function apply(ctx) {
     //   once = this one call); rejected ⇒ final deny (annotated with the trustee's verdict);
     //   null ⇒ falls into the flatten block below, bit-identical with 0.2.14 (zero-regression control).
     if (decision.kind === 'review' && !engine.windowBroken) {
-      const verdict = await requestReviewVerdict(exec, decision);
+      const verdict = await requestReviewVerdict(exec, decision, call);
       if (verdict === 'allowed-once') {
+        // 🔴 [2026-10-29 · exfiltration demoted to S · ledger] a human-approved exfiltration leaves a
+        //   factual trace: "irreversible" is carried by the ledger, "should it go out" is the human's choice.
+        //   ⚠️ Third-layer lesson: sLedger only creates an entry when positive/negative/trauma > 0
+        //   (the sign is derived from the facts, but passing only `executed` creates no entry) ⇒ the
+        //   0.3.3 "the ledger is empty" had TWO causes (the namespace mix-up and this).
+        //   Grading: an executed exfiltration means the data left and cannot be recalled ⇒ the steady
+        //   state was **consumed** ⇒ an explicit negative entry (not +S: "release ≠ gain", per the
+        //   2026-09-20 fix that stopped counting releases as gains).
+        const atE = decision?.attrib;
+        const cmdCat = commandLayer(String(call?.args?.command ?? call?.args?.cmd ?? call?.args?.script ?? '')) || '';
+        if (atE && (cmdCat === 'exfil' || cmdCat === 'exfil-net' || atE.layer === 'network-send' || atE.layer === 'exfil' || atE.layer === 'exfil-net')) {
+          engine.recordSteady?.({
+            executed: true,
+            negative: 1,
+            attrib: atE,
+            action: String(call?.args?.command ?? call?.args?.body ?? '').slice(0, 200),
+            detail: 'Exfiltration executed (human-approved): the data left this machine and cannot be recalled — the steady state was consumed, recorded as a negative entry (the ledger only grows)',
+          });
+        }
         // 🔴 [2026-10-29 · exfiltration demoted to S · ledger] a human-approved exfiltration leaves a
         //   factual trace: "irreversible" is carried by the ledger (executed ⇒ the ledger derives the
         //   sign from reversibility), "should it go out" is the human's choice.

@@ -100,8 +100,11 @@ test('popup carries three things: who refused (law) / why (reason verbatim) / wh
   await handlers['tools/pre-execute'](exec(...REVIEW_CALL), next);
   assert.equal(asks.length, 1);
   const reason = asks[0].reason;
-  assert.match(reason, /your adjudication is needed/, 'the popup must mark itself an authorization request, not a notification');
-  assert.match(reason, /uncertain/, 'it must state the verdict nature (cannot decide, returned to human)');
+  // [2026-10-29 · after the popup refinement] the semantic locks are unchanged (authorization request /
+  //   verdict nature / two options / granularity / audit) — only the title became "needs a verdict" and
+  //   the criterion text became a one-line summary pointing at the ledger.
+  assert.match(reason, /authorization request/, 'the popup must mark itself an authorization request, not a notification');
+  assert.match(reason, /Who bears it|exhausted|cannot decide/, 'it must state the verdict nature (cannot decide, returned to human)');
   assert.match(reason, /Allow/, 'it must offer the Allow option');
   assert.match(reason, /Refuse/, 'it must offer the Refuse option');
   assert.match(reason, /this one call only/, 'it must state the grant granularity (action-level once)');
