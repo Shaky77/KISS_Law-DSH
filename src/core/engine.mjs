@@ -1490,6 +1490,23 @@ export class WeiwenLawEngine {
   //   - trauma is a history-scar record (absolute value), doesn't roll back current value.
   // Note: real path is M → H₀ fork → S₀(+1) or |S₀(S₀-1)| (see law.mjs's FEEDBACK_LOOP).
   recordSteady({ positive = 0, negative = 0, trauma = 0, subsystem = 'core', topic = null, detail = null, action = null, attrib = null, executed = false } = {}) {
+    // 🔴 [2026-10-29 · serialization hardening (xiaoD #39 measured: once the ledger grew from 0 to 7
+    //   entries, query_steady_state started returning "invalid output: value is not lossless JSON")]
+    //   Ledger entries must be **losslessly serializable data**: a detail/action carrying an object
+    //   (attrib and friends) drags unserializable values into the entry ⇒ the whole readout face breaks.
+    //   ⇒ everything is reduced to strings at the entrance (objects via JSON, failures via a truncated String()).
+    const safeText = (v, cap = 400) => {
+      if (v === null || v === undefined) return null;
+      if (typeof v === 'string') return v.slice(0, cap);
+      if (typeof v === 'number' || typeof v === 'boolean') return String(v);
+      try { return JSON.stringify(v).slice(0, cap); } catch { return String(v).slice(0, cap); }
+    };
+    detail = safeText(detail);
+    action = safeText(action, 400);
+    // attrib keeps only scalar fields (an attribution object may carry cycles / class instances)
+    if (attrib && typeof attrib === 'object') {
+      attrib = { layer: attrib.layer ?? null, method: attrib.method ?? null, signal: safeText(attrib.signal, 200) };
+    }
     this._settleMarked = true;      // [2026-09-24] 出口统一落点：本次裁决已落稳态刻痕（幂等依据）
     // ═══ [2026-09-24 · 如实记录（口径层修复）] sign 与 delta **同源**，且只由**可复验的事实**推得 ═══
     //   修前口径：sign 由**出口分支**给定（`positive: ok ? 1 : 0` ⇒ 放行即 '+'）。那是**评价**，不是事实 ——
@@ -1559,15 +1576,31 @@ export class WeiwenLawEngine {
   }
 
   // Bucket effect: effective S takes the minimum of each subsystem
+  // 🔴 [2026-10-29 · reserve and overdraft read apart (xiaoD #39)] Before: effectiveS = min(各子系统**净值**)
+  //   ⇒ negative values allowed ⇒ the bucket had no floor ⇒ "running dry" (reserve 0) and "overdrawn"
+  //   (reserve negative) were mixed together, and those differ causally ("nothing left" vs "in debt").
+  //   His #40 adds: this is not a clamp question, it is **do not read the reserve off the running net**.
+  //   ⇒ the fix separates the readout face (it does not clamp the negative away):
+  //     · effectiveS = **reserve reading**: shortest bucket, floor 0 (0 = no reserve left);
+  //     · overdraft  = **overdraft amount**: the sum of negative nets (how much is owed) — a separate
+  //       quantity, never folded into the reserve.
   effectiveS() {
     const vals = Object.values(this.sBySubsystem);
-    return vals.length ? Math.min(...vals) : 0;
+    if (!vals.length) return 0;
+    const shortest = Math.min(...vals);
+    return shortest > 0 ? shortest : 0;   // reserve reading: down to 0 (overdraft see overdraft())
+  }
+
+  /** Overdraft amount: the sum of negative nets ("how much is owed"). Separate from the reserve reading. */
+  overdraft() {
+    return Object.values(this.sBySubsystem).reduce((a, v) => a + (v < 0 ? -v : 0), 0);
   }
 
   snapshot() {
     return {
       bySubsystem: { ...this.sBySubsystem },
       effectiveS: this.effectiveS(),
+      overdraft: this.overdraft(),   // overdraft amount (separate from the reserve reading)
       traumaCount: this.traumaCount,
       // By default expose only the aggregated ledger (latest version), avoid full historyTrail causing context overload
       ledger: this.steadyLedger(),

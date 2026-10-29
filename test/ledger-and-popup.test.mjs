@@ -38,7 +38,11 @@ test('🔴 a human-approved exfiltration ⇒ the S ledger **really** records it 
   assert.ok(after, 'the ledger must be readable (same face as xiaoD\'s query_steady_state)');
   assert.ok((after.ledgerSize ?? 0) > (before?.ledgerSize ?? 0),
     `the ledger must gain an entry after the exfiltration (0.3.3 measured ledger=[]; here ${before?.ledgerSize} → ${after?.ledgerSize})`);
-  assert.notEqual(after.effectiveS, before?.effectiveS, 'the steady-state reading must move too (not only an entry added)');
+  // [2026-10-29 · readout separation] an executed exfiltration records a **negative** entry ⇒ what moves is
+  //   the **overdraft** (the reserve reading never goes negative; running dry and being overdrawn
+  //   differ causally) ⇒ the assertion now watches overdraft.
+  assert.ok((after?.overdraft ?? 0) > (before?.overdraft ?? 0),
+    `the overdraft must move (the negative entry lands on the overdraft, not on a negative reserve; ${before?.overdraft} → ${after?.overdraft})`);
 });
 
 test('a refusal ⇒ negative entry (the ledger only grows); a defer ⇒ not recorded (the human did not rule)', async () => {

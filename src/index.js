@@ -1328,13 +1328,14 @@ function apply(ctx) {
     async execute() {
       // white-box self-check by default only exposes the aggregated view, not dumping full historyTrail (prevent context overload)
       return {
-        effectiveS: engine.effectiveS(),
+        effectiveS: engine.effectiveS(),   // reserve reading (down to 0)
+        overdraft: engine.overdraft(),     // overdraft amount (owed, read apart from the reserve)
         ledger: engine.steadyLedger(),
         ledgerSize: engine.sLedger.size,
         standbySize: engine.sStandby.length,
         traumaCount: engine.traumaCount,
         failureStreak: engine.failureStreak,
-        note: 'ledger=active state (latest version); standby=silent standby (old versions, append-only retained not called). Full historyTrail reserved for deep audit.',
+        note: 'ledger=active state (latest version); standby=silent standby (old versions, append-only retained, not called). The full historyTrail is for deep audit only. ⚠️ effectiveS is the **reserve reading** (shortest bucket, floor 0: 0 = no reserve left); owing is read from overdraft (the overdraft amount) — a negative net is never folded into the reserve (2026-10-29, per xiaoD #39/#40: running dry and being overdrawn differ causally).',
       };
     },
   }));
