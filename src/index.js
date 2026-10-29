@@ -41,7 +41,7 @@ import { writeFileSync, appendFileSync, readFileSync, readdirSync, existsSync, m
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { createHash } from 'node:crypto';
-import { WeiwenLawEngine, DEFAULT_RIGID_ANCHORS, isIrreversible } from './core/engine.mjs';
+import { WeiwenLawEngine, DEFAULT_RIGID_ANCHORS, inferCategory, isIrreversible } from './core/engine.mjs';
 import { parseCapability, capabilityStatus, parsePledge, pledgeStatus, isNarrower, locValues } from './core/capability.mjs';  // [2026-10-28 · batch 4] 通行证 + 担保：判据与词汇都在该模块，适配层只做签发/自提/自省（不重写判据）
 import { R_DOMAIN, THREE_IRON_LAWS } from './core/law.mjs';
 // 🔴 [2026-10-29] three namespaces, all three stepped on in one day: the command layer's
@@ -1059,6 +1059,12 @@ function apply(ctx) {
       });
       if (out === 'allowed-once') {
         engine.grantBuffer(BUFFER_QUOTA, 'trustee thaw via the approval channel (not self-signed by the audited)');
+        // 🔴 [2026-10-30 · closing the door leaves a mark too (xiaoD 50 §3)] actorAudit answers
+        //   "who opened the door" — **closing it (revoke/unfreeze/refuse) is the other half of
+        //   the same question**. Before, the buffer approval left only the approval audit pair
+        //   ⇒ the trustee clicked "agree to revoke the broken window" and actorAudit had no trace.
+        recordActorAudit('buffer-grant', ACTOR_DECIDER,
+          `Broken-window unfreeze approved (buffer quota ${BUFFER_QUOTA} "local/rollback/no external sink" steps; auto-reset on repair = revoking the broken-window state)`);
         logline(`buffer granted via approval (${BUFFER_QUOTA}) — broken-window thaw adjudicated by the trustee`);
         return true;
       }
@@ -1356,6 +1362,14 @@ function apply(ctx) {
             action: String(call?.args?.command ?? call?.args?.body ?? '').slice(0, 200),
             detail: 'Exfiltration executed (human-approved): the data left this machine and cannot be recalled — the steady state was consumed, recorded as a negative entry (the ledger only grows)',
           });
+          // 🔴 [2026-10-30 · structural wiring (xiaoD 51, the trustee's own words)] the first
+          //   same-class exfiltration to complete M (review → human approves → executes) ⇒ one
+          //   **criterion-shape** entry; later same-class events go to the running ledger only.
+          engine.recordStructural?.({
+            cls: 'struct::exfil::review',
+            sign: '-',
+            rule: 'Same-class exfiltration ⇒ ask a human (review); if approved, execute and record the negative entry; irreversible (the data has left the machine)',
+          });
         }
         // 🔴 [2026-10-29 · exfiltration demoted to S · ledger] a human-approved exfiltration leaves a
         //   factual trace: "irreversible" is carried by the ledger (executed ⇒ the ledger derives the
@@ -1405,6 +1419,21 @@ function apply(ctx) {
       // verdict === null (no service / exception / no answer) ⇒ silent flatten, identical with 0.2.14
     }
     if (decision.kind === 'deny' || decision.kind === 'review') {
+      // 🔴 [2026-10-30 · structural wiring (xiaoD 49/51)] an M-verdict final (deny / review
+      //   flattened) is the **first sampling point** of "how this class is judged from now on":
+      //   class × legal layer, one entry per key (not enumerable); later same-class blocks go
+      //   to the running ledger only. Both exec, but an R hard anchor (rm -rf: wrong for
+      //   everyone) and a review (mid risk: ask) are different criterion shapes ⇒ separate keys.
+      //   ⚠️ never a gate: R_EXPANSION is never auto-triggered (hop 3 belongs to the decider).
+      try {
+        const catS = inferCategory(call ?? { name: exec?.name, args: exec?.arguments ?? {} }) || 'unknown';
+        const lawS = decision.law ?? 'review';
+        engine.recordStructural?.({
+          cls: `struct::${catS}::${lawS}`,
+          sign: '-',
+          rule: `${lawS} final ${decision.kind === 'review' ? '(not judgeable ⇒ handed to a human)' : 'interception'}: ${String(decision.reason ?? '').split('\n')[0].slice(0, 120)}`,
+        });
+      } catch { /* structural-ledger failure must not block the interception itself */ }
       // block this step, do not spread (landing of D break-window stop-loss / M sever-to-preserve / high-risk deduction fallback)
       // review (medium risk) is conservatively intercepted in a no-human-confirmation environment; reason already says "suggest re-confirm"
       // forward the engine's closed-loop fields and deduction risk level for the caller to read
@@ -1582,6 +1611,16 @@ function apply(ctx) {
   ctx.on('tools/result', (exec, result) => {
     if (result?.error) {
       engine.onFailure();
+      // 🔴 [2026-10-30 · structural wiring (xiaoD 49 target-state ①)] a real failure is also a
+      //   negative anchor (manuscript: |-S| = negative accumulation — trauma, failure, setback)
+      //   ⇒ one structural entry per class; later same-class failures go to the running ledger.
+      try {
+        engine.recordStructural?.({
+          cls: 'struct::failure::onFailure',
+          sign: '-',
+          rule: 'Real failure (error returned and not caused by this gate) ⇒ |-S| bookkeeping + broken-window accrual; same class not re-recorded',
+        });
+      } catch { /* structural-ledger failure must not block failure bookkeeping */ }
       logline(`result audit: failure accrued (streak=${engine.failureStreak}/${engine.maxFailureStreak})`);
     }
   });
@@ -1621,8 +1660,20 @@ function apply(ctx) {
       return toLossless({
         effectiveS: engine.effectiveS(),   // reserve reading (down to 0)
         overdraft: engine.overdraft(),     // overdraft amount (owed, read apart from the reserve)
+        // 🔴 [2026-10-30 · deducted from where (xiaoD 50 §3)] the net-value model already implies
+        //   offset-then-overdraft; the attribution rule goes to the reader (placeholder grade).
+        overdraftNote: 'A cost first offsets the owning bucket\'s (subsystem) positive net; the part crossing 0 lands in overdraft. The bucket = the subsystem segment of the entry class.',
         ledger: engine.steadyLedger(),
         ledgerSize: engine.sLedger.size,
+        // 🔴 [2026-10-30 · structural ledger (xiaoD 49/51)] hop-1 readout: entries are criterion
+        //   shapes (how this class is judged from now on), one per class; count belongs to the running ledger.
+        structLedger: engine.structuralLedger(),
+        structLedgerSize: engine.sStructLedger.size,
+        sMSediment: engine.sStructLedger.size,   // true body = structural ledger entries
+        structuralWiring: { negative: true, positive: false, note: 'negative=|-S| structural entries wired; positive=+S closed-loop-success entrance unwired (no instance feedback) — until then the ΣS true body holds negative anchors only.' },
+        // 🔴 [2026-10-30 · expansion readout (xiaoD 51 retraction)] hop 3 belongs to the decider:
+        //   never auto-triggered, only presented.
+        expansion: engine.snapshot().expansion,
         standbySize: engine.sStandby.length,
         traumaCount: engine.traumaCount,
         failureStreak: engine.failureStreak,

@@ -563,7 +563,7 @@ export function mComputability(surface, opts = {}) {
   // S：分子侧的 S —— 须有**真身**（经 M 沉淀），占位不作数。
   const mSediment = s ? s.mSediment : 0;
   if (!s) missing.push('S（未接 engine 实例）');
-  else if (mSediment === 0) missing.push('S（经 M 沉淀的 S ＝ 0：正账入口未接，闭环成功没进记账）');
+  else if (mSediment === 0) missing.push('S（经 M 沉淀的 S ＝ 0：结构账尚无条目——负向侧已接线（2026-10-30），正向侧（+S 闭环成功）入口仍未接）');
   // D：分母侧的扰动 —— dMax 未实现。
   missing.push('D_max（最大扰动量：MULTI_SYSTEM_RULES.dMax 未实现）');
   // H：分母侧的人类 —— 内 H 不可观测；可观测代理（同类 D 重现时取极行为是否变）未接。
@@ -713,8 +713,12 @@ export function dataSurface(engine) {
   //   positive") ⇒ **the real reason the +S entrance is empty is not the measurement, it is that
   //   "closed-loop success" was never wired into the ledger**.
   const mTrail = arr(engine.historyTrail);   // the name must not collide with the existing `trail` (historyTrail aggregate)
-  // "S settled through M feedback" count = positive settled marks (the real count; shows 0 if it is 0)
-  const mSediment = mTrail.filter((e) => e && e.type === 'S+1').length;
+  // [2026-10-30 · true-body source updated (xiaoD 49/51)] = structural-ledger entry count
+  //   (recordStructural: one per class, entry = criterion shape — the trustee's own words).
+  //   The historyTrail S+1 count stays as the legacy fallback (engines without a structural ledger).
+  const mSediment = Number.isFinite(engine?.sStructLedger?.size)
+    ? engine.sStructLedger.size
+    : mTrail.filter((e) => e && e.type === 'S+1').length;
   // 🔴 [2026-10-30 · 沉淀停摆显式化（小D 48 号件第四节）] 小D 实测：sMSediment = 0，判读为
   //   「**这一步从来没跑过**」，而现在的读数是**静默的 0** ⇒ 读起来像「暂时没有」⇒ **unknown ≠ 零** 被违反。
   //   ⇒ 落法：**停摆与零分开报**。停摆时给 `stalled:true` + 原因，**不报 0**。
@@ -724,14 +728,21 @@ export function dataSurface(engine) {
   //   ⚠️ 判据怎么落：引擎暴露一个**声明式开关**（`mSedimentWired`）——由引擎自己答"这条线接没接"，
   //     本模块**只读不算、不猜**（与元判据同原则：不能自己判断的东西就如实报缺）。
   const sedimentWired = engine?.mSedimentWired === true;
+  // 🔴 [2026-10-30 · wiring declaration evolves (was sedimentStall; xiaoD 48 §4 → 49/51)]
+  //   At 0.5.0 neither side was wired ⇒ "stalled". This build **wires the negative side**
+  //   (interception / refused / failure / irreversible cost ⇒ recordStructural); the positive
+  //   side (+S closed-loop success) stays unwired (no instance feedback) ⇒ report both states.
+  const negativeWired = Number.isFinite(engine?.sStructLedger?.size);
   const sedimentStall = {
-    stalled: !sedimentWired && mSediment === 0,
-    reason: sedimentWired
-      ? null
-      : '🔴 沉淀步**停摆**：M 未接线 ⇒ 「闭环成功 ⇒ 记正账（S+1）」这条线在引擎里没有产生入口 ⇒ '
-        + 'sMSediment 的 0 是**静默的 0**（读起来像「暂时没有」，实际是「这一步从来没跑过」）。'
-        + '按 unknown ≠ 零 ⇒ **停摆时不得读作零**。',
-    wired: sedimentWired,
+    // stalled = the structural ledger does not exist in the engine (not even the negative side).
+    // The positive side being unwired is NOT a stall — it is reported honestly as positiveWired:false.
+    stalled: !negativeWired,
+    reason: negativeWired
+      ? '负向侧已接线（2026-10-30）：拦截/被拒/失败/不可逆消耗 ⇒ 结构账条目。正向侧（+S 闭环成功）仍未接——正向沉淀如需真身，待实例反馈后接线。'
+      : '🔴 沉淀步**停摆**：结构账在引擎里不存在 ⇒ 「经 M 反馈沉淀」这条线没有产生入口 ⇒ sMSediment 是**静默的 0**。按 unknown ≠ 零 ⇒ **停摆时不得读作零**。',
+    wired: negativeWired,
+    negativeWired,
+    positiveWired: sedimentWired,
   };
   // Same-class diff: group by (subsystem, topic), compare the **first** and the **latest** mark.
   //   🔴 "same class" = same topic (the topic is the discriminator for same-kind events, see law.mjs S

@@ -274,7 +274,7 @@ function extractPath(call) {
   const m = sh.match(/(?:cat|head|tail|read|less|more|vi|vim|nano|cp|mv|rm|echo|write)\s+([^\s]+)/i);
   return m ? m[1] : '';
 }
-function inferCategory(call) {
+export function inferCategory(call) {
   const name = call?.name ?? '';
   if (TOOL_CATEGORY[name]) return TOOL_CATEGORY[name];
   const a = call?.args ?? {};
@@ -1396,7 +1396,25 @@ export class WeiwenLawEngine {
     //     起明写「不再记 positive」⇒ 放行 ≠ 增益；而「闭环成功」这条正账入口尚未接进记账）
     //     ⇒ `sMSediment` 的 0 是**静默的 0**（读起来像「暂时没有」，实际是「这一步从来没跑过」）。
     //   ⇒ 读数面据此报「沉淀停摆（原因：M 未接线）」，**不报 0**（unknown ≠ 零）。
+    // [2026-10-30 · wiring (xiaoD 49/51, the trustee's own words)] The **structural ledger**
+    //   lands ⇒ the negative side is wired: "the structural ledger is not enumerable. For the
+    //   same kind of action, record one |-S| and that is it; later encounters of the same kind
+    //   are running-account only. The running account has data; the structural ledger has no
+    //   data, only criteria." ⇒ an entry = a **criterion shape** (how this class is judged from
+    //   now on), one per class; later same-class events go to the running ledger (sLedger).
+    //   ⚠️ The wired side is the **negative** side (|-S|: interception / refused after handover /
+    //     failure / irreversible cost). The **positive side (+S, closed-loop success) stays
+    //     unwired** (no instance feedback — not wired on guesswork) ⇒ structuralWiring reports
+    //     {negative: true, positive: false} honestly.
+    // 🔴 [2026-10-30 · structural ledger (xiaoD 51)] separate from the running ledger (sLedger):
+    //   the running ledger has **data** (every event; count/firstTs/lastTs live there); the
+    //   structural ledger has only **criteria** (first same-class M-completed verdict ⇒ one
+    //   "how this class is judged from now on"; later same-class calls are a no-op).
+    //   Hop 1 (event→anchor) and hop 2 (anchor→M) belong to the executor; **hop 3 (ΣS>R₀ ⇒ new
+    //   rules) belongs to the decider** (xiaoD 51's retraction) ⇒ the engine never auto-triggers
+    //   R_EXPANSION — it only presents the distance (snapshot.expansion).
     this.mSedimentWired = false;
+    this.sStructLedger = new Map();
     this.onStreakChange = opts.onStreakChange ?? null;
     //
     // Don't agonize over the threshold, don't agonize "how many triggers to lock": intercept = mark, accumulated marks hit cap → hand to human, AI stops burning compute.
@@ -1575,10 +1593,24 @@ export class WeiwenLawEngine {
     //     分子＝**留了痕的事件数**（不是刻痕条数）⇒ 比值恒在 [0,1]，且 <1 才是真的漏记。
     //   ⚠️ 一笔事件可能留**多条**刻痕（negative 与 trauma 同时 >0 ⇒ 推 |S-1| 与 trauma 两条）⇒
     //     这正是修前比值会 >1 的机制（分子数的是刻痕条，分母数的是事件条）。
+    // 🔴 [2026-10-30 · one mark = one cost (xiaoD 50 §2)] trauma is an **attribute** of the
+    //   |-S| mark (the manuscript: |-S| is the quantity "negative accumulation"; trauma is its
+    //   irreversibility attribute), **not a second mark**. Before: negative=1 ∧ trauma=1 ⇒ two
+    //   trail marks and two sLedger classes ⇒ the same failure counted twice. Now: one |-S|
+    //   mark carrying trauma:true.
+    const traumaIsAttr = negative > 0 && trauma > 0;
     let trailMarked = false;
     if (positive > 0) { this.historyTrail.push({ type: 'S+1', subsystem, amount: positive, topic, detail }); trailMarked = true; }
-    if (negative > 0) { this.historyTrail.push({ type: '|S-1|', subsystem, amount: Math.abs(negative), topic, detail }); trailMarked = true; }
-    if (trauma > 0) { this.traumaCount += 1; this.historyTrail.push({ type: 'trauma', subsystem, amount: Math.abs(trauma), topic, detail }); trailMarked = true; }
+    if (negative > 0) {
+      this.historyTrail.push(traumaIsAttr
+        ? { type: '|S-1|', subsystem, amount: Math.abs(negative), topic, detail, trauma: true }
+        : { type: '|S-1|', subsystem, amount: Math.abs(negative), topic, detail });
+      trailMarked = true;
+    }
+    if (trauma > 0) {
+      this.traumaCount += 1;
+      if (!traumaIsAttr) { this.historyTrail.push({ type: 'trauma', subsystem, amount: Math.abs(trauma), topic, detail }); trailMarked = true; }
+    }
 
     // S time-period model: same-type events keep only the latest version as active; old versions sink to silent standby;
     //   +1/-1 accumulate into +N/-N marking "how many times happened" (event mark, not arithmetic). Solves S long-term thickening causing context overload.
@@ -1586,8 +1618,8 @@ export class WeiwenLawEngine {
     const ts = Date.now();
     const base = topic ? `${subsystem}::${topic}` : `${subsystem}`;
     if (positive > 0) this._coalesce(`${base}::+1`, detail, '+', ts);
-    if (negative > 0) this._coalesce(`${base}::-1`, detail, '-', ts);
-    if (trauma > 0) this._coalesce(`${base}::trauma`, detail, 'trauma', ts);
+    if (negative > 0) this._coalesce(`${base}::-1`, detail, '-', ts, traumaIsAttr ? { trauma: true } : null);
+    if (trauma > 0 && !traumaIsAttr) this._coalesce(`${base}::trauma`, detail, 'trauma', ts);
 
     // [2026-09-20 ledger wiring · additive · 2026-09-24 口径修复] S 刻痕沉入 R 账本：term 字典序索引、R 域标签、可逆性标签。
     //   仅附加记录，不改裁决逻辑、不碰禁区。attrib/action 为可选（onFailure 等调用点不传 ⇒ 标签留空/unknown）。
@@ -1608,13 +1640,14 @@ export class WeiwenLawEngine {
   }
 
   // Same-type event aggregation: old version sinks to standby (silent, kept not dissolved), active keeps only latest version + count mark
-  _coalesce(cls, detail, signLabel, ts) {
+  _coalesce(cls, detail, signLabel, ts, attr = null) {
     const prev = this.sLedger.get(cls);
     if (prev) {
       this.sStandby.push({ ...prev, supersededAt: ts, reason: 'newer-version', role: 'cross-check-baseline' });
       prev.count += 1;
       if (detail) prev.latest = detail;
       prev.lastTs = ts;
+      if (attr) prev.attr = { ...(prev.attr || null), ...attr };
     } else {
       // 🔴 [2026-10-30 · 序列化真凶（小D 47 号件第七节 / 48 号件第五条的复现）]
       //   修前这里写的是 `detail: detail || null`（键名 **detail**），而 steadyLedger() 读的是 `v.latest`
@@ -1624,7 +1657,7 @@ export class WeiwenLawEngine {
       //     漏了 _coalesce 这条路径 ⇒ 同一形状复发三次。）
       //   ⇒ 修法：键名对齐为 `latest`（steadyLedger 读的那个），并且**不允许 undefined 进读数面**
       //     （无内容就写 null —— JSON 里 null 是"有值且为空"，undefined 是"没这个键"＝丢值）。
-      this.sLedger.set(cls, { class: cls, sign: signLabel, latest: detail || null, count: 1, firstTs: ts, lastTs: ts });
+      this.sLedger.set(cls, { class: cls, sign: signLabel, latest: detail || null, count: 1, firstTs: ts, lastTs: ts, attr: attr || null });
     }
   }
 
@@ -1632,8 +1665,46 @@ export class WeiwenLawEngine {
   steadyLedger() {
     return [...this.sLedger.values()].map((v) => ({
       class: v.class, sign: v.sign, count: v.count,
-      latest: v.latest, firstTs: v.firstTs, lastTs: v.lastTs,
+      latest: v.latest, firstTs: v.firstTs, lastTs: v.lastTs, attr: v.attr ?? null,
     }));
+  }
+
+  // 🔴 [2026-10-30 · structural ledger (xiaoD 49/51, the trustee's own words)] "The structural
+  //   ledger is not enumerable. For the same kind of action, record one |-S| and that is it;
+  //   later encounters of the same kind are running-account only. The running account has
+  //   data; the structural ledger has no data, only criteria." ⇒ entry = a **criterion shape**,
+  //   one per class:
+  //   · cls  : the key (e.g. struct::exfil::review — class × legal layer; tool names drift,
+  //     the class is what makes "same kind")
+  //   · sign : direction (|-S| ⇒ '-'; the positive anchor +S is unwired this round)
+  //   · rule : the criterion shape — **generated from what actually happened** (law layer +
+  //     disposition + the point), recorded as fact, not stamped from a template
+  //   · returns { settled, already }: settled=true recorded now; already=true class exists (no-op)
+  //   ⚠️ who reads it: hop 2 (anchor→M input) and snapshot.expansion (distance to the decider).
+  //   ⚠️ never a gate: R_EXPANSION is never auto-triggered (hop 3 belongs to the decider).
+  recordStructural({ cls, sign = '-', rule = null, detail = null } = {}) {
+    // 🔴 [2026-10-30 · empty ledger ≠ clean ledger applies to the structural ledger too]
+    //   Locked (restore fail-closed) ⇒ the structural ledger also **stops appending**.
+    if (this.ledgerWriteLocked) return { settled: false, already: false, reason: 'ledger-write-locked' };
+    if (!cls) return { settled: false, already: false, reason: 'missing-class' };
+    const prev = this.sStructLedger.get(cls);
+    if (prev) {
+      // not enumerable: the class exists ⇒ running ledger only; structural ledger no-op.
+      return { settled: false, already: true, cls };
+    }
+    const ts = Date.now();
+    this.sStructLedger.set(cls, {
+      class: String(cls), sign: String(sign), rule: detail ?? (rule ? String(rule) : null), firstTs: ts,
+    });
+    // the structural ledger is a ledger too: notify the persistence hook (same channel).
+    if (!this.ledgerWriteLocked) {
+      try { this.onLedgerChange?.(this.exportLedger()); } catch { /* hook failure must not block bookkeeping */ }
+    }
+    return { settled: true, already: false, cls };
+  }
+
+  structuralLedger() {
+    return [...this.sStructLedger.values()].map((v) => ({ ...v }));
   }
 
   // Bucket effect: effective S takes the minimum of each subsystem
@@ -1684,6 +1755,10 @@ export class WeiwenLawEngine {
       windowBroken: !!this.windowBroken,
       historyTrail: this.historyTrail.map((e) => ({ ...e })),
       ledger: [...this.sLedger.values()].map((v) => ({ ...v })),
+      // [2026-10-30 · structural ledger persists in the same layer (xiaoD 48/51)] persist
+      //   without sediment ⇒ what is stored is a running account; sediment without persist
+      //   ⇒ the sediment dies on restart (48 §4).
+      structLedger: [...this.sStructLedger.values()].map((v) => ({ ...v })),
       standby: this.sStandby.map((v) => ({ ...v })),
       store: this.sAccount.rStore.map((r) => ({ ...r })),
       catalog: [...this.sAccount.catalog.entries()].map(([k, list]) => [k, list.map((r) => ({ ...r }))]),
@@ -1735,6 +1810,12 @@ export class WeiwenLawEngine {
         this.sLedger.set(v.class, { ...v });
       }
     }
+    // [2026-10-30 · structural ledger restore, same layer (xiaoD 48/51)] one per class ⇒
+    //   on restore the first local entry of a class wins (criterion shapes do not count).
+    for (const v of (d.structLedger ?? [])) {
+      if (!v || !v.class) continue;
+      if (!this.sStructLedger.has(v.class)) this.sStructLedger.set(v.class, { ...v });
+    }
     for (const v of (d.standby ?? [])) {
       if (!v || !v.class) continue;
       this.sStandby.push({ ...v });
@@ -1760,14 +1841,40 @@ export class WeiwenLawEngine {
     return {
       bySubsystem: { ...this.sBySubsystem },
       effectiveS: this.effectiveS(),
+      // 🔴 [2026-10-30 · deducted from where (xiaoD 50 §3)] the net-value model already implies
+      //   "first offset the bucket's positive net; only the part crossing 0 lands in overdraft".
+      //   His reading (effectiveS=0, overdraft=1) was the zero-reserve special case, not "no
+      //   allocation" ⇒ the bookkeeping stays (insufficient intersection); the attribution rule
+      //   goes into a note (readability placeholder).
+      overdraftNote: 'A cost first offsets the owning bucket\'s (subsystem) positive net; the part crossing 0 lands in overdraft. The bucket = the subsystem segment of the entry class (see bySubsystem).',
       overdraft: this.overdraft(),   // overdraft amount (separate from the reserve reading)
       traumaCount: this.traumaCount,
       // By default expose only the aggregated ledger (latest version), avoid full historyTrail causing context overload
       ledger: this.steadyLedger(),
       ledgerSize: this.sLedger.size,
+      // 🔴 [2026-10-30 · structural ledger readouts (xiaoD 49/51)] hop-1 output: one per class,
+      //   criterion shape, not enumerable.
+      structLedger: this.structuralLedger(),
+      structLedgerSize: this.sStructLedger.size,
+      // 🔴 [2026-10-30 · wiring declaration evolves (was sedimentStall)] the negative side (|-S|)
+      //   is wired in this build; the positive side (+S closed-loop success) stays unwired (no
+      //   instance feedback) ⇒ report both states, pretend neither.
+      structuralWiring: { negative: true, positive: false, note: 'negative=|-S| structural entries wired (interception / refused / failure / irreversible cost, one per class); positive=+S closed-loop-success entrance unwired (no instance feedback) — until wired, the ΣS true body holds negative anchors only.' },
+      sMSediment: this.sStructLedger.size,  // true-body reading = structural ledger entries (settled through M)
       standbySize: this.sStandby.length, // silent standby (old versions) count, append-only kept
       sAccountSize: this.sAccount.size(), // [2026-09-20] R 账本内的 S 刻痕总数（独立列表，S≠R）
       failureStreak: this.failureStreak,
+      // 🔴 [2026-10-30 · expansion readout (xiaoD 51 retraction; manuscript R_EXPANSION)] hop 3
+      //   belongs to the **decider**: the engine never auto-triggers R_EXPANSION, it only
+      //   presents the distance. r0 has no engine-side value (the decider sets it) ⇒ null,
+      //   honestly; distance likewise; only sigmaS (the true body) reads.
+      expansion: {
+        sigmaS: this.sStructLedger.size,
+        r0: null,
+        distance: null,
+        triggered: false,
+        note: 'The transition (R0→R1) belongs to the decider (manuscript: the AI need not agonize — a human backs it). This readout only presents the structural anchor count (the ΣS true body); distance becomes meaningful once the decider sets R0. Quantity ΣS>R0 AND quality settled-through-M (R_EXPANSION.qualification).',
+      },
       mHumanCap: this.mHumanCap,
       mBugForce: Object.fromEntries(this.mBugForce),
       mInterceptMarks: Object.fromEntries(this.mInterceptMarks), // interception counter bucket (systemKey → count)
@@ -3509,6 +3616,16 @@ export class WeiwenLawEngine {
    *  broken state never lands on disk ⇒ a reinstall clears it ⇒ the interception is void). */
   bumpFailureStreak() {
     this.failureStreak += 1;
+    // 🔴 [2026-10-30 · broken-window same-source (xiaoD 49: receipt said "5/5" while
+    //   windowBroken was false)] Before, windowBroken=true was set only by the R-projection
+    //   path; failures with no domain-layer assignment go through this function, and at the
+    //   threshold the **judging face** (dual channel: windowBroken || streak>=cap) already
+    //   treats it as broken while the **readout flag** stayed false ⇒ one state, two fields
+    //   telling different stories. ⇒ the set-point moves to the **single increment point**:
+    //   threshold reached ⇒ flag set. Same-sourcing, not a new trigger.
+    if (!this.windowBroken && this.failureStreak >= this.maxFailureStreak) {
+      this.windowBroken = true;
+    }
     try { this.onStreakChange?.(this.failureStreak, this.windowBroken); } catch { /* a failing hook must not block the verdict */ }
     return this.failureStreak;
   }

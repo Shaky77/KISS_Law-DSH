@@ -73,15 +73,16 @@ test('🔴 M 不可算时报「不可判（缺哪项）」，不许拿公式外�
   assert.match(m.reason, /不得顶替/, '必须明说公式外的量不得顶替');
   // 🔴 变异检测：缺项清单不得是硬编码的空/常量 —— 换实例后缺项内容必须变
   const e2 = ENG();
-  e2.recordSteady({ positive: 1, detail: '正账', subsystem: 'probe' });
+  // [2026-10-30 口径更新] S 的真身取数口＝结构账条目数（经 M 判决完成沉淀；安 10-30 原话
+  //   「结构账没有数据，只有判据」）⇒ 变异场景改为「结构账记入一条」（模拟一次经 M 的负向终局）。
+  e2.recordStructural({ cls: 'struct::probe::R', sign: '-', rule: '变异样本：同类首次经 M 终局' });
   const m2 = mComputability(dataSurface(e2));
   assert.notDeepEqual(m.missing, m2.missing, '缺项清单必须随实例变化（否则是写死的假读数）');
-  // 🔴 而且**空实例**必须报出「正账入口未接」这条真缺口（安的原话那条）
-  assert.ok(m.missing.some((x) => /正账入口未接/.test(x)), '必须报出「闭环成功没进记账」这个真缺口');
-  // 🔴 有正账进来 ⇒ S 项不再缺（缺口随实例消失，不是恒定文案）
-  assert.ok(!m2.missing.some((x) => /正账入口未接/.test(x)), '有正账后 S 项不该再报缺');
-  // ⚠️ 但**引擎侧**正账入口仍未接（recordSteady 的 positive 分支无调用点）
-  //    ⇒ 真实运行时 sMSediment 恒 0 ⇒ 这条缺口在引擎接上之前一直成立。
+  // 🔴 而且**空实例**必须报出「正向侧（+S 闭环成功）入口未接」这条真缺口（安的原话那条——
+  //    负向侧 2026-10-30 已接线，但正向侧 recordSteady 的 positive 分支依旧无调用点）
+  assert.ok(m.missing.some((x) => /正向侧|闭环成功/.test(x)), '必须报出「+S 闭环成功没进记账」这个真缺口');
+  // 🔴 有结构条目进来 ⇒ S 项不再缺（缺口随实例消失，不是恒定文案）
+  assert.ok(!m2.missing.some((x) => /正向侧|闭环成功/.test(x)), '有结构条目后 S 项不该再报缺');
 });
 
 test('🔴 M 不输出数值（框架明令不赋值不计算）—— 不可判形态不许偷偷给个数', async () => {
@@ -115,13 +116,14 @@ test('🔴 刻痕覆盖率分子分母同量纲：恒在 [0,1]，且 <1 才是�
   const { dataSurface } = await import('../src/core/strata.mjs');
   const e = ENG();
   // 🔴 判据要能**区分两个口径** ⇒ 必须造出「刻痕条数 ≠ 留痕事件数」的样本：
-  //   一笔失败会推**两条**刻痕（|S-1| 与 trauma）但只算**一笔事件**
-  //   ⇒ 修前口径（刻痕条/事件条）会给 2/1＝2.0；修后口径（留痕事件/事件条）＝ 1/1＝1.0。
-  //   ⚠️ 若样本里分子分母恰好相等（各留一痕），两个口径读数**相同** ⇒ 判据就测不出东西（变异不红）。
-  e.recordSteady({ negative: 1, trauma: 1, detail: '一笔失败（两条刻痕）', subsystem: 'probe' });
+  //   [2026-10-30 样本更新] 一笔失败的 trauma 已属性化（一条刻痕，小D 50 号件）⇒ 旧样本失效；
+  //   改用「一笔事件同时推两条**方向相反**的刻痕」（positive ∧ negative 同调 ⇒ S+1 与 |S-1| 各一条，
+  //   仍是 1 个事件）⇒ 修前口径（刻痕条/事件条）＝ 2/1＝2.0；修后口径（留痕事件/事件条）＝ 1/1＝1.0。
+  //   ⚠️ 若样本里分子分母恰好相等，两个口径读数相同 ⇒ 判据就测不出东西（变异不红）。
+  e.recordSteady({ positive: 1, negative: 1, detail: '一笔事件（两条反向刻痕）', subsystem: 'probe' });
   const d = dataSurface(e);
   assert.equal(d.eventCount, 1, '一笔事件');
-  assert.equal(d.trailEvents, 2, '两笔刻痕（|S-1| 与 trauma）');
+  assert.equal(d.trailEvents, 2, '两条刻痕（S+1 与 |S-1|）');
   assert.equal(d.markedEvents, 1, '留痕事件数＝1');
   // 🔴 修后：分子分母同量纲 ⇒ 覆盖率 = 1/1 = 1.0（不是 2.0）
   assert.equal(d.trailCoverage, 1, `覆盖率必须按「留痕事件数/事件数」算（实测 ${d.trailCoverage}；修前口径会给 2.0）`);
@@ -196,20 +198,29 @@ test('🔴 空账 ≠ 新账：恢复校验不过 ⇒ 按「账被清空」处�
 });
 
 // ── ⑦ 沉淀停摆显式化（小D 48 号第四条）─────────────────────────────
-test('🔴 沉淀停摆要报「停摆（原因）」，不许报 0（unknown ≠ 零）', async () => {
+test('🔴 接线声明分报两侧：负向已接不算停摆，正向未接如实报（unknown ≠ 零）', async () => {
   const { dataSurface } = await import('../src/core/strata.mjs');
   const e = ENG();
   const d = dataSurface(e);
-  assert.equal(d.mSediment, 0, '正账入口未接 ⇒ 计数是 0');
+  assert.equal(d.mSediment, 0, '尚无经 M 的负向终局 ⇒ 结构账 0（如实显示 0）');
   assert.ok(d.sedimentStall, '必须给出停摆面');
-  assert.equal(d.sedimentStall.stalled, true, '未接线 ⇒ 停摆');
-  assert.equal(d.sedimentStall.wired, false);
-  assert.match(d.sedimentStall.reason, /停摆/, '必须报「停摆」');
-  assert.match(d.sedimentStall.reason, /M 未接线/, '必须给出原因');
-  // 🔴 变异检测：把开关置 true ⇒ 停摆必须解除（否则停摆是写死的）
+  // 🔴 [2026-10-30 语义更新] 负向侧已接线（recordStructural 在场）⇒ 不再全停摆；
+  //   正向侧（+S 闭环成功）仍未接 ⇒ positiveWired:false 如实分报，不假装全接。
+  assert.equal(d.sedimentStall.stalled, false, '结构账在场 ⇒ 不停摆');
+  assert.equal(d.sedimentStall.wired, true, '负向侧已接');
+  assert.equal(d.sedimentStall.negativeWired, true);
+  assert.equal(d.sedimentStall.positiveWired, false, '正向侧仍未接（无实例反馈，不擅自接）');
+  assert.match(d.sedimentStall.reason, /正向侧/, '原因里必须如实说正向侧未接');
+  // 🔴 反例锁：引擎**没有**结构账 ⇒ 停摆必须回来（否则停摆是写死的 false）
+  const fake = { historyTrail: [], mSedimentWired: false };   // 旧式引擎：无 sStructLedger
+  const dFake = dataSurface(fake);
+  assert.equal(dFake.sedimentStall.stalled, true, '无结构账 ⇒ 停摆');
+  assert.match(dFake.sedimentStall.reason, /停摆/, '必须报「停摆」');
+  // 🔴 变异检测：正向开关置 true 只改 positiveWired，不得假装负向也变了
   e.mSedimentWired = true;
   const d2 = dataSurface(e);
-  assert.equal(d2.sedimentStall.stalled, false, '接线后不得仍报停摆');
+  assert.equal(d2.sedimentStall.positiveWired, true, '正向开关被引擎声明 ⇒ positiveWired 翻转');
+  assert.equal(d2.sedimentStall.negativeWired, true, '负向侧不受该开关影响');
 });
 
 test('🔴 引擎必须诚实回答「沉淀线接没接」（读数面不猜）', () => {
