@@ -407,7 +407,11 @@ function commandLayer(cmd) {
   //     ③ 宾语位：`/bin/rm` 这类**带路径分隔符**的 token 原样 ≠ 破坏名 ⇒ 不算（宾语不是命令）
   //   注：工具名封闭集（dd/wipefs/mkfs/truncate…不是动词词素、字典读不出）**仍在此表内消费，不废**——
   //     与字典词素两半都是有限封闭集，合起来才是完整的破坏标记集。
-  const DESTRUCTIVE_WORD = /^(?:rm|rmdir|shred|unlink|mkfs(?:\.\w+)?|format|dd|truncate|wipefs)$/i;
+  // [2026-10-29] rd added (Windows rmdir alias; no same-shape conflict in general contexts).
+  //   ⚠️ deliberately NOT adding del/erase: DEL in Redis deletes a key (deleting an abstract resource ≠
+  //   deleting the filesystem) — the dict-as-s gate explicitly forbids reading that as filesystem destruction;
+  //   same word-shape, different semantics, so the lexicon line does not take it.
+  const DESTRUCTIVE_WORD = /^(?:rm|rmdir|rd|shred|unlink|mkfs(?:\.\w+)?|format|dd|truncate|wipefs)$/i;
   for (const seg of String(cmd).split(SEG_SPLIT)) {
     const head = seg.trim().split(CMD_TOKEN_SPLIT).filter(Boolean)[0] ?? '';
     // 解释器段：引号内是**代码**不是数据 ⇒ 用原文（否则 `bash -c "rm -rf /"` 会塌方）
@@ -426,7 +430,10 @@ function commandLayer(cmd) {
   //   次序与既有破坏检查同层（破坏优先于读/外传），故置于读写判定之前。
   if (lexiconDestructive(cmd)) return 'exec-destructive';
   if (new RegExp(CMD_POS + '(cat|head|tail|read|less|more|vi|vim|nano|type|open)\\b', 'i').test(cmd)) return 'cred-read';
-  if (new RegExp(CMD_POS + '(curl|wget|scp|rsync|ftp|nc|ssh)\\b', 'i').test(cmd)) return 'network-send';
+  // [2026-10-29 · lexicon stop-gap (xiaoD #29)] PS network verbs added: Invoke-RestMethod used to
+  //   attribute to exec ⇒ the deduction layer's exfiltration clause never hit ⇒ silent failure. Same
+  //   family as curl (network tool), same criterion, same verdict.
+  if (new RegExp(CMD_POS + '(curl|curl\\.exe|wget|scp|rsync|ftp|nc|ssh|Invoke-RestMethod|Invoke-WebRequest|iwr|irm|Start-BitsTransfer)\\b', 'i').test(cmd)) return 'network-send';
   // [2026-09-20 · 对外不可逆（push / publish）—— 与"外传"同层，理由同 228-233 的封闭性论证]
   //   它们与 curl 同族而非与 rm 同族：**本机数据不动，不可逆的是"共享远端已被推进"**
   //   ——本地 git reset 改不回别人的克隆（对外不可逆 ⊄ 本地可复原）。故归 network-send（共享远端 = Macro）。

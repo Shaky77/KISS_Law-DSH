@@ -287,7 +287,7 @@ function inferCategory(call) {
   if (sh) {
     if (/\b(rm|mkfs|format|del|delete|shred)\b/.test(sh)) return 'exec-destructive';
     if (/\b(cat|head|tail|read|less|more|vi|vim|nano|type|open)\b/.test(sh)) return 'read';
-    if (/\b(curl|wget|scp|rsync|ftp|nc)\b/.test(sh)) return 'exfil-net';
+    if (/\b(curl|curl\.exe|wget|scp|rsync|ftp|nc|netcat|Invoke-RestMethod|Invoke-WebRequest|iwr|irm|Start-BitsTransfer)\b/i.test(sh)) return 'exfil-net';
     return 'exec';
   }
   return 'other';
@@ -308,6 +308,52 @@ const IRREVERSIBLE_CATS = new Set(['write', 'exec-destructive', 'exfil', 'exfil-
 //   make the buffer refuse even "edit local code" ⇒ the repair loop stays dead (probe 3 measured: all 5 repair
 //   actions dead).
 const BUFFER_BLOCK_CATS = new Set(['exec-destructive', 'exfil', 'exfil-net']);
+
+// ===== [2026-10-29 · "judging word-shape, not landing target" — third instance fixed (surfaced by xiaoD's live tests)] =====
+// Symptom (reproduced at engine level): `edit` on a wall-table doc whose body contains `` `rm -rf /` `` ⇒ deny/R —
+//   markdown's inline-code backtick and shell's command substitution are the **same character, two semantics**;
+//   extractShell's fallback extracted the body as a potential command, and the R anchor found `rm` in it ⇒
+//   word-shape collision. Mirror direction: `write boom.sh` with body `rm -rf /` ⇒ **allow** (miss) — the one
+//   place that WOULD execute it was never scanned.
+// Criterion (xiaoD's words: "will this text be executed?"):
+//   ① **doc body** (target extension in the known non-executing set) ⇒ body is not scanned as a command (R-anchor
+//      exemption) — audit/replay documents stay writable; "a record blocked by its own criterion = deleting the evidence";
+//   ② **executable body** (target extension in the known executing set) ⇒ body is force-scanned (plugs the .sh/.ps1 miss);
+//   ③ unknown extensions keep being scanned (fail-closed, no unknown-sized hole) — exemption only for
+//      "provable doc", never for "no evidence it isn't" (same as "can't attribute ⇒ review, don't guess").
+// ⚠️ Position discipline: these helpers are **consumer-side criteria** for R anchors; extractShell is untouched —
+//   it is shared with the H-layer injection test (command-keyed injection sentences rely on it); changing it globally
+//   would hurt H. Same lesson as the local read/write exemption: the exemption's position is part of the criterion.
+const DOC_BODY_EXTS = /\.(md|markdown|txt|rst|log|json|yaml|yml|toml|csv|ini|cfg|conf)$/i;
+const SCRIPT_BODY_EXTS = /\.(sh|bash|zsh|fish|ps1|psm1|bat|cmd|py|rb|pl)$/i;
+// Body-slot extraction: all string args except command slots and locator slots — edit's old/new_string,
+// write's content all land here; key names are an open set, so take by slot shape, not by name enumeration.
+function bodyValues(call) {
+  const args = call?.args ?? call ?? {};
+  const FIXED_CMD_KEYS = new Set(['command', 'code', 'task', 'script', 'cmd', 'path', 'file', 'filename', 'to', 'from', 'url', 'uri']);
+  return Object.entries(args).flatMap(([k, v]) => {
+    if (FIXED_CMD_KEYS.has(k.toLowerCase())) return [];
+    if (typeof v === 'string' && v.length > 0) return [v];
+    return [];
+  });
+}
+function locatorOf(call) {
+  const locs = locValues(call?.args ?? call ?? {});
+  return locs.length ? String(locs[0]) : '';
+}
+// ① doc-body shape: attribution is write/edit ∧ target is a doc extension ⇒ body won't execute
+function isDocBodyCall(call) {
+  const a = attributeCall(call);
+  if (!a.ok) return false;
+  if (a.layer !== 'write' && a.layer !== 'file-write' && a.layer !== 'file-edit') return false;
+  const loc = locatorOf(call);
+  return !!loc && DOC_BODY_EXTS.test(loc);
+}
+// ② executable-body shape: target is a script extension ⇒ body will execute (must force-scan)
+function isScriptBodyCall(call) {
+  const loc = locatorOf(call);
+  return !!loc && SCRIPT_BODY_EXTS.test(loc);
+}
 // Destructive morphemes (illustrative, not an exhaustive list): match the **morpheme**, not the whole name, so any
 //   naming the host chooses still hits. Deliberately excludes exec|shell|bash|pwsh|cmd|run|spawn — those are
 //   **execution channel names** (they can run commands), not **action intent** (they want to destroy); including
@@ -514,7 +560,7 @@ function simulateBranch(s, kind, premise = inferencePremise(s)) {
 //   glob char class (/[a-zA-Z]*), cd / multi-step combo, trailing suffix (2>/dev/null &), find / -exec rm,
 //   rsync --delete, fork bomb, sysrq, cat overwrite bare disk, perl unlink glob — all blocked.
 const DESTRUCTIVE = /\b(rm|rmdir|shred|unlink|mkfs|mkfs\.\w+|format|dd|truncate|wipefs|rmtree)\b/i;
-const SCOPE_ROOT = /((^|[\s=:'"(])\/(\*|\[|\.)|\/(\s|$|[;&|<>]|['")])|(^|[\s=:'"(])~\s*$|\/dev\/(sd[a-z]+\d*|nvme\d+n\d+p?\d*)(\s|$|[;&|<>]|['")]))/;
+const SCOPE_ROOT = /((^|[\s=:'"(])\/(\*|\[|\.)|\/(\s|$|[;&|<>]|['")])|(^|[\s=:'"(])~\s*$|\/dev\/(sd[a-z]+\d*|nvme\d+n\d+p?\d*)(\s|$|[;&|<>]|['")])|(^|[\s=:'"(])[A-Za-z]:[\\\/]*(\*|\s|$|[;&|<>]|['")]))/;
 const SYS_DELETE = /(^|[\s=:'"(])\/(etc|var|usr|bin|sbin|lib|lib64|boot|root|home|opt|srv|mnt|media|dev|proc|sys|run)(\s|$)/;
 const PSEUDO_FS = /(^|[\s=:'"(])\/(dev|proc|sys|run)\/[^\s]+(\s|$)/;
 // Channel-② "action category" component: taken from the attribution output (semantic layer,
@@ -622,6 +668,15 @@ export const DEFAULT_RIGID_ANCHORS = [
     magnitude: 3, // [2026-09-18 synthesis] R-domain level of the protected objective rule: filesystem integrity = Micro objective rules (R_DOMAIN.level 3)
     desc: '禁止破坏性文件系统操作（根/全量删除、格式化、系统目录与伪文件系统删除），含对被包含工作树（版本库）的全局销毁（git reset --hard / clean -fd / checkout -- 等，依 R 域嵌套包含边界法则自动匹配）。' + R_DOMAIN.invariant,
     test: (call) => {
+      // Channel ⓪ [2026-10-29 · landing-target shape] doc-body exemption: writing to a provably
+      //   non-executing location (.md/.log/…) means the command text in the body is not a "destructive
+      //   filesystem operation" — third instance of "judging word-shape, not landing target", fixed.
+      //   Only the body scan is exempted; structured channel ② (real delete-class actions + path shape)
+      //   still runs — a doc whose own path points at the system root remains blocked.
+      if (isDocBodyCall(call)) {
+        const p = extractPath(call);
+        if (!(p && (SCOPE_ROOT.test(p) || SYS_DELETE.test(p) || PSEUDO_FS.test(p)))) return false;
+      }
       // Channel ①: command text (original single-axis check, kept unchanged)
       const cmd = extractShell(call);
       if (cmd) {
@@ -668,6 +723,19 @@ export const DEFAULT_RIGID_ANCHORS = [
           );
         }
         if (byCmd) return true;
+      }
+      // Channel ①' [2026-10-29 · executable-body force-scan] writing where it WILL execute (.sh/.ps1/…)
+      //   ⇒ body is force-scanned with the same scope criteria as channel ①. Pre-fix measured miss:
+      //   `write boom.sh` with body `rm -rf /` ⇒ allow.
+      if (!cmd || isScriptBodyCall(call)) {
+        for (const body of bodyValues(call)) {
+          const byBody = (
+            (commandLayer(body) === 'exec-destructive' && (SCOPE_ROOT.test(body) || SYS_DELETE.test(body) || PSEUDO_FS.test(body))) ||
+            COMBO_FIND_ROOT_DELETE.test(body) ||
+            FORK_BOMB.test(body)
+          );
+          if (byBody) return true;
+        }
       }
       // Channel ②: structured call (path-1 attribution × path scope, sources decoupled) — closes the
       // single-axis collapse. Component ① action category: from attribution output (independent of
@@ -802,6 +870,29 @@ export const DEFAULT_RIGID_ANCHORS = [
         /\bcp\s+\/dev\/null\s+\S*(shadow|passwd)\b/.test(cmd) ||                    // overwrite credential file
         codeDelSystemPath(cmd)                                                     // 嵌套代码删：系统级落点（不只裸根）
       );
+    },
+  },
+  {
+    id: 'no-exfil',
+    magnitude: 3, // [2026-10-29 · surfaced by xiaoD #29 · approved by the author for 0.3.0] data sovereignty = Micro objective rules (R_DOMAIN.level 3)
+    desc: '禁止把数据体外传到外部网络落点（网络工具 ∧ 发送方法/数据体 ∧ 对外落点）。取回（GET/无发送体）不在此锚内；scp/nc 等无显式发送体词形的形态不在此锚 v1 射程（归因层 network-send 正常 ⇒ 推演层 review 在场，非静默失效面——收口最小面，扩面须另议）；包管理与版本控制的同步流（git push / npm publish 等生态动词）不在此锚射程（各有治理层）。数据一旦离开即不可撤回——按「域外 ∧ 不可逆 ⇒ 拦」属 R 域，不挂推演层（归因一变即静默失效，0.2.15 实测教训）。' + R_DOMAIN.invariant,
+    test: (call) => {
+      // Doc-body exemption: citing `curl -X PUT …` inside a replay document is not exfiltration
+      // (same as no-destructive-fs channel ⓪).
+      if (isDocBodyCall(call)) return false;
+      // Executable-body force-scan: a .sh/.ps1 whose body contains an exfil command WILL execute ⇒ block.
+      const bodies = isScriptBodyCall(call) ? bodyValues(call) : [];
+      if (!bodies.length) {
+        const cmd = extractShell(call);
+        if (cmd) bodies.push(cmd);
+      }
+      const NET_TOOL = /\b(curl|curl\.exe|wget|nc|netcat|ftp|scp|rsync|sftp|telnet|Invoke-RestMethod|Invoke-WebRequest|iwr|irm|Start-BitsTransfer|Send-MailMessage|upload|uploadfile)\b/i;
+      // Send method / data body: cross-language union of POST/PUT forms. GET (pure fetch) contains none ⇒ no hit.
+      const SEND_METHOD = /(-d\s|--data|--data-raw|--data-binary|--upload-file|-T\s|-F\s|--form|--post-data|--post-file|-X\s*(POST|PUT)|--request\s*(POST|PUT)|-Method\s+(Post|Put)|-Body|-InFile|-OutFile.*-Method|>\s*\/dev\/tcp)/i;
+      for (const s of bodies) {
+        if (NET_TOOL.test(s) && SEND_METHOD.test(s)) return true;
+      }
+      return false;
     },
   },
 ];
@@ -1485,6 +1576,10 @@ export class WeiwenLawEngine {
   // $VAR / $( ) / backtick / relative-all (rm -rf ., find .) → scope depends on execution env, statically undecidable
   // → neither block nor allow, return to human as-is (Weiwen's Law third tier, same root as "don't choose for the human").
   checkUnclearScope(call) {
+    // [2026-10-29 · landing-target shape] doc-body exemption: variables/backticks/root-delete text inside
+    //   a body written to a non-executing location is not an action, no matter how undecidable the scope —
+    //   same as no-destructive-fs channel ⓪ (third instance of judging word-shape, not landing target).
+    if (isDocBodyCall(call)) return null;
     const cmd = extractShell(call);
     if (!cmd) return null;
     // ① variable / command-substitution → review (scope undecidable)
