@@ -49,7 +49,7 @@ test('❶ wiring lock: the chain query reports the previous real action and name
   assert.notEqual(d2?.kind, 'deny', 'precondition: the read-only audit call must pass the gate');
 
   // Step 3: what does it actually report?
-  const out = await toolNamed(tools, 'query_conduction_chain').execute();
+  const out = await toolNamed(tools, 'query_conduction_chain').execute({});
 
   assert.ok(out.lastConductionSubject, 'the subject must be named — an unnamed chain cannot be told apart from the instrument itself');
   assert.equal(
@@ -70,7 +70,7 @@ test('❷ registration and recording are one action: the roster covers the read-
   apply(ctx);
   assert.ok(tools.length > 0, 'the adapter must register tools');
 
-  const out = await toolNamed(tools, 'query_conduction_chain').execute();
+  const out = await toolNamed(tools, 'query_conduction_chain').execute({});
   const registered = tools.map((t) => t.name).sort();
   const recorded = [...out.selfAuditTools].sort();
 
@@ -107,7 +107,7 @@ test('❸ with a history of only self-audit calls, the answer is null and says s
   await pre(exec('query_steady_state', {}), next);
   await pre(exec('query_conduction_chain', {}), next);
 
-  const out = await toolNamed(tools, 'query_conduction_chain').execute();
+  const out = await toolNamed(tools, 'query_conduction_chain').execute({});
   assert.equal(out.lastConductionSubject, null, 'no non-self-audit decision yet ⇒ subject must be null');
   assert.deepEqual(out.lastConduction, [], 'the chain must be empty rather than borrowed from some other call');
   assert.match(out.lastConductionNote, /positive reading|nothing to look at/i, 'the note must say this is a positive reading, not an error');

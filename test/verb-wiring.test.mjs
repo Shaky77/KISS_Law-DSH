@@ -1153,8 +1153,11 @@ test('79 工具面：query_tension 带出 hUmbrella/hFacets/seam；wants 给了�
   const tools = [];
   await mod.apply({ on() {}, tools: { register: (t) => tools.push(t) } });
   const qt = tools.find((t) => t.name === 'query_tension');
-  assert.ok(qt.parameters.wants, '参数表须声明 wants');
-  assert.ok(qt.parameters.selfReadsAs, '参数表须声明 selfReadsAs');
+  // ⚠️ 运行时参数表已被 defineTool 规范化为 JSON Schema（{type, properties}），
+  //    故须走 `.properties` —— 直接取 `qt.parameters.wants` 恒 undefined（不是没声明）。
+  const qtParams = qt.parameters?.properties ?? qt.parameters ?? {};
+  assert.ok(qtParams.wants, '参数表须声明 wants');
+  assert.ok(qtParams.selfReadsAs, '参数表须声明 selfReadsAs');
 
   const a = await qt.execute({ tol: 5, dev: 7 });
   assert.ok(a.hUmbrella && a.hFacets && a.seam, '面向结构须始终在场');
@@ -1194,7 +1197,9 @@ test('80 公式准入律：能进公式的 H 全部是外 H；"不在输入集" 
   const tools = [];
   await mod.apply({ on() {}, tools: { register: (t) => tools.push(t) } });
   const qt = tools.find((t) => t.name === 'query_tension');
-  assert.ok(qt.parameters.inFormula, '参数表须声明 inFormula');
+  // ⚠️ 同上：运行时参数表已被 defineTool 规范化为 JSON Schema（{type, properties}），须走 `.properties`。
+  const qtParams = qt.parameters?.properties ?? qt.parameters ?? {};
+  assert.ok(qtParams.inFormula, '参数表须声明 inFormula');
   const a = await qt.execute({ tol: 5, dev: 7 });
   assert.ok(a.formulaInput, '准入律须始终在场');
   assert.strictEqual(a.formulaInputNow, undefined, '未传 ⇒ 不判（≠ 在内，也 ≠ 不在）');

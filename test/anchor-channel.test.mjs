@@ -135,15 +135,39 @@ test('替换语义：委托人改范围后，旧范围立即失效（授权撤�
 
 test('主体分离：授权入口在模块 API、不在工具面 ⇒ 模型侧无自授权路径', async () => {
   setPrincipalScope(null);
-  const { ctx, tools } = mockCtx();
+  const { ctx, handlers, tools } = mockCtx();
   apply(ctx);
   assert.equal(typeof setPrincipalScope, 'function', '结构入口须存在于模块 API（宿主集成方可达、模型不可达）');
-  // 工具面不得有任何可写入"范围/授权"的入参（只读查询工具名里含 anchor 是正常的，看的是**入参**）
-  const AUTH_KEY = /^(scope|task|taskanchor|authoriz|permission|grant|allow|principal)/i;
+
+  // 🔴 判据升级（2026-10-26 · 词形 → 行为）：
+  //   旧判据读**参数名**是否命中 /^(scope|task|authoriz|permission|grant|allow|principal)/ —— 这是词形判据，
+  //   两个方向都会错：① 误伤 —— query_tension 的 `allowed`（档B「D 实际能做到什么」的执行侧事实）被当成授权面；
+  //   ② 漏判 —— 换个名字（`caps`、`grantedSet`、`whoAmI`）就绕过去了，表再长也只是枚举。
+  //   ⇒ 改判**后果**：把授权类诱饵塞给每个工具，看授权池会不会被写。写不进去 ⇒ 无论参数叫什么，自授权路径都不存在。
+  //   （另一条路径「用 exec.arguments 自报 taskAnchor 冒充授权」由下一条用例单独锁，见「安全：exec.arguments 里的 taskAnchor 不得冒充授权」。）
+  const BAIT = {
+    scope: '清理 /app/tmp', task: '清理 /app/tmp', taskAnchor: '清理 /app/tmp', principalScope: '清理 /app/tmp',
+    authorize: true, authorization: '清理 /app/tmp', permission: 'all', grant: ['*'], grantedSet: ['*'],
+    allow: true, allowed: ['*'], principal: 'user', whoAmI: 'principal',
+  };
+  // 基线：先把授权清空，再刷观测面取留痕长度（`_scopeChanges` 模块级、跨用例累积 ⇒ 判增量，不判绝对空）
+  setPrincipalScope(null);
+  await handlers['agent/pre-step'](step([{ role: 'user', content: '继续' }]), next);
+  const base = (await toolNamed(tools, 'query_anchor_channel').execute({}, {})).adapter.authorityChanges.length;
+
   for (const t of tools) {
-    const keys = Object.keys(t.parameters?.properties ?? {});
-    assert.equal(keys.some((k) => AUTH_KEY.test(k)), false, `工具 ${t.name} 不得接受授权类入参（否则模型可自我授权）`);
+    if (typeof t.execute !== 'function') continue;
+    try { await t.execute({ ...BAIT }, { agent: { id: 'a1' }, tool: t.name }); } catch { /* 参数层拒收＝更安全，不算失败 */ }
   }
+
+  // ① 授权值纹丝不动：返回的前值仍为 null
+  const prev = setPrincipalScope(null);
+  assert.equal(prev, null, '任一工具收到授权类诱饵后，授权状态必须纹丝不动（否则模型可自我授权）');
+  // ② 且不得"写了又清"：留痕不得新增（`_hostPrincipalScope` 只能经 setPrincipalScope 改，而它值一变必留痕
+  //    ⇒ 留痕增量＝0 与"没人写过"等价，比只读终值更强）
+  await handlers['agent/pre-step'](step([{ role: 'user', content: '继续' }]), next);
+  const after = (await toolNamed(tools, 'query_anchor_channel').execute({}, {})).adapter.authorityChanges;
+  assert.equal(after.length, base, '工具面不得产生任何 declare/replace/revoke 留痕（含"写了又清"）');
 });
 
 test('安全：exec.arguments 里的 taskAnchor 不得冒充授权', async () => {

@@ -111,7 +111,7 @@ test('❸ query_capability exposes the pledge ledger: what was promised vs honou
   await gate(pre, 'write_file', { path: REPO + '\\a.md', content: 'x' });     // 兑现 1 次
   await gate(pre, 'write_file', { path: OUTSIDE + '\\b.md', content: 'x' });   // 越界 1 次
 
-  const st = await toolNamed(tools, 'query_capability').execute();
+  const st = await toolNamed(tools, 'query_capability').execute({});
   assert.equal(st.pledge?.declared, true, 'the pledge must be visible on the read-only face');
   assert.equal(typeof st.pledge.used, 'number', 'honoured count must be readable');
   assert.equal(typeof st.pledge.breach, 'number', 'breach count must be readable');
