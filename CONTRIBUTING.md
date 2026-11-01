@@ -34,6 +34,5 @@ distribute your contribution under both licenses.
 
 ## Other conventions
 
-- The canonical conduction chain is **R→S→D→H→M** (codename `RSDHM`, matching alphabetical order). **Do not use the legacy spelling `RDSHM`.**
 - The framework body (mind layer) is frozen in the base repos (`Shaky77/Weiwen-s_Law`, `Shaky77/KISS-s_Law`); this live-system repo carries engineering iteration only.
 - Please attach the `npm test` output (tests / pass / fail) to your PR.

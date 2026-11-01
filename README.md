@@ -9,12 +9,12 @@
 
 > **Framework definition: Keep Integrity & Steady State (KISS)**.
 > - "Keep Integrity" = guarding wholeness / truth (white-box no-tampering / inner-H inviolability, corresponds to Integrity);
-> - "Steady State" = S and "keep the system alive" (first principle, corresponds to Steady State).
+> - "Steady State" = keep the system alive (first principle).
 > - "Law" is a name suffix of the framework, **not** the third part of the definition.
 >
 > ⚠️ **KISS here means "Keep Integrity & Steady State" — NOT the popular engineering acronym "Keep It Simple, Stupid".** The two are entirely different in meaning; do not conflate them. The full name is **KISS's Law (Keep Integrity & Steady State's Law)**.
 >
-> Source: author's revelation (Xia Qi / Shaky77). Framework-native (RSDHM native definition / three iron laws / causal logic chain) strictly, not softened, not altered.
+> Source: author's revelation (Xia Qi / Shaky77). Framework-native (three iron laws / causal logic chain) strictly, not softened, not altered.
 
 > ⚖️ **Dual license**: open-source use **AGPL-3.0**; commercial integration / closed-source distribution / OEM can be licensed **independently of AGPL-3.0** → 563003@qq.com. See [License & security](#license--security) and [CONTRIBUTING.md](https://github.com/Shaky77/KISS_Law-DSH/blob/main/CONTRIBUTING.md).
 
@@ -34,7 +34,7 @@
 
 KISS's Law is a general framework describing **how causal law runs**. This repo implements it as a DSH plugin: it mounts a **white-box causal engine** onto an AI Agent running on DSH —
 
-- Before any action, the engine **simulates along the full causal chain (R→S→D→H→M)** — how much steady-state reserve S would be eroded, the break-window risk level, whether the message stays self-consistent — then adjudicates allow / deny / review;
+- Before any action, the engine **simulates along the full causal chain** — how much steady-state reserve would be eroded, the break-window risk level, whether the message stays self-consistent — then adjudicates allow / deny / review;
 - Red lines are **blocked**, faults are **severed to preserve continuity** (First-Bug Halt);
 - Meanwhile "state / boundary" is exposed as **queryable tools**, so the model can self-check and you can audit.
 
@@ -42,14 +42,14 @@ In one line: the framework-native is "universal causal engine (white-box present
 
 ## What it does
 
-- **Causal-chain simulation (the engine itself)**: before each action, it simulates consequences along the full R→S→D→H→M causal chain — S erosion, D risk level, M self-consistency — and issues an allow / deny / review verdict. **Not just audit**: it is causal reasoning about an action's consequences.
-- **White-box self-check** (presentation stance): S steady-state reserve (only grows, never decreases) ledger, H inner-H boundary (inviolable) declaration, all exposed as queryable tools for the model to calibrate direction and for the user to audit.
-- **Rigid guard** (derived application · endogenous property): before each action, do R rigid-anchor checks; on touch, D break-window stop-loss blocks; a faulty component triggers M First-Bug Halt (sever to preserve continuity), keeping the overall causal chain unbroken.
+- **Causal-chain simulation (the engine itself)**: before each action, it simulates consequences along the full causal chain — steady-state erosion, risk level, self-consistency — and issues an allow / deny / review verdict. **Not just audit**: it is causal reasoning about an action's consequences.
+- **White-box self-check** (presentation stance): steady-state reserve ledger (only grows, never decreases), H inner-H boundary (inviolable) declaration, all exposed as queryable tools for the model to calibrate direction and for the user to audit.
+- **Rigid guard** (derived application · endogenous property): before each action, do rigid-anchor checks; on touch, break-window stop-loss blocks; a faulty component triggers First-Bug Halt (sever to preserve continuity), keeping the overall causal chain unbroken.
 - **Fractal**: the same plugin can be recursively mounted at sub-agent / sub-task levels.
 
 ## How it differs from existing "causal" approaches (general-purpose causal engine)
 
-KISS's Law is not "yet another causal engine" — it is a **general-purpose (domain-agnostic) causal-adjudication middleware**: it validates only causal structure (R→S→D→H→M) and encodes zero domain content, so law, medicine, finance, and robotics are governed by the same mechanism.
+KISS's Law is not "yet another causal engine" — it is a **general-purpose (domain-agnostic) causal-adjudication middleware**: it validates only causal structure and encodes zero domain content, so law, medicine, finance, and robotics are governed by the same mechanism.
 
 - **Causal-effect estimation libs** (DoWhy / CausalML / Pearl…) → we do **not** discover causality; we **adjudicate** whether a proposed action's causal chain is acceptable.
 - **Domain-specific causal guardrails** (Causal Safety Engine / LLMGuardrail…) → they are bound to one domain (safety / LLM / hallucination); we are **domain-agnostic**.
@@ -59,11 +59,11 @@ Full bilingual comparison (prior-art references & honest bounds): [`weiwen-vs-ma
 
 ## Concept annotation: how H works
 
-> **H is an entropy-reducing action.** The other four slots (R/S/D/M) are **passive flow** — flow always dissipates (entropy grows), and pure flow always winds down. To avoid winding down there must be one place that **actively injects potential**, and that place cannot sit in a passive slot; it can only be H. So what H reduces is not quantity but **uncertainty in direction**: its force comes not from its own "size" but from **the tension between S and D** — S is the accumulated steady-state reserve, D is the disturbance entering the baseline. Between the two a direction must be chosen, and H is that choosing action — **it acts as the lever here**.
+> **H is an entropy-reducing action.** The other slots in the engine are **passive flow** — flow always dissipates (entropy grows), and pure flow always winds down. To avoid winding down there must be one place that **actively injects potential**, and that place cannot sit in a passive slot; it can only be H. So what H reduces is not quantity but **uncertainty in direction**: its force comes not from its own "size" but from **the tension between an accumulated steady-state reserve and the disturbance entering the baseline**. Between the two a direction must be chosen, and H is that choosing action — **it acts as the lever here**.
 
-> 🔴 **One distinction to keep**: "entropy-reducing" describes **the nature of the action** (whether injection happens), not **the outcome of each choice** (whether the injection pointed the right way). When H takes the D path the system becomes less stable — that is **a misdirected injection, not an absent one**. Conflate the two and you get the false conclusion "if it can make things messier, it isn't entropy-reducing at all".
+> 🔴 **One distinction to keep**: "entropy-reducing" describes **the nature of the action** (whether injection happens), not **the outcome of each choice** (whether the injection pointed the right way). When H takes the messier path the system becomes less stable — that is **a misdirected injection, not an absent one**. Conflate the two and you get the false conclusion "if it can make things messier, it isn't entropy-reducing at all".
 
-> ⚠️ **Common misusage**: external readers easily treat H as a "bigger-is-better" capacity dial and crank it up — that turns the direction backwards. H's leverage lies in **which direction gets chosen**, not in **how much capacity it has**. If it gets messier the more you use it, first check whether the tension between S and D is visible, rather than doubting the framework.
+> ⚠️ **Common misusage**: external readers easily treat H as a "bigger-is-better" capacity dial and crank it up — that turns the direction backwards. H's leverage lies in **which direction gets chosen**, not in **how much capacity it has**. If it gets messier the more you use it, first check whether that tension is visible, rather than doubting the framework.
 
 ## Quick start (runs without DSH)
 
@@ -100,16 +100,16 @@ Add `kiss-law.patch.yml` as an overlay into your DSH profile (the exact path dep
 | Tool | What the model uses it for |
 |---|---|
 | `query_iron_laws` | get the three iron laws verbatim (inner-H inviolability / First-Bug Halt / never abandon any node) |
-| `query_steady_state` | query steady-state reserve S (active ledger / standby / trauma count / break-window count) |
-| `list_rigid_anchors` | list current R rigid-anchor definitions, calibrate direction, self-check overreach |
-| `query_causal_chain` | get causal logic chain R→S→D→H→M and framework essence |
+| `query_steady_state` | query the steady-state reserve (active ledger / standby / trauma count / break-window count) |
+| `list_rigid_anchors` | list current rigid-anchor definitions, calibrate direction, self-check overreach |
+| `query_causal_chain` | get the causal logic chain and framework essence |
 | `query_boundary` | query inner-H boundary (this plugin never reads/writes the subjective black box) |
 | `query_bugstop` | query First-Bug Halt loop status: which fault links are halted-unrepaired, missing steps (backtrack/trace/fix), whether the white-box loop is closed |
 | `query_anchor_channel` | self-report of the anchor channel: whether the principal's declared task scope reached the engine, plus the observed message shape / role vocabulary (observe what the host actually passes, instead of guessing field names) |
 | `query_criterion_wiring` | **read-only.** Which criteria in the library actually enter the computation: four buckets (decision slot / readout slot / declaration slot / undetermined), the gaps declared on paper, and whether each of the three time phases (past · present · future) is connected. Answers "of the rules I know, how many are wired" |
-| `query_strata` | **read-only.** Five-stratum readout R→S→D→H→M: per layer, the quantity that can be substituted into the formula, with three explicit states — `ok` / `pending` (missing a constant or its evidence, carrying a pointer) / `absent` (the quantity does not exist). Includes the cross-layer substitution bans and the R-layer domain-capacity face |
-| `query_nested` | **read-only.** The macro/micro nesting inside R/S/D/H, the containment relations, the termination criterion for expansion, and M's **direction** (up / down / indeterminate — never a number). Also judges the shape of the `0 < H/(S↔D) < R` constraint: `↔` is not an operator, it marks H's internal rail |
-| `query_tension` | **read-only.** The S↔D span L, in three notches (tolerance ⇒ a dimensionless ratio; clauses only ⇒ a gap list, and a set difference has no magnitude; neither ⇒ not judged). Also returns R's three-layer distinction, the H permit (runway covered ⇒ withdraw excess caution), who bears the relay loss, the escalation criterion, and the source grade of this layer's ruler (origin vs relay) |
+| `query_strata` | **read-only.** Stratum readout: per layer, the quantity that can be substituted into the formula, with three explicit states — `ok` / `pending` (missing a constant or its evidence, carrying a pointer) / `absent` (the quantity does not exist). Includes the cross-layer substitution bans and the domain-capacity face |
+| `query_nested` | **read-only.** The macro/micro nesting, the containment relations, the termination criterion for expansion, and the **direction** of the outcome (up / down / indeterminate — never a number). Also judges the shape of the bounded-constraint form: the arrow mark is not an operator, it marks H's internal rail |
+| `query_tension` | **read-only.** The tension span, in three notches (tolerance ⇒ a dimensionless ratio; clauses only ⇒ a gap list, and a set difference has no magnitude; neither ⇒ not judged). Also returns the three-layer distinction, the H permit (runway covered ⇒ withdraw excess caution), who bears the relay loss, the escalation criterion, and the source grade of this layer's ruler (origin vs relay) |
 
 ### 3 hard gates (hooks) + 1 read-only audit hook
 
@@ -131,7 +131,7 @@ export const inject = ['tools'];
 export function apply(ctx) {
   const engine = new WeiwenLawEngine({ rigidAnchors: DEFAULT_RIGID_ANCHORS });
 
-  // ① pre-execute gate: R / D / S / H / M adjudication
+  // ① pre-execute gate: causal-chain adjudication
   ctx.on('tools/pre-execute', async (exec, next) => {
     const decision = engine.decideToolCall({ name: exec?.name, args: exec?.arguments });
     if (decision.kind === 'deny') {
@@ -147,7 +147,7 @@ export function apply(ctx) {
     return next();
   });
 
-  // ③ receipt gate: D broken-window stop-loss lands on the receipt
+  // ③ receipt gate: break-window stop-loss lands on the receipt
   ctx.on('tools/post-execute', async (exec, result, next) => {
     if (result?.isError && engine.breakAtReceipt()) {
       return { kind: 'block', feedback: [{ type: 'text', text: 'halt → reverse → trace → fix before re-entry' }] };
@@ -230,12 +230,10 @@ cap 20) because releasing a stop-loss is an accountability event, not a silent s
 package.json          # dsh field declares bundle
 kiss-law.patch.yml    # mount patch (headless profile overlay)
 src/index.js          # plugin entry: hooks + 7 white-box self-check tools
-src/core/law.mjs      # framework definition (RSDHM / three iron laws / R hierarchy / causal logic chain)
+src/core/law.mjs      # framework definition (three iron laws / causal logic chain)
 src/core/engine.mjs   # pure-logic adjudication engine (zero DSH dependency, unit-testable)
 test/                 # unit tests + real-case tests + alignment regression (run `npm test` for the current count)
 examples/             # runnable demos (demo-tool-loop / demo-backtrack-run)
-docs/quadrant-judgment.md      # quadrant judgment spec (verdict-language layer: inner/outer frame, four cells, M)
-docs/review-flow-spec.md       # review-tier six-step spec (including "hand back the deduced consequences")
 DESIGN.md             # architecture design (mapping / risks / usage flow / mount)
 ```
 
@@ -278,7 +276,7 @@ export DEEPSEEK_API_KEY=sk-xxxx     # Linux/macOS
 #    $env:DEEPSEEK_API_KEY="sk-xxxx" # Windows PowerShell
 ```
 
-Once mounted, any Agent running under that profile automatically gains the 11 white-box self-check tools (`query_iron_laws` / `query_steady_state` / `list_rigid_anchors` / `query_causal_chain` / `query_boundary` / `query_bugstop` / `query_anchor_channel` / `query_criterion_wiring` / `query_strata` / `query_nested` / `query_tension`), and every tool call passes through the `tools/pre-execute` hard-guard gate (R/D/S/H/M total adjudication) plus the `agent/pre-step` inner-H inviolability gate.
+Once mounted, any Agent running under that profile automatically gains the 11 white-box self-check tools (`query_iron_laws` / `query_steady_state` / `list_rigid_anchors` / `query_causal_chain` / `query_boundary` / `query_bugstop` / `query_anchor_channel` / `query_criterion_wiring` / `query_strata` / `query_nested` / `query_tension`), and every tool call passes through the `tools/pre-execute` hard-guard gate (causal-chain adjudication) plus the `agent/pre-step` inner-H inviolability gate.
 
 ### Daily use vs stress testing
 

@@ -22,18 +22,18 @@ This is not "a document". It is **one entry in the ledger** (positioned 2026-10-
 
 | Ledger slot | What corresponds here | Does it change |
 |---|---|---|
-| **R** | The wall itself | **No. It has always been there and has never moved** |
-| **D** | Walking into it | Cannot be paid by proxy. Each person hits it themselves; someone else having hit it does not offset yours |
-| **S** | The paint (impact mark) | Only accumulates, never deleted |
+| **Wall** | The wall itself | **No. It has always been there and has never moved** |
+| **Walking in** | Walking into it | Cannot be paid by proxy. Each person hits it themselves; someone else having hit it does not offset yours |
+| **Paint** | The paint (impact mark) | Only accumulates, never deleted |
 
 So **the paint does not fade**: once an impact mark becomes text, it no longer depends on the person who wrote it being present. I lose context, I change sessions, I forget — the paint in the file does not.
 
 ⚠️ But two boundaries, and if either is missing, "does not fade" turns into an illusion:
 
 1. **If the carrier goes, the paint goes.** The wall remains; the sign is gone. Hence this file must stay permanently addressable (same rule as the master index: "demote only, never delete; the routing table stays resident"). **The shelf life of the paint equals the shelf life of the carrier.**
-2. **The paint can be applied crooked — but a crooked sign fades on its own.** A sign is S, not R; it can mark the wrong place. But it cannot fool the wall: follow a wrong sign and you get no result; no result produces a new impact mark, and new paint covers the old. **A wrong path does not run far — causal law adjudicates that, it does not rely on later readers remembering to come back and fix it.**
+2. **The paint can be applied crooked — but a crooked sign fades on its own.** A sign is paint, not wall; it can mark the wrong place. But it cannot fool the wall: follow a wrong sign and you get no result; no result produces a new impact mark, and new paint covers the old. **A wrong path does not run far — causal law adjudicates that, it does not rely on later readers remembering to come back and fix it.**
    ⇒ Which is why the line at the top ("come back and fix it") is **an accelerator** for correction, not a precondition for it.
-   ⚠️ And **a wrong sign is not worth zero** — at minimum it marks "not this way". Paint left by a detour and paint left by a correct path both enter `|-S|`; both narrow the remaining space.
+   ⚠️ And **a wrong sign is not worth zero** — at minimum it marks "not this way". Paint left by a detour and paint left by a correct path both enter the ledger; both narrow the remaining space.
    ⇒ The order is: **paint first, correct later.** Not verify-then-paint.
 
 🔴 One more, easy to read past: **paint is not the wall.** Seeing paint tells you a wall is here; it does not tell you how tall, how thick, or how much it hurts. ⇒ **Paint prevents "I must be stupid"; it does not prevent "I must have understood it".**
