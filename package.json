@@ -84,5 +84,8 @@
     "@deepseek-ai/dsh-tools": {
       "optional": true
     }
+  },
+  "devDependencies": {
+    "@deepseek-ai/dsh-tools": "0.0.1-rc.1"
   }
 }
