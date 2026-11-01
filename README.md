@@ -1,5 +1,10 @@
 # dsh-kiss-law
 
+> 📦 **npm release source**｜package `dsh-kiss-law`｜latest published **0.2.15**
+>
+> This repo is the release source for the [npm package `dsh-kiss-law`](https://www.npmjs.com/package/dsh-kiss-law). Install: `npm i dsh-kiss-law`.
+> The version in `package.json` tracks the **next** release; the latest published version is the one on npm.
+
 **KISS's Law universal causal engine (white-box presentation)** —— implemented as a **Cordis plugin of DeepSeek Harness (DSH)**.
 
 > **Framework definition: Keep Integrity & Steady State (KISS)**.
