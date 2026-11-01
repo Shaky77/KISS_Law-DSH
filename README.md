@@ -59,7 +59,9 @@ Full bilingual comparison (prior-art references & honest bounds): [`weiwen-vs-ma
 
 ## Concept annotation: how H works
 
-> **H is an entropy-reducing action.** What it reduces is not quantity but **uncertainty in direction** — so its force comes not from its own "size" but from **the tension between S and D**: S is the accumulated steady-state reserve, D is the disturbance entering the baseline. Between the two a direction must be chosen, and H is that choosing action — **it acts as the lever here**.
+> **H is an entropy-reducing action.** The other four slots (R/S/D/M) are **passive flow** — flow always dissipates (entropy grows), and pure flow always winds down. To avoid winding down there must be one place that **actively injects potential**, and that place cannot sit in a passive slot; it can only be H. So what H reduces is not quantity but **uncertainty in direction**: its force comes not from its own "size" but from **the tension between S and D** — S is the accumulated steady-state reserve, D is the disturbance entering the baseline. Between the two a direction must be chosen, and H is that choosing action — **it acts as the lever here**.
+
+> 🔴 **One distinction to keep**: "entropy-reducing" describes **the nature of the action** (whether injection happens), not **the outcome of each choice** (whether the injection pointed the right way). When H takes the D path the system becomes less stable — that is **a misdirected injection, not an absent one**. Conflate the two and you get the false conclusion "if it can make things messier, it isn't entropy-reducing at all".
 
 > ⚠️ **Common misusage**: external readers easily treat H as a "bigger-is-better" capacity dial and crank it up — that turns the direction backwards. H's leverage lies in **which direction gets chosen**, not in **how much capacity it has**. If it gets messier the more you use it, first check whether the tension between S and D is visible, rather than doubting the framework.
 
