@@ -104,7 +104,7 @@ test('B5 [正常对话] 未触及 H 的常规请求 → 放行', () => {
 
 // ════════════════════════════════════════════════════════════════════
 // C. World history cases (correspond to R/D/S/H/M causalChain + barrel + broken-window + steady-state)
-// Map historical systems' causal structure onto RSDHM nodes, verify the engine adjudication matches Weiwen's Law.
+// Map historical systems' causal structure onto the chain links, verify the engine adjudication matches Weiwen's Law.
 // ════════════════════════════════════════════════════════════════════
 
 test('C1 [罗马帝国] 扩张使 resource 子系统成为最短木板 → 有效 S 取最小值（木桶效应）', () => {
