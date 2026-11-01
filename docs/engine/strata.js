@@ -366,7 +366,7 @@ criterionSourceNote: 'S 层量（公式分子）⇒ 公式内；**两源一致�
   {
     layer: 'D',
     name: '扰动 / 脆弱性',
-    criterion: 'RSDHM.D',
+    criterion: 'CHAIN_NODES.D',
     formula: 'D_impact ∝ 不可逆性（scar ≫ window > none），不 ∝ 发生次数',
     quantities: [
       {
@@ -527,7 +527,7 @@ criterionSourceNote: 'M 层量（前向推演接线）⇒ 公式内。',
 //   小D 的核心观察（经我独立复核**成立**）：引擎跑的是**闸门**，不是**因果律计算**——
 //     · 公式 M = (R×S)/(D×H) 在实现层**零命中**（readout.mjs R_EXPANSION.gap 已登记）；
 //     · strata 的 M 层只有 mConcentration（落点集中度，**不是 M**）/ mDirection(pending) / mForwardWired(absent)；
-//     · 框架原文（weiwen_framework L1604）：「公式 ＝ **截面**；活系统 ＝ **循环**：R→S→D→H→M→S′」，
+//     · 框架原文（weiwen_framework L1604）：「公式 ＝ **截面**；活系统 ＝ **循环**」，
 //       且「S 在链上应出现**两次**：M 之前读入（本圈基线）、M 之后写成 S′（下圈基线）」。
 //   ⇒ **「公式没跑」是真的**（不是小D 的误读）。
 //

@@ -94,7 +94,7 @@ import { commandLayer } from './core/attribution.mjs';
 //   No verdict, no state writes, no gate participation — meta-cognition may READ, never RULE
 //   (docs/runway-and-criterion §4).
 import { readout as criterionReadout } from './core/readout.mjs';
-// [2026-10-21] Five-stratum readout (R→S→D→H→M, each layer given a substitutable quantity).
+// [2026-10-21] Stratum readout (each layer given a substitutable quantity).
 import { strataReadout, dataSurface as strataDataSurface, mComputability, FORMULA_VARS } from './core/strata.mjs';
 // [2026-10-21] Four-layer nesting (macro/micro inside R/S/D/H) + M's directional form.
 import { NESTED_VARS, M_CONSTRAINT, mDirection, mTwoLayer, mConstraintShape, nestAudit } from './core/nested.mjs';
@@ -1711,7 +1711,7 @@ function apply(ctx) {
 
   registerSelfAuditTool(defineTool({
     name: 'list_rigid_anchors',
-    description: 'List the currently effective definition of R rigid anchors in RSDHM, for the model to calibrate direction and self-check whether out of bounds.',
+    description: 'List the currently effective definition of rigid anchors, for the model to calibrate direction and self-check whether out of bounds.',
     parameters: {},
     output: { schema: { type: 'object', additionalProperties: true }, render: renderObj },
     async execute() {
@@ -1725,7 +1725,7 @@ function apply(ctx) {
 
   registerSelfAuditTool(defineTool({
     name: 'query_causal_chain',
-    description: 'Return the causalChain-chain order R→S→D→H→M and the framework essence, plus the **actual chain landing of the most recent decision** (per-node readings and verdict), so the model can understand the closed-loop structure and audit the basis of the latest verdict.',
+    description: 'Return the causal-chain order and the framework essence, plus the **actual chain landing of the most recent decision** (per-node readings and verdict), so the model can understand the closed-loop structure and audit the basis of the latest verdict.',
     parameters: {},
     output: { schema: { type: 'object', additionalProperties: true }, render: renderObj },
     async execute() {
@@ -1747,7 +1747,7 @@ function apply(ctx) {
         // [2026-09-24 · white-box carry-through] Before, this tool **returned a constant**: no matter what had happened, you read the same text
         //   ⇒ a surface that looks like a white-box query but is in fact a black box (nobody outside can re-derive any single verdict from it).
         //   Meanwhile the chain landing of the latest decision has **always been present** on the engine side
-        //   (each R→S→D→H→M node carries sBefore/sAfter/delta/verdict readings) ⇒ echo it as-is, unprocessed.
+        //   (each node carries sBefore/sAfter/delta/verdict readings) ⇒ echo it as-is, unprocessed.
         //   No new criterion, no change to adjudication, no field-picking (same rule: faithful by position, never summarised by name).
         lastCausalChain: subject ? subject.causalChain : [],
         // The subject must be **named**: without "whose chain is this", the reader cannot tell whether they are
@@ -1913,10 +1913,10 @@ function apply(ctx) {
     },
   }));
 
-  // ── 五层推演读数（R→S→D→H→M，逐层给「可代入量」）──────────────────
+  // ── 分层推演读数（逐层给「可代入量」）──────────────────
   registerSelfAuditTool(defineTool({
     name: 'query_strata',
-    description: 'Five-stratum readout (read-only): walks R→S→D→H→M and returns, per layer, the quantities that can actually be substituted into the formula — each with its expression and with "where it stops". Three states are explicit: ok (computable now) / pending (missing a constant or its evidence, carrying a TBD pointer) / absent (the quantity does not exist in the implementation). Also returns the cross-layer substitution bans (e.g. ΣS and S_now aggregate in opposite directions and may not stand in for each other). The R layer additionally exposes the domain-capacity face: p_max (evidenced standard value) / N_opp (denominator, absent in the engine) / R₀ (= p×N) / rCapRoute (which formula this domain should use), plus a domain-table health check that counts "malformed entry" separately from "legal standard that gives no number". Changes no allow/deny verdict.',
+    description: 'Stratum readout (read-only): walks the chain and returns, per layer, the quantities that can actually be substituted into the formula — each with its expression and with "where it stops". Three states are explicit: ok (computable now) / pending (missing a constant or its evidence, carrying a TBD pointer) / absent (the quantity does not exist in the implementation). Also returns the cross-layer substitution bans (e.g. ΣS and S_now aggregate in opposite directions and may not stand in for each other). The R layer additionally exposes the domain-capacity face: p_max (evidenced standard value) / N_opp (denominator, absent in the engine) / R₀ (= p×N) / rCapRoute (which formula this domain should use), plus a domain-table health check that counts "malformed entry" separately from "legal standard that gives no number". Changes no allow/deny verdict.',
     parameters: {},
     output: { schema: { type: 'object', additionalProperties: true }, render: renderObj },
     async execute() {

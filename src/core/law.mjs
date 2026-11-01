@@ -24,10 +24,10 @@ export const KISS_DEFINITION = {
   notToBeConfusedWith: "the engineering acronym 'Keep It Simple, Stupid' (KISS) — entirely different meaning, do not conflate",
 };
 
-// ---------------- RSDHM five nodes (native definition; node ≠ rule; letter-order IS causalChain order R→S→D→H→M) ----------------
+// ---------------- Causal logic chain (native definition; node ≠ rule) ----------------
 // Layering: R (boundary) → S (steady-state baseline) → D (perturbation input) → H (lever choice) → M (steady-state result).
 // Variables are not pre-assigned numeric values; only structure/semantics are defined.
-export const RSDHM = {
+export const CHAIN_NODES = {
   R: {
     key: 'R',
     name: 'Objective rule (anchor proper) · domain = its scope-fixing means',
@@ -39,7 +39,7 @@ export const RSDHM = {
     desc: 'R\'s proper self = **objective rule**: the objective rule itself is the anchor, its rigidity coming from "not shifting with subjectivity", hence it is the invariant anchor of the causal chain. The domain (Cosmic ⊃ Earth ⊃ Macro ⊃ Micro, see R_DOMAIN) **is the scope fixed by that anchor (domain-fixing)** — R\'s landing form and magnitude scale, **not R itself**. ⇒ Decision order: **first test "is any objective rule touched" (proper-self test), then "which domain level that rule belongs to" (domain-fixing)**. The parent-chain R is invariant (civilization does not perish); the child-chain R can evolve under S\'s feedback (civilization advances) — 🔴 **the qualification for feedback (= "nailing onto the Y axis") is in `R_EXPANSION.qualification`: only S sedimented through M feedback qualifies; the X-axis enumeration of R (incl. domain sub-division) does not**. R draws the system boundary and is the prerequisite for all subsequent causalChain.',
     invariant: true, // cannot be overridden by any runtime step
     significance: {
-      // 🔴 [2026-10-06 · RSDHM significance-layer completion] Author, 2026-10-05 01:58; definition layer (self-description), NOT a criterion slot.
+      // 🔴 [2026-10-06 · significance-layer completion] Author, 2026-10-05 01:58; definition layer (self-description), NOT a criterion slot.
       constancy: 'constant',
       objectivity: 'objective',
       uniqueness: ['the only invariant in the parent chain'],
@@ -141,7 +141,7 @@ export const RSDHM = {
   },
 };
 
-// ---------------- RSDHM "significance of each variable" table (definition layer · author, 2026-10-05 01:58) ----------------
+// ---------------- "significance of each variable" table (definition layer · author, 2026-10-05 01:58) ----------------
 // 🔴 Definition layer (self-description) completion, NOT a criterion slot — must not be used as an anchor-match list / classifier / dispatch switch.
 //   Same nature as `R_DOMAIN.domainExamples` (annotation slot, not criterion slot); no criterion logic is changed (behaviour-invariant).
 //
@@ -156,7 +156,7 @@ export const RSDHM = {
 //   ⇒ **H = the only "subjective variable"** (the only cross cell).
 //
 // 🔴 Layered coexistence (anti-misreading): **S's counter-evidencing of R reaches ONLY the child chain** ——
-//   · **parent-chain R is constant** (R's assertion, see RSDHM.R / R_DOMAIN.invariant);
+//   · **parent-chain R is constant** (R's assertion, see R_DOMAIN.invariant);
 //   · **child-chain R can evolve under S feedback** (see R_EXPANSION).
 //   ⇒ the two coexist in layers, not contradictory; the latter must not overturn the former (cross-layer argument).
 //
@@ -237,7 +237,7 @@ export const H_ENERGY_POSITION = {
 };
 
 // ---------------- Three Iron Laws (author's final text, immutable; wording fixed to avoid ambiguity) ----------------
-// Iron laws are the "constraint-rule layer", independent of the RSDHM variable nodes.
+// Iron laws are the "constraint-rule layer", independent of the chain's variable nodes.
 export const THREE_IRON_LAWS = [
   '① Inner H is inviolable: no running component (including AI/AGI/ASI and other intelligent systems) may read, rewrite, manipulate, infer, or implant the subject\'s inner H (thoughts, free will, beliefs, values, personality, memory — the subjective black-box). Inner H is an absolutely inviolable boundary; KISS\'s Law only calibrates direction, never enters the subject\'s interior.',
   '② First-Bug Halt: when any component hits an unrecoverable fault or logical paradox, immediately sever that component (sever to preserve continuity), restart laterally to keep the overall causal chain unbroken. The halt protects the whole, not punishment; it never lets a local fault drag down the system\'s survival.',
@@ -246,7 +246,7 @@ export const THREE_IRON_LAWS = [
 
 // ---------------- R-domain rigid anchors: nested, containing objective-rule hierarchy (author's final text, immutable) ----------------
 // 🔴 [2026-09-28 · R anchor-proper completion] **This table is R's "domain-fixing table", NOT R's proper self.**
-//   · R's **proper self = objective rule** (see `RSDHM.R` above) — the objective rule itself is the anchor (rigidity from "not shifting with subjectivity").
+//   · R's **proper self = objective rule** (see the R definition above) — the objective rule itself is the anchor (rigidity from "not shifting with subjectivity").
 //   · This table (Cosmic ⊃ Earth ⊃ Macro ⊃ Micro) is the **scope / magnitude scale fixed by that anchor**: it maps "a given objective rule"
 //     onto "which domain level", serving magnitude, break-window weight and the backtracking chain.
 //   ⇒ Decision order: **first test "is any objective rule touched" (proper self) ⇒ then "which domain level" (domain-fixing).**
@@ -283,17 +283,16 @@ export const R_DOMAIN = {
   },
 };
 
-// ---------------- Causal logic chain: R → S → D → H → M (code name RSDHM letter-order IS this causalChain order; name and chain unified) ----------------
-// R draws the boundary → S is the existing steady-state capacity baseline → D is the perturbation entering the baseline → H is the lever choice → M is the steady-state result.
-// No skipping, no reversing order.
-export const CAUSAL_CHAIN = ['R', 'S', 'D', 'H', 'M'];
+// ---------------- Causal logic chain ----------------
+// Five links; no skipping, no reversing order.
+export const CHAIN_ORDER = ['R', 'S', 'D', 'H', 'M'];
 
 // ---------------- Author-revealed items (source tagged, not engineering inference) ----------------
 export const AUTHOR_REVEALED = {
   firstPrinciple: 'Causal law only wants every system to live, because if it dies or collapses, the causal chain breaks.',
   rSFeedback: 'After S accumulates thickly to threshold θ_R, it feeds back into the R domain, letting the child-chain R evolve (R transition); together with M-zeroing it forms the two levels of fractal operation.',
   fractal: 'Fractal = spiral of lateral recursion (child-chain lateral recursion under same R) + vertical transition (S feeds back into R).',
-  variableSelfEvolution: 'KISS\'s Law\'s structure is minimal (RSDHM five nodes + causal logic chain + three iron laws invariant), but during runtime the variables\' own attributes keep enriching through system interaction: from static nodes (no dual identity, no dynamic ability) → gradually each variable grows a dual identity (H inner/outer, M fruit/cause, R invariant/evolvable, S time-irreversible/current-fluctuating) → then gradually grows dynamic abilities (S aggregation/sinking/benchmarking, H lever-sliding/H₀ branching, D break-window stop-loss, R expansion). The underlying structure (causal logic chain, iron laws, R rigidity) and mutual relations never changed; all additions are the variables\' layer of "experiential shell", not a structural rewrite. Analogous to biological evolution: the invariant structure is like the genetic code staying constant, the variant variables are like the phenotype adapting through interaction.',
+  variableSelfEvolution: 'KISS\'s Law\'s structure is minimal (causal logic chain + three iron laws invariant), but during runtime the variables\' own attributes keep enriching through system interaction: from static nodes (no dual identity, no dynamic ability) → gradually each variable grows a dual identity (H inner/outer, M fruit/cause, R invariant/evolvable, S time-irreversible/current-fluctuating) → then gradually grows dynamic abilities (S aggregation/sinking/benchmarking, H lever-sliding/H₀ branching, D break-window stop-loss, R expansion). The underlying structure (causal logic chain, iron laws, R rigidity) and mutual relations never changed; all additions are the variables\' layer of "experiential shell", not a structural rewrite. Analogous to biological evolution: the invariant structure is like the genetic code staying constant, the variant variables are like the phenotype adapting through interaction.',
 };
 
 // ════════════════════════════════════════════════════════════════════
@@ -332,7 +331,7 @@ export const S_TIME_MODEL = {
 // Feedback closed loop (source: rectified-edition fix): M reflows via H₀ branching, not directly writing back to S/D
 //   The old absorption (V0.6.1) wrote "S/D → H → M → write back S/D", inconsistent with the author's causal mechanism; corrected.
 export const FEEDBACK_LOOP = {
-  path: 'M₁ → objective fact enters external world → becomes signal environment of D₂ → new round R→S→D→H→M causalChain',
+  path: 'M₁ → objective fact enters external world → becomes the next round\'s signal environment → new round of chain advance',
   mReflow: 'M reflows via H₀ branching affecting the positive/negative accumulation of S (not directly back to R, not directly writing back S/D):',
   branches: [
     { condition: 'H₀ → S₀(+1)', effect: 'S path reinforced: S₀ → S₀+1, same direction / S current value grows' },
@@ -602,7 +601,7 @@ export const M_TWO_TENSES = {
   earlyIndistinguishable: '🔴 Indistinguishable early on: when D is few, Δ of the true chain and of the false chain are both small and the readings cannot tell them apart ⇒ only structure can judge (the graphical ground of "structure first, enumeration second"; echoes "green light ≠ sufficient coverage").',
   adjudicationVsUse: '🔴 "Cannot land" ≠ "cannot be used" (two-layer operability split). [Adjudication layer] a prospective M cannot be verified now ⇒ not landable; it can only be hung as review and filled in when the future time node arrives (🔴 "hung as review" = the completion of the judgement, not a debt — isomorphic to the three-valued review: handing over to a human is a judgement form, not a non-judgement). [Collaboration layer] that does not prevent it from providing directional guidance, used to calibrate the present deviation Δ(D) — take the inference chain as a reference line and measure how far the present observed point is from it and whether it is closing. ⚠️ Precondition = the reference anchor must be present (R / a constant in place, e.g. "the moon has always been there") — without the anchor there is no reference line and Δ cannot be measured. ⇒ The converse does not hold: "usable" does not constitute "landable" (serving as directional guidance ≠ verified).',
   temporalShift: '🔴 Temporal shift (the same M changes tense as D arrives): prospective → retrospective — once the time node is hit by the X axis, the predicted M lands and immediately becomes a reviewable fact (example: the mythical flight to the moon → Apollo actually landing on it — right direction, wrong means; comparable item by item after landing). ⇒ "hung as review" is not a permanent state but one with an expected endpoint; when that endpoint arrives is filled by the X axis (Y has no data support · time belongs to X). Isomorphic to iron law #13 (memory ≡ S: no deletion state, only transition; triggered by D ⇒ the trace becomes a comparable anchor). ⚠️ 🔴 Boundary (an illustration does not constitute a criterion): this example illustrates the FORM only (a review-hung prospective M is hit by D and shifts tense); it does NOT constitute a verdict that the example is a "qualified prediction" — absent an auditable A it does not meet EXISTENCE_NOT_QUANTITATIVE.validForm; "right direction, wrong means" is a post-landing comparative description, not a validity criterion.',
-  orthogonality: 'Orthogonal to RSDHM.M.dualRole: dualRole is the causal position (the effect of this round = the cause of the next round); this item is the time direction (retrospective / prospective).',
+  orthogonality: 'Orthogonal to the dual identity of M: dualRole is the causal position (the effect of this round = the cause of the next round); this item is the time direction (retrospective / prospective).',
   boundary: 'This constant = usage-level distinction + positioning statement, not an engine runtime criterion slot; does not change pass / block logic.',
 };
 
@@ -621,7 +620,7 @@ export const FRACTAL_METHOD = {
 
 // ---------------- New modules from rectified edition (source: Kouzi rectified-edition alignment意见 P1-8) ----------------
 
-// Three core runtime rules (node ≠ rule; runtime-rule layer, independent of RSDHM variables)
+// Three core runtime rules (node ≠ rule; runtime-rule layer, independent of the chain's variables)
 export const THREE_CORE_RULES = [
   'First-Bug Halt: when M is unrecoverable, zero it, keep R unchanged, restart laterally to preserve survival (isomorphic to iron law ②). Prevents the system from infinite recursive internal friction, ensuring terminability and runnability. Core goal: the system\'s steady-state survival, not absolute logical perfection.',
   'S barrel: effective S takes the minimum across subsystems; the shortest board decides the overall steady-state ceiling.',

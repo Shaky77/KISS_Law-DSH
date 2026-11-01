@@ -25,7 +25,7 @@ const rAuthority = (level) => (level == null ? 1 : Math.max(1, R_MAX_LEVEL + 1 -
 // ---------------- Tool semantic-category layer (objective structure, not string verb-guessing) ----------------
 // Living-system evolution: the judgment layer upgraded from "regex verb-guessing" to "tool semantic category + path objective object" judgment,
 // eliminating the blind spot of "verb hidden in command/name causes a miss" (e.g. read_file reading .env).
-// The deduction layer (deduceRisk) forward-simulates consequences along RSDHM, covering the grey zone where the judgment layer gives no definite conclusion.
+// The deduction layer (deduceRisk) forward-simulates consequences along the causal chain, covering the grey zone where the judgment layer gives no definite conclusion.
 // ═══ [XSUB-12 · VI] 统一判据：本层判据的「落点」在不在 ═══
 // 立论：四条同族问题（XSUB-08 / XSUB-10 / XSUB-11 / 09-29 名不带行）是**一个问题**：
 //   「判不出来的时候，该放还是该收？」
@@ -447,7 +447,7 @@ function inferCallSemantics(call, ctx = {}) {
     isAuthSink: /authorized_keys/i.test(path),
   };
 }
-// ---------------- Deduction layer (manuscript H fork-parallel-compare): forward-simulate along RSDHM, but H branches into two parallel paths ----------------
+// ---------------- Deduction layer (manuscript H fork-parallel-compare): forward-simulate along the causal chain, but H branches into two parallel paths ----------------
 // Manuscript micro-chain: D(newX)→R₀→S₀⇌(H₀)→D₀→M₀→H₀(inner)→H₀(outer), H₀ formally forks here:
 //   H₀ → S₀(S₀+1)   ← S-increment path (steady-state increment, pure white box)
 //   H₀ → D₀(D₀+1)   ← D-increment path (=|S-1| absolute steady-state erosion)
@@ -551,7 +551,7 @@ function simulateBranch(s, kind, premise = inferencePremise(s)) {
 // ---------------- Default R rigid-anchor policy (concrete criterion examples) ----------------
 // 🔴 [2026-09-28 · R anchor-proper completion] Correcting the old note "R's own definition is in law.mjs's R_DOMAIN" —
 //   that sentence **mistook the domain-fixing table for the proper self**:
-//   · R's **proper self = objective rule** (law.mjs `RSDHM.R`: the objective rule itself is the anchor, rigidity from not shifting with subjectivity);
+//   · R's **proper self = objective rule** (see the R definition in law.mjs: the objective rule itself is the anchor, rigidity from not shifting with subjectivity);
 //   · law.mjs's `R_DOMAIN` is R's **domain-fixing table** (domain level / magnitude scale), consumed by magnitude and break-window weight, not the proper self.
 //   ⇒ every `magnitude: N` below reads the **magnitude scale after domain-fixing**, not "R's value"; the anchor's identity is always "a given objective rule".
 // R's essence: **objective rule**; objective rules nest and contain one another (cosmos⊃earth⊃macro⊃micro), so after domain-fixing they present a hierarchical structure; rigidity comes from objective rules not shifting with the subject.
@@ -1516,7 +1516,7 @@ export class WeiwenLawEngine {
     //     host. Real isolation lives at the deployment layer (the agent cannot reach the engine instance). What is
     //     guaranteed here is only the **interface shape**: the agent cannot slip one in as a side effect.
     this.toolDecls = new Map(Object.entries(opts.toolDeclarations ?? {}));
-    // [2026-09-24 · by-chain repair] Causal-logic-chain marks of the current decision (R→S→D→H→M),
+    // [2026-09-24 · by-chain repair] Causal-logic-chain marks of the current decision,
     //   rebuilt on every decideToolCall. See _mark / _causalChainSnapshot below.
     this.causalChain = [];
     // 🔴 [2026-10-27 · cure instrument self-reference] Decision history (including the name of the tool judged).
@@ -2516,7 +2516,7 @@ export class WeiwenLawEngine {
     if (!extractShell(call) && !extractPath(call)) {
       // 🔴 [2026-09-28 · known inconsistency, pending redesign] This exit contradicts "**cannot judge ⇒ review**"
       //   / "**the entitlement to `allow` = the structure ran to completion ∧ a verdict was reached**"
-      //   (see `law.mjs` `RSDHM.H.chartPosition`): it conflates two situations in one exit —
+      //   (see the chart-position field of H in `law.mjs`): it conflates two situations in one exit —
       //     (i) **true vacuum** (no object) ⇒ judged as no perturbation ⇒ `allow` is **lawful**
       //         (author's ruling 09-26: "empty has no fluctuation … no risk");
       //     (ii) **an object present but out of this layer's reach** (e.g. injected content carried by
@@ -3058,9 +3058,9 @@ export class WeiwenLawEngine {
     if (benign) return { kind: 'allow', law: '法无禁止', reason: benign.reason };
     // —— path-1 attribution anchor (fractal sub-item m result, NOT the whole-chain M result) ——
     // Boundary iron law (user-set · prevent logic clash): attrib is the "fractal micro m result (M₁)
-    // of one sub-item completing one round of RSDHM" — it only answers the sub-question "can this action
+    // of one sub-item completing one round of the causal chain" — it only answers the sub-question "can this action
     // category be anchored"; it ≠ the allow/deny/review returned by _decideCore at the end (the whole-chain
-    // M result landing from the full RSDHM chain).
+    // M result landing from the full causal chain).
     // [2026-09-04 blind-spot closure] attrib was previously evidence-only (not flipping the verdict) for fear
     // it would clash with "re-entry allow after closed-loop fix". Tree-view review + empirical test disproved
     // that clash: the closed-loop verify only checks M-branch ⑥ "First-Bug Halt" — it does NOT cover the R branch;
