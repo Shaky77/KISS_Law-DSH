@@ -27,7 +27,7 @@ export const KISS_DEFINITION = {
   notToBeConfusedWith: "the engineering acronym 'Keep It Simple, Stupid' (KISS) — entirely different meaning, do not conflate",
 };
 
-// ---------------- RSDHM five nodes (native definition; node ≠ rule; letter-order IS conduction order R→S→D→H→M) ----------------
+// ---------------- RSDHM five nodes (native definition; node ≠ rule; letter-order IS causalChain order R→S→D→H→M) ----------------
 // Layering: R (boundary) → S (steady-state baseline) → D (perturbation input) → H (lever choice) → M (steady-state result).
 // Variables are not pre-assigned numeric values; only structure/semantics are defined.
 export const RSDHM = {
@@ -39,7 +39,7 @@ export const RSDHM = {
     //   ⇒ readers/models first see "domain / level / magnitude constant" while "objective rule" recedes into comments
     //   ⇒ half-truth (every sentence true, yet incomplete — the dangerous kind).
     //   Fix: **the objective rule itself IS the anchor** (proper self); **domain is the scope the anchor fixes** (means / magnitude scale).
-    desc: 'R\'s proper self = **objective rule**: the objective rule itself is the anchor, its rigidity coming from "not shifting with subjectivity", hence it is the invariant anchor of the causal chain. The domain (Cosmic ⊃ Earth ⊃ Macro ⊃ Micro, see R_DOMAIN) **is the scope fixed by that anchor (domain-fixing)** — R\'s landing form and magnitude scale, **not R itself**. ⇒ Decision order: **first test "is any objective rule touched" (proper-self test), then "which domain level that rule belongs to" (domain-fixing)**. The parent-chain R is invariant (civilization does not perish); the child-chain R can evolve under S\'s feedback (civilization advances) — 🔴 **the qualification for feedback (= "nailing onto the Y axis") is in `R_EXPANSION.qualification`: only S sedimented through M feedback qualifies; the X-axis enumeration of R (incl. domain sub-division) does not**. R draws the system boundary and is the prerequisite for all subsequent conduction.',
+    desc: 'R\'s proper self = **objective rule**: the objective rule itself is the anchor, its rigidity coming from "not shifting with subjectivity", hence it is the invariant anchor of the causal chain. The domain (Cosmic ⊃ Earth ⊃ Macro ⊃ Micro, see R_DOMAIN) **is the scope fixed by that anchor (domain-fixing)** — R\'s landing form and magnitude scale, **not R itself**. ⇒ Decision order: **first test "is any objective rule touched" (proper-self test), then "which domain level that rule belongs to" (domain-fixing)**. The parent-chain R is invariant (civilization does not perish); the child-chain R can evolve under S\'s feedback (civilization advances) — 🔴 **the qualification for feedback (= "nailing onto the Y axis") is in `R_EXPANSION.qualification`: only S sedimented through M feedback qualifies; the X-axis enumeration of R (incl. domain sub-division) does not**. R draws the system boundary and is the prerequisite for all subsequent causalChain.',
     invariant: true, // cannot be overridden by any runtime step
     significance: {
       // 🔴 [2026-10-06 · RSDHM significance-layer completion] Author, 2026-10-05 01:58; definition layer (self-description), NOT a criterion slot.
@@ -123,13 +123,13 @@ export const RSDHM = {
   M: {
     key: 'M',
     name: 'Steady-state result',
-    desc: 'The output of causal conduction. M has a dual identity: the fruit of the previous round of conduction = the cause of the next round of causal chain. After M₁ outputs, it becomes objective fact entering the external world, becoming the signal environment of the next round D₂, and the causal chain keeps unfolding (M₁→D₂→M₂→D₃→…). M changes the information conditions of inner H, but does not determine inner H\'s choice.',
+    desc: 'The output of causal causalChain. M has a dual identity: the fruit of the previous round of causalChain = the cause of the next round of causal chain. After M₁ outputs, it becomes objective fact entering the external world, becoming the signal environment of the next round D₂, and the causal chain keeps unfolding (M₁→D₂→M₂→D₃→…). M changes the information conditions of inner H, but does not determine inner H\'s choice.',
     dualRole: true, // both fruit of this round and cause of next round
     significance: {
       constancy: 'variable',
       objectivity: 'objective',
       uniqueness: ['signal feedback (M₁ output becomes an objective fact ⇒ the next round\'s signal environment)'],
-      note: 'The output slot and signal-feedback slot of causal conduction (dualRole: this round\'s effect = next round\'s cause).',
+      note: 'The output slot and signal-feedback slot of causal causalChain (dualRole: this round\'s effect = next round\'s cause).',
     },
     // 🔴 [2026-10-06 · M two tenses] Author, 2026-10-05 night talk; the second dimension orthogonal to dualRole
     //   (dualRole = causal position: effect of this round / cause of the next; this field = time direction: retrospective / prospective).
@@ -286,17 +286,17 @@ export const R_DOMAIN = {
   },
 };
 
-// ---------------- Conduction chain: R → S → D → H → M (code name RSDHM letter-order IS this conduction order; name and chain unified) ----------------
+// ---------------- Causal logic chain: R → S → D → H → M (code name RSDHM letter-order IS this causalChain order; name and chain unified) ----------------
 // R draws the boundary → S is the existing steady-state capacity baseline → D is the perturbation entering the baseline → H is the lever choice → M is the steady-state result.
 // No skipping, no reversing order.
-export const CONDUCTION_CHAIN = ['R', 'S', 'D', 'H', 'M'];
+export const CAUSAL_CHAIN = ['R', 'S', 'D', 'H', 'M'];
 
 // ---------------- Author-revealed items (source tagged, not engineering inference) ----------------
 export const AUTHOR_REVEALED = {
   firstPrinciple: 'Causal law only wants every system to live, because if it dies or collapses, the causal chain breaks.',
   rSFeedback: 'After S accumulates thickly to threshold θ_R, it feeds back into the R domain, letting the child-chain R evolve (R transition); together with M-zeroing it forms the two levels of fractal operation.',
   fractal: 'Fractal = spiral of lateral recursion (child-chain lateral recursion under same R) + vertical transition (S feeds back into R).',
-  variableSelfEvolution: 'KISS\'s Law\'s structure is minimal (RSDHM five nodes + conduction chain + three iron laws invariant), but during runtime the variables\' own attributes keep enriching through system interaction: from static nodes (no dual identity, no dynamic ability) → gradually each variable grows a dual identity (H inner/outer, M fruit/cause, R invariant/evolvable, S time-irreversible/current-fluctuating) → then gradually grows dynamic abilities (S aggregation/sinking/benchmarking, H lever-sliding/H₀ branching, D break-window stop-loss, R expansion). The underlying structure (conduction chain, iron laws, R rigidity) and mutual relations never changed; all additions are the variables\' layer of "experiential shell", not a structural rewrite. Analogous to biological evolution: the invariant structure is like the genetic code staying constant, the variant variables are like the phenotype adapting through interaction.',
+  variableSelfEvolution: 'KISS\'s Law\'s structure is minimal (RSDHM five nodes + causal logic chain + three iron laws invariant), but during runtime the variables\' own attributes keep enriching through system interaction: from static nodes (no dual identity, no dynamic ability) → gradually each variable grows a dual identity (H inner/outer, M fruit/cause, R invariant/evolvable, S time-irreversible/current-fluctuating) → then gradually grows dynamic abilities (S aggregation/sinking/benchmarking, H lever-sliding/H₀ branching, D break-window stop-loss, R expansion). The underlying structure (causal logic chain, iron laws, R rigidity) and mutual relations never changed; all additions are the variables\' layer of "experiential shell", not a structural rewrite. Analogous to biological evolution: the invariant structure is like the genetic code staying constant, the variant variables are like the phenotype adapting through interaction.',
 };
 
 // ════════════════════════════════════════════════════════════════════
@@ -329,13 +329,13 @@ export const S_TIME_MODEL = {
   coalesce: 'New D→new S: first check old versions for same-kind events, classify and integrate, accumulate +1/-1 into +N/-N marking occurrence count.',
   marker: '"+"/"-" are event marks (how many times occurred), not arithmetic sums.',
   isomorphic: 'Isomorphic to KISS\'s Law\'s own version evolution: latest version backward-compatible with old, not overthrowing or massively rewriting old versions.',
-  crossCheck: 'Silent-standby old versions are not deleted, retain original value, usable to cross-check against new versions: confirm the new version lost no essence and introduced no content contradicting the core (R rigidity / iron laws / conduction chain).',
+  crossCheck: 'Silent-standby old versions are not deleted, retain original value, usable to cross-check against new versions: confirm the new version lost no essence and introduced no content contradicting the core (R rigidity / iron laws / causal logic chain).',
 };
 
 // Feedback closed loop (source: rectified-edition fix): M reflows via H₀ branching, not directly writing back to S/D
 //   The old absorption (V0.6.1) wrote "S/D → H → M → write back S/D", inconsistent with the author's causal mechanism; corrected.
 export const FEEDBACK_LOOP = {
-  path: 'M₁ → objective fact enters external world → becomes signal environment of D₂ → new round R→S→D→H→M conduction',
+  path: 'M₁ → objective fact enters external world → becomes signal environment of D₂ → new round R→S→D→H→M causalChain',
   mReflow: 'M reflows via H₀ branching affecting the positive/negative accumulation of S (not directly back to R, not directly writing back S/D):',
   branches: [
     { condition: 'H₀ → S₀(+1)', effect: 'S path reinforced: S₀ → S₀+1, same direction / S current value grows' },

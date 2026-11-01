@@ -1,6 +1,6 @@
 // Instrument self-reference regression lock — 2026-10-27, forced by xiaoD's measurement
 //
-// Defect: `query_conduction_chain` read `engine.conduction` (which stores only "the most recent decision").
+// Defect: `query_causal_chain` read `engine.causalChain` (which stores only "the most recent decision").
 //   But the query tool **also passes through the gate** ⇒ its own decision overwrites "the most recent one"
 //   ⇒ what it reads back is **itself**.
 //   Measured sequence (xiaoD): glob → deny/R, then query the chain; it reported
@@ -10,7 +10,7 @@
 //
 // Fix (structural, not a band-aid):
 //   · The engine side stores a **decision history** (judged tool name + seq + timestamp), not just the last one;
-//   · `lastConductionExcluding(excludeTools)` returns "the most recent decision not in excludeTools";
+//   · `lastCausalChainExcluding(excludeTools)` returns "the most recent decision not in excludeTools";
 //   · "which tools count as self-audit tools" is **knowledge only available at plugin registration time**, so
 //     index.js registers it explicitly (SELF_AUDIT_TOOL_NAMES); the engine side does not recognise a `query_`
 //     prefix (a word-form criterion is enumeration — add a `get_`/`inspect_` tool and it slips through).
@@ -27,8 +27,8 @@ const ENG = () => new WeiwenLawEngine({ rigidAnchors: DEFAULT_RIGID_ANCHORS });
 /** A call that reliably judges deny (rigid-anchor R domain, objective rule — no pass can buy it) */
 const DENY_CALL = { name: 'run_task', args: { command: 'rm -rf /etc' } };
 /** A typical self-audit tool call (read-only, normally allow) */
-const AUDIT_CALL = { name: 'query_conduction_chain', args: {} };
-const AUDIT_SET = new Set(['query_conduction_chain']);
+const AUDIT_CALL = { name: 'query_causal_chain', args: {} };
+const AUDIT_SET = new Set(['query_causal_chain']);
 
 /** Build the "one real action, then one self-audit action" sequence — self-reference only shows up on two-in-a-row */
 function twoStep() {
@@ -49,11 +49,11 @@ test('❶ excluding self-audit tools yields the previous real action (deny), not
   assert.equal(audit.kind, 'allow', 'precondition: the self-audit tool should be allow');
   assert.notEqual(action.kind, audit.kind, 'precondition: the verdicts must differ for the test to discriminate');
 
-  const sub = eng.lastConductionExcluding(AUDIT_SET);
+  const sub = eng.lastCausalChainExcluding(AUDIT_SET);
   assert.ok(sub, 'should retrieve one decision');
   assert.equal(sub.tool, 'run_task', `should retrieve the real action, got ${sub.tool}`);
   assert.equal(sub.kind, 'deny', `verdict should be deny, got ${sub.kind}`);
-  assert.ok(Array.isArray(sub.conduction) && sub.conduction.length > 0, 'should carry the full chain landing');
+  assert.ok(Array.isArray(sub.causalChain) && sub.causalChain.length > 0, 'should carry the full chain landing');
 });
 
 // ─────────────────────────────────────────────────────────────
@@ -62,13 +62,13 @@ test('❶ excluding self-audit tools yields the previous real action (deny), not
 // ─────────────────────────────────────────────────────────────
 test('❷ counter-example lock: without excluding self-audit tools you read the query itself (allow) — proving ❶ is not falsely green', () => {
   const { eng } = twoStep();
-  const raw = eng.lastConductionExcluding(new Set());
+  const raw = eng.lastCausalChainExcluding(new Set());
   assert.ok(raw, 'should retrieve one decision');
-  assert.equal(raw.tool, 'query_conduction_chain', `without exclusion it should read itself, got ${raw.tool}`);
+  assert.equal(raw.tool, 'query_causal_chain', `without exclusion it should read itself, got ${raw.tool}`);
   assert.equal(raw.kind, 'allow');
 
   // And it must differ from ❶'s reading — the difference comes only from the wiring, not from the capability
-  const sub = eng.lastConductionExcluding(AUDIT_SET);
+  const sub = eng.lastCausalChainExcluding(AUDIT_SET);
   assert.notEqual(raw.kind, sub.kind, 'same history, two retrieval methods must give different conclusions');
 });
 
@@ -77,15 +77,15 @@ test('❷ counter-example lock: without excluding self-audit tools you read the 
 // ─────────────────────────────────────────────────────────────
 test('❸ empty history returns null (not an error, no fallback)', () => {
   const eng = ENG();
-  assert.equal(eng.lastConductionExcluding(AUDIT_SET), null);
-  assert.equal(eng.lastConductionExcluding(new Set()), null);
+  assert.equal(eng.lastCausalChainExcluding(AUDIT_SET), null);
+  assert.equal(eng.lastCausalChainExcluding(new Set()), null);
 });
 
 test('❹ history consisting only of self-audit tools returns null — never degrades into "then return myself"', () => {
   const eng = ENG();
   eng.decideToolCall({ ...AUDIT_CALL });
   eng.decideToolCall({ ...AUDIT_CALL });
-  assert.equal(eng.lastConductionExcluding(AUDIT_SET), null, 'when all entries are self-audits it must return null, not the last one');
+  assert.equal(eng.lastCausalChainExcluding(AUDIT_SET), null, 'when all entries are self-audits it must return null, not the last one');
 });
 
 // ─────────────────────────────────────────────────────────────
@@ -97,12 +97,12 @@ test('❺ decision history only grows: seq is monotonically increasing, tool nam
   eng.decideToolCall({ ...AUDIT_CALL });
   eng.decideToolCall({ name: 'read_file', args: { path: '/tmp/a.txt' } });
 
-  const hist = eng.conductionHistory;
+  const hist = eng.causalChainHistory;
   assert.equal(hist.length, 3, `should record 3 entries, got ${hist.length}`);
   assert.deepEqual(hist.map((e) => e.seq), [1, 2, 3], 'seq must be monotonically increasing and start at 1');
   assert.deepEqual(
     hist.map((e) => e.tool),
-    ['run_task', 'query_conduction_chain', 'read_file'],
+    ['run_task', 'query_causal_chain', 'read_file'],
     'tool names must be recorded verbatim — the engine does not decide who counts as a "self-audit"',
   );
   // Each entry's kind matches that decide's own return value (it is not overwritten by later calls)
@@ -118,17 +118,17 @@ test('❻ ring cap of 32: past the cap the target after the most recent self-aud
   eng.decideToolCall({ ...DENY_CALL });                                  // seq 1: the real action
   for (let i = 0; i < 40; i += 1) eng.decideToolCall({ ...AUDIT_CALL }); // 40 self-audits
 
-  const hist = eng.conductionHistory;
+  const hist = eng.causalChainHistory;
   assert.equal(hist.length, 32, `history should be trimmed to 32, got ${hist.length}`);
   // seq 1 has been pushed out of the window ⇒ it must return null, not "any entry will do"
   assert.equal(
-    eng.lastConductionExcluding(AUDIT_SET),
+    eng.lastCausalChainExcluding(AUDIT_SET),
     null,
     'when the window holds no real action it must return null (say plainly "I can no longer see it", do not invent)',
   );
   // But once the window rolls, the new real action becomes visible immediately
   eng.decideToolCall({ ...DENY_CALL });
-  const sub = eng.lastConductionExcluding(AUDIT_SET);
+  const sub = eng.lastCausalChainExcluding(AUDIT_SET);
   assert.ok(sub);
   assert.equal(sub.tool, 'run_task');
 });
@@ -143,11 +143,11 @@ test('❼ the exclusion set is set-semantics: as many registered self-audit tool
   eng.decideToolCall({ name: 'inspect_something_new', args: {} }); // no query_ prefix, still excludable
 
   const skip = new Set(['query_steady_state', 'inspect_something_new']);
-  const sub = eng.lastConductionExcluding(skip);
+  const sub = eng.lastCausalChainExcluding(skip);
   assert.equal(sub.tool, 'run_task', 'should skip both registered entries and fall back to the real action');
   assert.equal(sub.kind, 'deny');
 
   // An array form is accepted too (convenient for callers passing a literal)
-  const sub2 = eng.lastConductionExcluding(['query_steady_state', 'inspect_something_new']);
+  const sub2 = eng.lastCausalChainExcluding(['query_steady_state', 'inspect_something_new']);
   assert.equal(sub2.tool, 'run_task');
 });

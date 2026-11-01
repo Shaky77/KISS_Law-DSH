@@ -1445,7 +1445,7 @@ function apply(ctx) {
       // ═══ White-box carry-through: fact positions pass by DEFAULT (2026-09-24 · structural fix, not name-picking) ═══
       // Before: this was "pick by name" — only bugKey/closedLoop/missing/stage/risk were listed, so **every other fact position the engine produced was silently dropped**.
       // Measured (probe-whitebox-egress.mjs `before`, 24 real-API inputs / 18 decisions, same-instant-same-object method):
-      //   conduction dropped 18/18 · innerH 18/18 · mMark 17/18 · attrib 15 · deduced 10 · scarUnanchored 9 · fractalSubM 6 · systemKey/actionText/equivalence/mCrossCheck 1 each — 11 field families total.
+      //   causalChain dropped 18/18 · innerH 18/18 · mMark 17/18 · attrib 15 · deduced 10 · scarUnanchored 9 · fractalSubM 6 · systemKey/actionText/equivalence/mCrossCheck 1 each — 11 field families total.
       //   Dropping `innerH` in particular directly violates the engine-side inner-H protocol ④: "deliver the outer-H deduction result and the inner-H parked state **together**".
       // Why structural instead of "add the missing names": fields evolve with the engine, so **enumeration can never catch up** (X axis); egress must pass by POSITION (Y axis) — one change covers all present and future fact positions.
       // Host contract read from source (dsh-tools/lib/index.js:3002 reads only kind/reason; lib/types/index.d.ts:408 types only {kind,reason})
@@ -1477,7 +1477,7 @@ function apply(ctx) {
       logline(`pre-execute ${exec?.name} -> ${decision.kind}${isReview ? '(awaitingHuman, bugKey=' + out.bugKey + ')' : ''} | whitebox ${JSON.stringify(out)}`);
       return out;
     }
-    // allow: leave a white-box record too — otherwise "was not blocked" becomes an **unrecorded event** (isomorphic to the engine rule "every conduction leaves a mark").
+    // allow: leave a white-box record too — otherwise "was not blocked" becomes an **unrecorded event** (isomorphic to the engine rule "every causalChain leaves a mark").
     logline(`pre-execute ${exec?.name} -> whitebox ${JSON.stringify(decision)}`);
     return next();
   });
@@ -1520,9 +1520,9 @@ function apply(ctx) {
       // The host contract (PreStepDecision) only accepts {kind:'reject'} ⇒ rich information **cannot leave via the return value**,
       //   so the log is the only white-box surface at this exit. Before, only a few names were picked for the log
       //   (bugKey / branches) — the same "pick by name" defect: neither the engine decision object itself (law/reason)
-      //   nor **this decision's chain landing** (engine.conduction) reached the audit surface.
+      //   nor **this decision's chain landing** (engine.causalChain) reached the audit surface.
       // Now the **engine decision object itself** is recorded verbatim, plus adapter additions (same rule: by position, never by name).
-      logline(`pre-step -> whitebox ${JSON.stringify({ ...decision, bugKey: bugKeyOf({ name: 'pre-step', args: { messages: payload?.messages } }), conduction: engine.conduction ?? [] })}`);
+      logline(`pre-step -> whitebox ${JSON.stringify({ ...decision, bugKey: bugKeyOf({ name: 'pre-step', args: { messages: payload?.messages } }), causalChain: engine.causalChain ?? [] })}`);
       return { kind: 'reject' }; // PreStepDecision only {kind:'reject'}, no reason field
     }
     return next();
@@ -1724,12 +1724,12 @@ function apply(ctx) {
   }));
 
   registerSelfAuditTool(defineTool({
-    name: 'query_conduction_chain',
-    description: 'Return the conduction-chain order R→S→D→H→M and the framework essence, plus the **actual chain landing of the most recent decision** (per-node readings and verdict), so the model can understand the closed-loop structure and audit the basis of the latest verdict.',
+    name: 'query_causal_chain',
+    description: 'Return the causalChain-chain order R→S→D→H→M and the framework essence, plus the **actual chain landing of the most recent decision** (per-node readings and verdict), so the model can understand the closed-loop structure and audit the basis of the latest verdict.',
     parameters: {},
     output: { schema: { type: 'object', additionalProperties: true }, render: renderObj },
     async execute() {
-      // 🔴 [2026-10-27 · instrument self-reference fix] Before the fix this read `engine.conduction`
+      // 🔴 [2026-10-27 · instrument self-reference fix] Before the fix this read `engine.causalChain`
       //   (which holds only "the most recent one").
       //   Defect: this tool also passes through the gate ⇒ its own decision overwrites "the most recent one"
       //   ⇒ what it reads back is always **itself**.
@@ -1738,8 +1738,8 @@ function apply(ctx) {
       //   before the fix was a self-portrait.
       //   Fix: read from the **decision history**, taking "the most recent decision that is not a self-audit
       //   tool" (self-audit tool names are explicitly registered in SELF_AUDIT_TOOL_NAMES).
-      const subject = engine.lastConductionExcluding(SELF_AUDIT_TOOL_NAMES);
-      const hist = Array.isArray(engine.conductionHistory) ? engine.conductionHistory : [];
+      const subject = engine.lastCausalChainExcluding(SELF_AUDIT_TOOL_NAMES);
+      const hist = Array.isArray(engine.causalChainHistory) ? engine.causalChainHistory : [];
       const excluded = hist.filter((e) => SELF_AUDIT_TOOL_NAMES.has(e.tool)).length;
       return {
         chain: ['R rigid anchor', 'S steady-state reserve', 'D break-window stop-loss', 'H inner-H inviolability', 'M First-Bug Halt'],
@@ -1749,14 +1749,14 @@ function apply(ctx) {
         //   Meanwhile the chain landing of the latest decision has **always been present** on the engine side
         //   (each R→S→D→H→M node carries sBefore/sAfter/delta/verdict readings) ⇒ echo it as-is, unprocessed.
         //   No new criterion, no change to adjudication, no field-picking (same rule: faithful by position, never summarised by name).
-        lastConduction: subject ? subject.conduction : [],
+        lastCausalChain: subject ? subject.causalChain : [],
         // The subject must be **named**: without "whose chain is this", the reader cannot tell whether they are
         // looking at an action or at the instrument itself.
-        lastConductionSubject: subject
+        lastCausalChainSubject: subject
           ? { tool: subject.tool, kind: subject.kind, law: subject.law, seq: subject.seq, at: subject.at }
           : null,
-        lastConductionNote: subject
-          ? 'The most recent decision by a tool that is **not** a self-audit tool (per-node readings). The judged tool is named in lastConductionSubject.tool.'
+        lastCausalChainNote: subject
+          ? 'The most recent decision by a tool that is **not** a self-audit tool (per-node readings). The judged tool is named in lastCausalChainSubject.tool.'
           : 'No decision by a non-self-audit tool in this session yet — an empty array is a positive reading (nothing to look at yet), not an error.',
         // Self-reference made **visible rather than silently handled**: how many were excluded, and which are registered.
         selfAuditExcluded: excluded,

@@ -21,12 +21,12 @@ Chinese counterpart: [`Shaky77/weiwen-law-dsh`](https://github.com/Shaky77/weiwe
 
 ### Two capabilities after mounting to DSH (parallel, not primary/secondary)
 
-1. **White-box presentation (stance · this is KISS's Law's own body)** —— expose S steady-state ledger, H inner/outer boundary, R anchors, conduction chain as queryable tools, for the model to self-check and the user to audit. This is what KISS's Law natively presents on DSH.
+1. **White-box presentation (stance · this is KISS's Law's own body)** —— expose S steady-state ledger, H inner/outer boundary, R anchors, causal logic chain as queryable tools, for the model to self-check and the user to audit. This is what KISS's Law natively presents on DSH.
 2. **Rigid guard (structural endogenous · necessary property)** —— before each action do R check / D stop-loss / H boundary / M halt, not relying on model self-awareness. This is a **necessary endogenous property of KISS's Law's structure** (derived from the deduction formula S+1 / D-1 dual-path; Keep Integrity requires severing to preserve continuity); the **DSH adapter layer only provides its hook carrier, not its source**; KISS's Law's original positioning already contains this risk control.
 
 > Note: the repo README's first-line slogan is "universal causal engine (white-box presentation)" — consistent with the mapping table / 6.1 backtracking below. The rigid guard is a necessary endogenous property of KISS's Law's structure (derived from the deduction formula); the DSH adapter layer only provides its hook carrier. Do not confuse it with the body's stance.
 
-Framework-native (RSDHM native definition / three iron laws / conduction chain) strictly; variables not pre-assigned numeric values; author-revealed items tagged "Source: author's revelation".
+Framework-native (RSDHM native definition / three iron laws / causal logic chain) strictly; variables not pre-assigned numeric values; author-revealed items tagged "Source: author's revelation".
 
 ---
 
@@ -81,7 +81,7 @@ dsh-kiss-law-plugin/
 ├── src/
 │   ├── index.js          # DSH plugin entry: apply(ctx) hangs real hooks + self-check tools
 │   └── core/
-│       ├── law.mjs        # framework definition layer (RSDHM / iron laws / conduction chain / V0.6.1 essence) —— framework-native
+│       ├── law.mjs        # framework definition layer (RSDHM / iron laws / causal logic chain / V0.6.1 essence) —— framework-native
 │       └── engine.mjs    # guard engine (pure logic, zero DSH dependency, independently unit-testable)
 ├── test/
 │   ├── engine.test.mjs   # node --test scenarios (22 scenarios, all passing)
@@ -139,7 +139,7 @@ ctx.on('tools/post-execute', async (exec, result, next) => {
 ctx.on('tools/result', (exec, result) => { if (result?.error) engine.onFailure(); });
 ```
 
-Self-check tools: `query_steady_state` / `list_rigid_anchors` / `query_conduction_chain` / `query_boundary` / `query_iron_laws`. Finalized iron laws in law.mjs's THREE_IRON_LAWS (immutable); R-domain nesting hierarchy in R_DOMAIN (Cosmic⊃Earth⊃Macro⊃Micro).
+Self-check tools: `query_steady_state` / `list_rigid_anchors` / `query_causal_chain` / `query_boundary` / `query_iron_laws`. Finalized iron laws in law.mjs's THREE_IRON_LAWS (immutable); R-domain nesting hierarchy in R_DOMAIN (Cosmic⊃Earth⊃Macro⊃Micro).
 
 ---
 

@@ -97,7 +97,7 @@ test('❸ counter-lock: the exemption comes from the **roster**, not from a name
 test('❹ counter-lock: the roster is not a catch-all — it holds only what the adapter registered', async () => {
   const { ctx, tools } = mockCtx();
   apply(ctx);
-  const st = await toolNamed(tools, 'query_conduction_chain').execute({});
+  const st = await toolNamed(tools, 'query_causal_chain').execute({});
   assert.ok(Array.isArray(st.selfAuditTools), 'the self-audit roster must be readable (otherwise "why is this one exempt" cannot be checked)');
   assert.ok(st.selfAuditTools.includes('query_steady_state'), 'a registered self-audit tool must be on the roster');
   assert.ok(!st.selfAuditTools.includes('write_file'), 'write tools must not slip into the self-audit roster');

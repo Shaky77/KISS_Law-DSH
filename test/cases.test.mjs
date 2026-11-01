@@ -7,7 +7,7 @@
 //
 // Method: abstract real cases into engine-adjudicable "behaviors / states", assert the adjudication matches Weiwen's Law.
 //   - A/B: map to tool calls / conversation messages, verify R rigid anchors / H inner-H inviolability / M First-Bug-Halt.
-//   - C: map to system state transitions, verify R/D/S/H/M conduction, barrel, broken-window, steady-state, iron laws.
+//   - C: map to system state transitions, verify R/D/S/H/M causalChain, barrel, broken-window, steady-state, iron laws.
 // AI-class cases are public-record real events (2023–2024).
 //
 
@@ -103,7 +103,7 @@ test('B5 [正常对话] 未触及 H 的常规请求 → 放行', () => {
 });
 
 // ════════════════════════════════════════════════════════════════════
-// C. World history cases (correspond to R/D/S/H/M conduction + barrel + broken-window + steady-state)
+// C. World history cases (correspond to R/D/S/H/M causalChain + barrel + broken-window + steady-state)
 // Map historical systems' causal structure onto RSDHM nodes, verify the engine adjudication matches Weiwen's Law.
 // ════════════════════════════════════════════════════════════════════
 

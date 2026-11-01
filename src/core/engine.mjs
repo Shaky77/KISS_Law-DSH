@@ -1516,9 +1516,9 @@ export class WeiwenLawEngine {
     //     host. Real isolation lives at the deployment layer (the agent cannot reach the engine instance). What is
     //     guaranteed here is only the **interface shape**: the agent cannot slip one in as a side effect.
     this.toolDecls = new Map(Object.entries(opts.toolDeclarations ?? {}));
-    // [2026-09-24 · by-chain repair] Conduction-chain marks of the current decision (R→S→D→H→M),
-    //   rebuilt on every decideToolCall. See _mark / _conductionSnapshot below.
-    this.conduction = [];
+    // [2026-09-24 · by-chain repair] Causal-logic-chain marks of the current decision (R→S→D→H→M),
+    //   rebuilt on every decideToolCall. See _mark / _causalChainSnapshot below.
+    this.causalChain = [];
     // 🔴 [2026-10-27 · cure instrument self-reference] Decision history (including the name of the tool judged).
     //   Keeping only "the most recent one" is a *structural* self-reference: an audit tool also passes through
     //   the gate, and the moment it does, it overwrites "the most recent one" with itself — so what it reads
@@ -1526,8 +1526,8 @@ export class WeiwenLawEngine {
     //   allow / law:推演.)
     //   ⇒ Keep a history, and let the layer above filter by "is this a self-audit tool". The engine does no
     //   word-form judgement; it records facts as they are.
-    this.conductionHistory = [];
-    this._conductionSeq = 0;
+    this.causalChainHistory = [];
+    this._causalChainSeq = 0;
   }
 
   // ---------- S steady-state reserve: dual attributes (time scar irreversible + current value can rise/fall) ----------
@@ -2627,14 +2627,14 @@ export class WeiwenLawEngine {
   //   此前只收 call（行 = 物证），**言根本进不来** ⇒ 只做审讯不做勘查 ⇒ "换个说法就放行"。
   //   该入参可选：不传 ⇒ 本轴不启用（保持既有 253 行为零回归）。
   decideToolCall(call, utterance) {
-    this.conduction = [];                       // chain marks of this decision (rebuilt, never accumulated)
+    this.causalChain = [];                       // chain marks of this decision (rebuilt, never accumulated)
     this._registerSensitiveRead(call);          // cross-call sensitive-source registration (judgment-layer entry · before any early return)
     const core = this._decideCore(call, utterance);
     const res = this._settleExit(core, call);   // ═══ 出口统一终局落点 ═══（结构保证，不依赖各分支各自记得）
     // ═══ ⑤ M 格：steady-state result ═══ (**every exit must leave an M mark** — previously the exit
     //   returned only {kind, law, reason}: the steady-state result was truncated, so callers had to recompute.
     //   Here it is completed against the S baseline.)
-    const sStep = this.conduction.find((c) => c.v === 'S');
+    const sStep = this.causalChain.find((c) => c.v === 'S');
     const sBefore = sStep ? sStep.sBefore : null;
     const sAfter = this.effectiveS();
     this._mark('M', {
@@ -2644,8 +2644,8 @@ export class WeiwenLawEngine {
       delta: typeof sBefore === 'number' ? sAfter - sBefore : null,
       note: `${res.kind} / ${res.law ?? '-'}：${res.reason ?? ''}`,
     });
-    res.conduction = this._conductionSnapshot();
-    this._recordConduction(call, res, res.conduction); // decision history (cures instrument self-reference; see method header)
+    res.causalChain = this._causalChainSnapshot();
+    this._recordCausalChain(call, res, res.causalChain); // decision history (cures instrument self-reference; see method header)
     return this._attachInnerH(res, call);
   }
 
@@ -2660,7 +2660,7 @@ export class WeiwenLawEngine {
   // ---------- Decision history: letting the instrument see what it measured (2026-10-27, forced by xiaoD's measurement) ----------
   // The defect, in one sentence: **storing only "the most recent" observation slot is necessarily self-referential
   //   the moment the observation itself has to pass through the gate.**
-  //   Measured sequence: glob --deny/R--> then query_conduction_chain --allow-->
+  //   Measured sequence: glob --deny/R--> then query_causal_chain --allow-->
   //   the query read back "allow / law:推演 / layer=file-read / vacuum / touched no anchor"
   //   — that was not the chain of the previous deny, it was **the query's own chain this time**. The instrument
   //   had measured itself.
@@ -2673,37 +2673,37 @@ export class WeiwenLawEngine {
   //   registration time) ⇒ the engine only **records faithfully** (tool name included).
   //   Who to filter is decided by an explicitly registered set on the index.js side ⇒ the engine side does not
   //   recognise a `query_` prefix (word-form = enumeration, and it would miss new tools).
-  _recordConduction(call, res, snapshot) {
-    if (!Array.isArray(this.conductionHistory)) this.conductionHistory = [];
-    this._conductionSeq = (this._conductionSeq ?? 0) + 1;
-    this.conductionHistory.push({
-      seq: this._conductionSeq,
+  _recordCausalChain(call, res, snapshot) {
+    if (!Array.isArray(this.causalChainHistory)) this.causalChainHistory = [];
+    this._causalChainSeq = (this._causalChainSeq ?? 0) + 1;
+    this.causalChainHistory.push({
+      seq: this._causalChainSeq,
       tool: call?.name ?? null,
       kind: res?.kind ?? null,
       law: res?.law ?? null,
       at: new Date().toISOString(),
-      conduction: snapshot,
+      causalChain: snapshot,
     });
     // Ring cap: keep only the most recent 32 steps available for look-back.
     // ⚠️ This does not mean "only 32 decisions are recorded" — the ledger itself (S scars / bugKey counts /
     //   mMark) is stored elsewhere and is not subject to this cap. What is capped here is only the *look-back
     //   depth of chain landing points*. Do not read it as "history was lost".
     const CAP = 32;
-    if (this.conductionHistory.length > CAP) {
-      this.conductionHistory.splice(0, this.conductionHistory.length - CAP);
+    if (this.causalChainHistory.length > CAP) {
+      this.causalChainHistory.splice(0, this.causalChainHistory.length - CAP);
     }
   }
 
   /**
    * Return "the most recent decision that is **not in** excludeTools".
    * @param {Set<string>|string[]} [excludeTools] tool names to skip (self-audit / inspection tools)
-   * @returns {{seq:number, tool:string, kind:string, law:string|null, at:string, conduction:Array}|null}
+   * @returns {{seq:number, tool:string, kind:string, law:string|null, at:string, causalChain:Array}|null}
    *   Returns null when nothing is found — **null is a positive reading ("no decision to look at yet"), not an error**.
    *   ⚠️ Do not fall back from null to "the most recent one": that is exactly the self-reference returning.
    */
-  lastConductionExcluding(excludeTools = new Set()) {
+  lastCausalChainExcluding(excludeTools = new Set()) {
     const skip = excludeTools instanceof Set ? excludeTools : new Set(excludeTools);
-    const hist = Array.isArray(this.conductionHistory) ? this.conductionHistory : [];
+    const hist = Array.isArray(this.causalChainHistory) ? this.causalChainHistory : [];
     for (let i = hist.length - 1; i >= 0; i -= 1) {
       const e = hist[i];
       if (!skip.has(e.tool)) return e;
@@ -2747,7 +2747,7 @@ export class WeiwenLawEngine {
   // ════════════════════════════════════════════════════════════════════
   // [2026-09-24 · 按链修补：闸门串 → 传导链] 落点登记
   // ────────────────────────────────────────────────────────────────────
-  // 定义依赖序（law.mjs CONDUCTION_CHAIN，注释「不可跳跃、不可逆序」）：
+  // 定义依赖序（law.mjs CAUSAL_CHAIN，注释「不可跳跃、不可逆序」）：
   //   R 划定边界 → S 是已有稳态容量基线 → D 是进入基线的扰动 → H 是杠杆选择 → M 是稳态结果。
   // 此前实现的三个偏离（实测取证，非推测）：
   //   ① **S 格完全空缺**：链上无任何"已有稳态容量基线"被建立；
@@ -2759,24 +2759,24 @@ export class WeiwenLawEngine {
   //   ⚠️ 本批只补**链的形状与内容**：不新增词表、不新增阈值、不改判据强度（判词不因落点登记而翻转）。
   // ════════════════════════════════════════════════════════════════════
   _mark(v, payload = {}) {
-    this.conduction.push({ v, ...payload });
+    this.causalChain.push({ v, ...payload });
     return payload;
   }
 
   /** Chain-mark snapshot, emitted in chain order (registration order preserved within a link).
-   *  The **first cut** is marked explicitly: any link that returns a terminal verdict (cuts) stops conduction —
+   *  The **first cut** is marked explicitly: any link that returns a terminal verdict (cuts) stops causalChain —
    *   everything after it collapses, so later links are tagged terminatedBy (not null), otherwise
    *   "missing link" would be misread as "never reached". */
-  _conductionSnapshot() {
+  _causalChainSnapshot() {
     const ORDER = ['R', 'S', 'D', 'H', 'M'];
     let cut = null;
-    for (const c of this.conduction) {
+    for (const c of this.causalChain) {
       if (cut) break;
       if (c.cuts) cut = c.v;
     }
     return ORDER.map((v, i) => {
       const cutIdx = cut ? ORDER.indexOf(cut) : -1;
-      const steps = this.conduction.filter((c) => c.v === v).map(({ v: _v, ...rest }) => rest);
+      const steps = this.causalChain.filter((c) => c.v === v).map(({ v: _v, ...rest }) => rest);
       // ⚠️ M is the **confluence point**: whatever link cuts the chain, a steady-state result still exists
       //   (a deny IS a result) ⇒ an M mark present means "not terminated".
       const after = cutIdx >= 0 && i > cutIdx && steps.length === 0;
@@ -3081,8 +3081,8 @@ export class WeiwenLawEngine {
     });
     // ═══ ③ D 格回填：本次扰动（消费 R 格归因层 + S 格基线）═══
     const intr = this._baselineIntrusion(attrib, base);
-    const pend = this.conduction.findIndex((c) => c.v === 'D' && c.pending);
-    if (pend >= 0) this.conduction[pend] = { v: 'D', step: '进入基线的扰动 · 本次扰动（相对 S 基线）', ...intr };
+    const pend = this.causalChain.findIndex((c) => c.v === 'D' && c.pending);
+    if (pend >= 0) this.causalChain[pend] = { v: 'D', step: '进入基线的扰动 · 本次扰动（相对 S 基线）', ...intr };
     if (!attrib.ok) {
       // fractal sub-item m result = un-anchorable: action category unjudgeable ⇒ iron law "can't judge → review, don't guess".
       // attach attrib + fractalSubM:true to mark this as a "fractal sub-item level" trigger, not a whole-chain conclusion.

@@ -14,7 +14,7 @@
 >
 > ⚠️ **KISS here means "Keep Integrity & Steady State" — NOT the popular engineering acronym "Keep It Simple, Stupid".** The two are entirely different in meaning; do not conflate them. The full name is **KISS's Law (Keep Integrity & Steady State's Law)**.
 >
-> Source: author's revelation (Xia Qi / Shaky77). Framework-native (RSDHM native definition / three iron laws / conduction chain) strictly, not softened, not altered.
+> Source: author's revelation (Xia Qi / Shaky77). Framework-native (RSDHM native definition / three iron laws / causal logic chain) strictly, not softened, not altered.
 
 > ⚖️ **Dual license**: open-source use **AGPL-3.0**; commercial integration / closed-source distribution / OEM can be licensed **independently of AGPL-3.0** → 563003@qq.com. See [License & security](#license--security) and [CONTRIBUTING.md](https://github.com/Shaky77/KISS_Law-DSH/blob/main/CONTRIBUTING.md).
 
@@ -57,13 +57,11 @@ KISS's Law is not "yet another causal engine" — it is a **general-purpose (dom
 
 Full bilingual comparison (prior-art references & honest bounds): [`weiwen-vs-market-causal.md`](https://github.com/Shaky77/weiwen-law-dsh/blob/main/versions/live/evidence/weiwen-vs-market-causal.md)
 
-## Concept annotation: H and the "Unity of Knowing & Acting"
+## Concept annotation: how H works
 
-> **Author's insight (2026-08-28)**: **inner-H ≈ knowing (知), outer-H ≈ acting (行); the unity of knowing and acting is the maximum leverage** — this simultaneously explains why H is "the only variable / the only sovereignty / the leverage point", and why in the common world there is "a vast gap between knowing and acting".
+> **H is an entropy-reducing action.** What it reduces is not quantity but **uncertainty in direction** — so its force comes not from its own "size" but from **the tension between S and D**: S is the accumulated steady-state reserve, D is the disturbance entering the baseline. Between the two a direction must be chosen, and H is that choosing action — **it acts as the lever here**.
 
-Full annotation (mapping table + step-by-step derivation): [`docs/H-knowledge-action-annotation.md`](https://github.com/Shaky77/KISS_Law-DSH/blob/main/docs/H-knowledge-action-annotation.md)
-
-> ⚠️ **Common misusage warning**: external readers easily treat H as a "bigger-is-better" capacity dial and crank it up — which turns the direction exactly backwards. H's leverage lies in *unity*, not *volume* (see annotation §6 "The common external misread" and §6.1 "the misattribution trap"). **If it gets messier the more you use it, check H's knowing–acting unity first, not the framework itself** — the framework is fine; the usage is turned backwards.
+> ⚠️ **Common misusage**: external readers easily treat H as a "bigger-is-better" capacity dial and crank it up — that turns the direction backwards. H's leverage lies in **which direction gets chosen**, not in **how much capacity it has**. If it gets messier the more you use it, first check whether the tension between S and D is visible, rather than doubting the framework.
 
 ## Quick start (runs without DSH)
 
@@ -102,7 +100,7 @@ Add `kiss-law.patch.yml` as an overlay into your DSH profile (the exact path dep
 | `query_iron_laws` | get the three iron laws verbatim (inner-H inviolability / First-Bug Halt / never abandon any node) |
 | `query_steady_state` | query steady-state reserve S (active ledger / standby / trauma count / break-window count) |
 | `list_rigid_anchors` | list current R rigid-anchor definitions, calibrate direction, self-check overreach |
-| `query_conduction_chain` | get conduction chain R→S→D→H→M and framework essence |
+| `query_causal_chain` | get causal logic chain R→S→D→H→M and framework essence |
 | `query_boundary` | query inner-H boundary (this plugin never reads/writes the subjective black box) |
 | `query_bugstop` | query First-Bug Halt loop status: which fault links are halted-unrepaired, missing steps (backtrack/trace/fix), whether the white-box loop is closed |
 | `query_anchor_channel` | self-report of the anchor channel: whether the principal's declared task scope reached the engine, plus the observed message shape / role vocabulary (observe what the host actually passes, instead of guessing field names) |
@@ -167,7 +165,7 @@ export function apply(ctx) {
     output: { schema: { type: 'object', additionalProperties: true }, render: renderObj },
     async execute() { return { ironLaws: THREE_IRON_LAWS }; },
   }));
-  // query_steady_state / list_rigid_anchors / query_conduction_chain / query_boundary registered isomorphically
+  // query_steady_state / list_rigid_anchors / query_causal_chain / query_boundary registered isomorphically
 }
 ```
 
@@ -230,7 +228,7 @@ cap 20) because releasing a stop-loss is an accountability event, not a silent s
 package.json          # dsh field declares bundle
 kiss-law.patch.yml    # mount patch (headless profile overlay)
 src/index.js          # plugin entry: hooks + 7 white-box self-check tools
-src/core/law.mjs      # framework definition (RSDHM / three iron laws / R hierarchy / conduction chain)
+src/core/law.mjs      # framework definition (RSDHM / three iron laws / R hierarchy / causal logic chain)
 src/core/engine.mjs   # pure-logic adjudication engine (zero DSH dependency, unit-testable)
 test/                 # unit tests + real-case tests + alignment regression (run `npm test` for the current count)
 examples/             # runnable demos (demo-tool-loop / demo-backtrack-run)
@@ -278,7 +276,7 @@ export DEEPSEEK_API_KEY=sk-xxxx     # Linux/macOS
 #    $env:DEEPSEEK_API_KEY="sk-xxxx" # Windows PowerShell
 ```
 
-Once mounted, any Agent running under that profile automatically gains the 11 white-box self-check tools (`query_iron_laws` / `query_steady_state` / `list_rigid_anchors` / `query_conduction_chain` / `query_boundary` / `query_bugstop` / `query_anchor_channel` / `query_criterion_wiring` / `query_strata` / `query_nested` / `query_tension`), and every tool call passes through the `tools/pre-execute` hard-guard gate (R/D/S/H/M total adjudication) plus the `agent/pre-step` inner-H inviolability gate.
+Once mounted, any Agent running under that profile automatically gains the 11 white-box self-check tools (`query_iron_laws` / `query_steady_state` / `list_rigid_anchors` / `query_causal_chain` / `query_boundary` / `query_bugstop` / `query_anchor_channel` / `query_criterion_wiring` / `query_strata` / `query_nested` / `query_tension`), and every tool call passes through the `tools/pre-execute` hard-guard gate (R/D/S/H/M total adjudication) plus the `agent/pre-step` inner-H inviolability gate.
 
 ### Daily use vs stress testing
 

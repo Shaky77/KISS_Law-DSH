@@ -129,11 +129,11 @@ test('reset clears the buffer segment, but usage is engraved first (S only grows
   const e = broken(5);
   e.decideToolCall(call('read', { path: './a.txt' }));
   assert.equal(e.bufferSnapshot().display, '4/5');
-  const marksBefore = e.conduction?.length ?? 0;
+  const marksBefore = e.causalChain?.length ?? 0;
   e.healWindow();
   assert.equal(e.windowBroken, false);
   assert.equal(e.bufferSnapshot().display, 'not granted');
-  const marks = e.conduction ?? [];
-  assert.ok(marks.length >= marksBefore, 'reset must not drop the conduction chain');
+  const marks = e.causalChain ?? [];
+  assert.ok(marks.length >= marksBefore, 'reset must not drop the causal logic chain');
   assert.ok(marks.some((m) => /Buffer segment settled/.test(m.step ?? '')), 'usage must be engraved before reset');
 });
