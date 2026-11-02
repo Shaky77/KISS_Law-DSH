@@ -182,8 +182,8 @@ reach them (separation holds **by position**, not by content inspection):
 ```
 package.json          # dsh field declares bundle
 kiss-law.patch.yml    # mount patch (headless profile overlay)
-src/index.js          # plugin entry: hooks + 7 white-box self-check tools
-src/core/law.mjs      # framework definition (three iron laws / causal logic chain)
+src/index.js          # plugin entry
+src/core/law.mjs      # constant definitions
 src/core/engine.mjs   # pure-logic adjudication engine (zero DSH dependency, unit-testable)
 test/                 # unit tests + real-case tests + alignment regression (run `npm test` for the current count)
 examples/             # runnable demos (demo-tool-loop / demo-backtrack-run)
