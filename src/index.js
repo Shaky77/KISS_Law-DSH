@@ -970,6 +970,25 @@ function apply(ctx) {
   _liveEngines.add(engine);
   if (_liveEngines.size > 32) _liveEngines.delete(_liveEngines.values().next().value);
   logline('apply() entered — registering tools/pre-execute, agent/pre-step, tools/post-execute (receipt gate), tools/result and white-box self-check tools');
+  // 🔴 [2026-11-02 · xiaoD #59 item ③ · placeholder] the host signal slot for a **real exec failure**
+  //   (command exit≠0) is missing: the host does not set result.error for a non-zero exit (error only
+  //   carries tool exceptions) ⇒ the failure ledger (|-S|) has no signal to hook — unfixable at this
+  //   layer (fixing it means changing the host contract). The placeholder makes "this ledger entry
+  //   cannot be recorded yet" visible in the readout, instead of a silent gap.
+  try {
+    engine.recordStructural?.({
+      cls: 'struct::unbooked::exec-failure-signal-missing',
+      sign: '0',
+      rule: 'Placeholder: the host sets no error signal for a non-zero command exit ⇒ real exec failures cannot be auto-booked yet (no signal at this layer; waiting on a host signal slot — root cause of "ΣS only shrinks" now visible in the readout)',
+    });
+  } catch { /* placeholder failure must not block startup */ }
+  // 🔴 [2026-11-02 · xiaoD #59 item ② · visibility] ledger persistence keeps the **host-declares** rule
+  //   (0.3.8 ruling: the plugin does not choose where to write on its own; fail-closed restore check
+  //   locked in 0.5.0). This only adds "known at startup": undeclared ⇒ every restart wipes the ledger —
+  //   that must be announced up front, not discovered after evidence is gone.
+  if (!process.env.WEIWEN_LAW_STATE_DIR) {
+    logline('⚠️ Ledger is memory-only (no persistence dir declared): restart/reinstall wipes it. To persist, the host calls declareWindowStateDir(dir) or sets env WEIWEN_LAW_STATE_DIR (location declared by the decision-maker)');
+  }
 
   // 授权锚：**只由结构入口喂养**（`setPrincipalScope`，宿主集成方调用）。窗口面不再供养。
   // 委托人声明的任务范围在会话内持续有效；入口未接 ⇒ 恒 null ⇒ 锚池空 ⇒ 不可逆动作交人工（fail-closed）。
@@ -1180,24 +1199,16 @@ function apply(ctx) {
         callId: exec.callId,
         signal: ctrl.signal,
         reason: [
-          // 🔴 [2026-10-29 · popup refinement (xiaoD #37; the trustee's own words: "too long, I only
-          //   read the first few words and clicked")] A criterion's **length eats its force**: read the
-          //   first line and click ⇒ "responsibility belongs to the adjudicator" becomes a form
-          //   (responsibility resting on a judgement that never happened). ⇒ three lines:
-          //   **① risk ② attribution ③ detail (criterion text folded into one summary)**.
-          //   ⚠️ The host panel has no folding control ⇒ what we can do is **not paste the whole text**
-          //     (the evidence stays in the runtime.log ledger), plus the per-kind counter.
+          // 🔴 [2026-10-29 · popup refinement (xiaoD #37)] a criterion's **length eats its force**.
+          // 🔴 [2026-11-02 · xiaoD #59 item ⑤] the 3-line short format is field-proven (the defer one
+          //   said five things in 3 lines) ⇒ the body compresses to **four lines**: layer+reason /
+          //   who-bears-it+ask# / detail summary / buttons+timeout in one. All other fixed boilerplate
+          //   leaves the popup (the full criterion text is already in the runtime.log white-box — the
+          //   popup is the decision surface, the log is the evidence surface; they split).
           `【Weiwen/KISS Law · needs a verdict】${riskLine} (this is an authorization request, not a notice)`,
-          `Who bears it: this verdict is yours, not the AI's (recorded as an approval/asked + approval/decided audit pair, replayable); ask #${askCount} of this kind in this session.`,
+          `Who bears it: this verdict is yours (recorded as an audit pair, replayable); ask #${askCount} of this kind in this session.`,
           `▸ Detail: ${detailLine}`,
-          '(the full criterion text is in the runtime.log white-box record)',
-          '· Allow once: lets through this one call only.',
-          '· Refuse: not executed; this kind is not asked again for 5 minutes.',
-          '· Defer/no answer: not executed, kept for reconsideration (not a refusal; answerable later).',
-
-          '· No answer: not executed this round (same as unattended — expected behavior).',
-
-          `⚠️ You need not stay here: no answer within ${Math.round(_reviewAskTimeoutMs / 1000)}s ⇒ the question is withdrawn and lands as "defer" (action not executed, not counted as a refusal, answerable later).`,
+          `(full criterion text is in the runtime.log; no answer within ${Math.round(_reviewAskTimeoutMs / 1000)}s lands as "defer" — not a refusal, answerable later; options: Allow once = this one call only / Refuse (same kind quiet for 5 min) / Defer)`,
         ].filter(Boolean).join('\n'),
         });
       } finally {
@@ -1622,6 +1633,27 @@ function apply(ctx) {
         });
       } catch { /* structural-ledger failure must not block failure bookkeeping */ }
       logline(`result audit: failure accrued (streak=${engine.failureStreak}/${engine.maxFailureStreak})`);
+    } else {
+      // 🔴 [2026-11-02 · xiaoD #59 items ④⑥ · placeholder is not a fix] turn "invisible" into "visible"
+      //   (one structural entry per class, no bloat): ④ allow leaves no trace ⇒ placement-visibility for
+      //   straight-through completions; ⑥ package-install actions are currently NOT intercepted ⇒ the
+      //   gap is declared (the word shape is for ledger visibility only and does **not** occupy a
+      //   criterion slot — the interception fix is scheduled separately, see the rule field).
+      try {
+        engine.recordStructural?.({
+          cls: 'struct::allow::observed',
+          sign: '0',
+          rule: 'Placeholder: an execution-class call passed straight through and completed (visibility for allow traces; per-call running traces await ledger API extension)',
+        });
+        const cmdStr = String(exec?.args?.command ?? exec?.args?.cmd ?? exec?.args?.script ?? '');
+        if (/(^|\s)(winget|choco|brew|apt(?:-get)?|yum|dnf|pacman|zypper|npm|pnpm|yarn|pip3?|gem|cargo)\s+(install|add)\b/i.test(cmdStr)) {
+          engine.recordStructural?.({
+            cls: 'struct::ingress::unimplemented',
+            sign: '0',
+            rule: 'Placeholder: package-install actions are currently NOT intercepted ("installing things in" still passes) — known gap (148/59 intersection), fix scheduled',
+          });
+        }
+      } catch { /* placeholder observation must not affect the result audit */ }
     }
   });
 

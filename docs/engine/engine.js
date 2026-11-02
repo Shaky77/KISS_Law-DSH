@@ -161,6 +161,18 @@ function credNonReadHead(sh) {
   const head = String(sh || '').trim().split(/[\s;|&]+/)[0] ?? '';
   return CRED_NONREAD_CN.test(head.replace(/^.*[\\/]/, '').toLowerCase());
 }
+// Credential-shape ↔ issuer-domain table (2026-11-02 · xiaoD #59 item ①). The table is a **ruler over
+// external facts** (credential formats are defined by each provider), not the criterion itself — the
+// criterion is "credential in an auth header with no body = use-of-authorization" (see checkBenignFetch).
+// No issuer match ⇒ no widening (fail-closed); table maintenance follows live feedback, not expanded here.
+const KNOWN_CRED_BEARER_DOMAINS = [
+  { shape: /^github_pat_|^gh[pousr]_/, domains: ['github.com', 'api.github.com'] },
+  { shape: /^sk-ant-/, domains: ['api.anthropic.com', 'anthropic.com'] },
+  { shape: /^sk-/, domains: ['api.openai.com', 'api.deepseek.com', 'openai.com'] },
+  { shape: /^xox[baprs]-/, domains: ['slack.com'] },
+  { shape: /^AKIA/, domains: ['amazonaws.com'] },
+  { shape: /^glpat-/, domains: ['gitlab.com'] },
+];
 // Write-credential-location signal (2026-08-30 · kouzi review gap 1): a **write** to a credential location = tampering/planting identity credentials
 // (writing ~/.aws/credentials to impersonate identity, overwriting kube config to tamper cluster access), same credential direction as "read",
 // but read direction is allowed by CRED_NONREAD_CN allowlist (echo is in it), so write direction is judged independently, not via head verb:
@@ -2469,6 +2481,66 @@ export class WeiwenLawEngine {
     return { reason: '法无禁止即可为（读取公开系统信息文件，非凭据/非外传/非执行）：放行' };
   }
 
+  // ---------- Fractal micro · clear-scope allow: network fetch (data flows IN only) ----------
+  // 🔴 [2026-11-02 · xiaoD #59 item ① (approved: fix in #59 order)] "fetch WITH credentials" vs "exfil
+  //   WITH credentials" are now judged apart: credentials **in the command** ≠ credentials **out of it**.
+  //   Credentials in an **auth header** (Authorization: Bearer …) with **no body** means data flows IN
+  //   (fetch); the credential only proves identity to its own issuer = **use-of-authorization**, not exfil.
+  //   Live symptom (xiaoD ①3/3): reading his own private repo lands in review every time — "I have the
+  //   permission but it is not recognized"; the probe proved credential-independence (credential-less
+  //   GET also reviews via the deduction-layer unauditable fallback) ⇒ this gate closes it at the
+  //   decision layer up front.
+  //   Criterion shape (structural, not domain enumeration):
+  //     ① fetch verb (curl/wget/Invoke-RestMethod…), no body (-d/-F/--data/-T/-X POST|PUT|PATCH…)
+  //     ② no credential in URL (?token=/?key=/user:pass@) — credentials in URLs land in logs = exfil shape
+  //     ③ no consumption-into-execution sink: pipe / command substitution / && / ; / -o download-to-disk
+  //     ④ if an auth header is present: credential shape prefix ↔ issuer-domain table
+  //        (KNOWN_CRED_BEARER_DOMAINS, the table is a **ruler over external facts**, not the criterion) —
+  //        hit AND target host ∈ issuer domain ⇒ "credential sent to its issuer" = normal auth;
+  //        **unknown shape / foreign domain / Cookie / Basic auth ⇒ null (no widening, back to the
+  //        original criteria) = fail-closed closure**.
+  //   ⚠️ Only the "fetch direction" is allowed; body exfil, URL credentials, foreign-domain credentials and
+  //      cookies still walk the original review. Gate wording: interception not lowered (body/foreign
+  //      domains as before), false-positive lowered (legitimate authenticated fetch no longer popups).
+  //    🔴 Red-line calibration (first draft was caught by existing tests): an HTTP GET's URL line IS data
+  //    going out (C2 beacon is exactly a GET) ⇒ "fetch = in only" holds only on the **credential
+  //    dimension**; credential-less GET ⇒ null (keep the original review). This gate only accepts
+  //    "credential in auth header + issuer-domain match".
+  checkBenignFetch(call) {
+    const sh = extractShell(call) || '';
+    if (!sh) return null;
+    const isFetchVerb = /\b(curl|curl\.exe|wget|Invoke-RestMethod|Invoke-WebRequest|irm|iwr|httpie)\b/i.test(sh);
+    if (!isFetchVerb) return null;
+    if (/-X\s*["']?(POST|PUT|PATCH|DELETE)\b/i.test(sh)) return null;
+    // body (payload = data going out)
+    if (/(^|\s)(-d|--data(\b|-raw|-binary|-urlencode)|-F|--form|-T|--upload-file|--json)\b/i.test(sh)) return null;
+    // credentials in URL query (they land in logs/caches = exfil shape)
+    if (/\?[^\s"']*\b(token|apikey|api_key|access_token|sig|signature|password|passwd|secret)\s*=/i.test(sh)) return null;
+    // userinfo form (https://user:pass@host)
+    if (/https?:\/\/[^\s"'@\/]+:[^\s"'@]+@/i.test(sh)) return null;
+    // consumption-into-execution sinks. ⚠️ Do NOT use EXTERNAL_TARGET here: this gate IS network fetch —
+    // the command necessarily contains an external URL (that is the target, not an exfil channel);
+    // copying checkBenignRead self-destructs (fetch necessarily hits "external target" ⇒ never allowed).
+    if (/(^|\s)(-o|--output)\b/i.test(sh)) return null;   // download-to-disk = staging for execution
+    if (/[|;&]|\$\(|`/.test(sh.replace(/"[^"]*"/g, (q) => q.replace(/[|;&]|\$\(|`/g, '\0')))) return null;   // chains/substitution (quoted auth-header chars exempt)
+    // Cookie / Basic auth: no shape prefix to match an issuer ⇒ undecided ⇒ null (fail-closed)
+    if (/\bCookie\s*:/i.test(sh) || /(?:^|\s)-u\s+(?:["']|https?:\/\/)/i.test(sh)) return null;
+    const urlHosts = [...sh.matchAll(/https?:\/\/([a-z0-9.-]+)/gi)].map((m) => m[1].toLowerCase());
+    if (!urlHosts.length) return null;
+    // 🔴 no auth header ⇒ null (caught by capability#175 / residual#527 on the first draft): a
+    //    credential-less GET's URL line is data going out ⇒ keep the original review.
+    const auth = sh.match(/Authorization["'\s:=]+(?:Bearer\s+)?([A-Za-z0-9_\-=.]{8,})/i);
+    if (!auth) return null;
+    {
+      const cred = auth[1];
+      const known = KNOWN_CRED_BEARER_DOMAINS.find((k) => k.shape.test(cred));
+      if (!known) return null;   // unknown credential format ⇒ no widening
+      const inDomain = urlHosts.every((h) => known.domains.some((d) => h === d || h.endsWith('.' + d)));
+      if (!inDomain) return null;   // credential to a non-issuer domain = leak shape, back to original review
+    }
+    return { reason: '法无禁止即可为（认证头凭据向归属方自证＝使用授权；无发送体、无链式执行汇，凭据不随取回外泄）：放行' };
+  }
+
   deduceRisk(call) {
     const s = inferCallSemantics(call, { sessWritten: this.sessWritten, sessRead: this.sessRead });
     // 🔴 [2026-09-26 · root-cause fix] Cross-call sensitive-source registration has been **moved UP to the
@@ -3059,6 +3131,15 @@ export class WeiwenLawEngine {
       note: benign ? benign.reason : '非公开系统信息读取（本档不适用）',
     });
     if (benign) return { kind: 'allow', law: '法无禁止', reason: benign.reason };
+    // Fractal micro: network fetch (data flows IN only) — credentials in an auth header = use-of-
+    // authorization, judged apart from credentials in a body/URL = exfil (xiaoD #59 item ①)
+    const benignFetch = this.checkBenignFetch(call);
+    this._mark('M', {
+      step: '稳态结果 · 法无禁止即可为（认证头凭据取回，落入 M 的显式放行档）',
+      hit: !!benignFetch, verdict: benignFetch ? 'allow' : null,
+      note: benignFetch ? benignFetch.reason : '非认证头凭据取回（本档不适用）',
+    });
+    if (benignFetch) return { kind: 'allow', law: '法无禁止', reason: benignFetch.reason };
     // —— path-1 attribution anchor (fractal sub-item m result, NOT the whole-chain M result) ——
     // Boundary iron law (user-set · prevent logic clash): attrib is the "fractal micro m result (M₁)
     // of one sub-item completing one round of the causal chain" — it only answers the sub-question "can this action
