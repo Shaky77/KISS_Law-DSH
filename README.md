@@ -111,14 +111,6 @@ Add `kiss-law.patch.yml` as an overlay into your DSH profile (the exact path dep
 | `query_nested` | **read-only.** The macro/micro nesting, the containment relations, the termination criterion for expansion, and the **direction** of the outcome (up / down / indeterminate — never a number). Also judges the shape of the bounded-constraint form: the arrow mark is not an operator, it marks H's internal rail |
 | `query_tension` | **read-only.** The tension span, in three notches (tolerance ⇒ a dimensionless ratio; clauses only ⇒ a gap list, and a set difference has no magnitude; neither ⇒ not judged). Also returns the three-layer distinction, the H permit (runway covered ⇒ withdraw excess caution), who bears the relay loss, the escalation criterion, and the source grade of this layer's ruler (origin vs relay) |
 
-### 3 hard gates (hooks) + 1 read-only audit hook
-
-- `tools/pre-execute` (waterfall) → returns `{ kind: 'deny', reason }` to block the **act**
-- `agent/pre-step` (waterfall) → returns `{ kind: 'reject' }` to reject the whole **step**
-- `tools/post-execute` (waterfall) → returns `{ kind: 'block', feedback }` and the host returns the call as an `isError` whose content is that feedback, severing a failed **receipt** into a corrective error
-- `tools/result` (emit) → observe only, never rewrite — by contract it has no return channel at all
-
-All four sit outside the model: two gate the act/step, one gates the receipt; none touches inner H.
 
 ### Full plugin entry (excerpt from `src/index.js`)
 
@@ -173,41 +165,6 @@ export function apply(ctx) {
 
 > Full implementation (all 7 tools' `execute`, runtime log, engine adjudication) in repo `src/index.js`.
 
-### Anchor source (task scope) — how irreversible actions get authorized
-
-The scar gate (`irreversible action + unattributable to any declared anchor ⇒ REVIEW`) needs an
-**authorization anchor**. Three structural rules apply:
-
-1. **Source = a structural entry, not the message stream.** The `agent/pre-step` payload carries
-   `messages` (`payload = { agent, messages, step, signal }`), but the **message stream is an observation
-   surface, not an authorization source**: at the text layer a principal's words and the audited agent's
-   own narration are isomorphic (both plain strings — only the host's `role` labelling separates them, and
-   that labelling is a host representation detail). Reading authority out of it puts a Y-axis quantity into
-   an X-axis container, and empirically yields two failure modes: a *false connection* (a bare "continue"
-   extracts no anchor yet reports the channel as connected, so the real gap stays hidden) and a *false
-   witness* (an agent narrating "I am about to wipe /app/data" hands a real path into the pool). Authority
-   therefore comes from `setPrincipalScope(scope)` instead — a **module-level API** the host integration
-   calls at the task boundary. It is not a tool, so the model cannot reach it: principal/audited-party
-   separation holds **by position**, not by content inspection. The `exec` view
-   (`{ token, callId, name, arguments, signal, agent?, parent? }`) has **no scope slot** — so nothing is
-   guessed onto it either.
-2. **Principal only.** Only the **principal's** declaration authorizes. The audited agent's own narration
-   never enters the anchor pool — otherwise a model could self-authorize by simply narrating the act
-   first. The agent's utterance still feeds the speech/action comparison: it **binds**, it does not authorize.
-3. **Scope in force now — replaced, not accrued.** The pool reflects the declaration currently in force.
-   A changed or withdrawn scope takes effect immediately; if it survived merely because it had been
-   declared once, authorization could never be taken back (and a single mis-attributed path would stay
-   valid forever).
-
-If no structural entry is connected, the pool stays empty and irreversible actions are handed to a
-human (`fail-closed`) — authorization is never invented. To observe what your host actually passes:
-
-    query_anchor_channel  →  { adapter: { authority, authoritySeen, shape, rolesSeen,
-                                          clueSeen, clueNonAuthoritative, assistantSeen,
-                                          agentBoundary: { present, keys }, structGap },
-                               engine:  { principalAnchorSeen, poolPaths, poolNouns } }
-
-Call it once on a real host to replace guessing about host field names with observation.
 
 ### Structural entries (host side, unreachable by the model)
 
@@ -216,12 +173,8 @@ reach them (separation holds **by position**, not by content inspection):
 
 | entry | when the host calls it | why it must exist structurally |
 |---|---|---|
-| `setPrincipalScope(scope)` | at the task boundary (task start / explicit revoke) | the message stream is an observation surface, not an authorization source (see above) |
+| `setPrincipalScope(scope)` | at the task boundary (task start / explicit revoke) | the message stream is an observation surface, not an authorization source |
 | `healBrokenWindow(note)` | after the fault is actually fixed, or by human ruling | once the broken window is in force, `pre-execute` refuses **every** call — including the repair action itself ⇒ with no host-side entry, the stop-loss is a **session-level deadlock** (only a process restart gets out). The engine's `healWindow()` is reachable only through `resolveBug()` / `settleWindow()`, and in a DSH session the audited model can trigger neither ⇒ what was missing is the **wire**, not the **capability**. |
-
-`healBrokenWindow` returns `{ at, note, kind, instances, wereBroken }`. `wereBroken` is read **before**
-healing, so the report cannot claim a heal that had nothing to heal; every call is traced (append-only,
-cap 20) because releasing a stop-loss is an accountability event, not a silent state flip.
 
 
 ## Structure
