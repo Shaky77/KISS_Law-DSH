@@ -1,6 +1,6 @@
 {
   "name": "dsh-kiss-law",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "KISS's Law (Weiwen's Law) universal causal engine (white-box presentation). DeepSeek Harness (Cordis) plugin implementation.",
   "type": "module",
   "main": "./src/index.js",
@@ -11,6 +11,8 @@
   },
   "files": [
     "src",
+    "!src/core/_engine_base_*",
+    "!src/runtime.log",
     "kiss-law.patch.yml",
     "README.md",
     "DESIGN.md",
