@@ -164,7 +164,11 @@ test('🔴 expansion 读数：只呈现 sigmaS（真身）与距离缺位，不�
   await handlers['tools/pre-execute'](DELETEROOT(), next);
   const after = await readSteady();
   assert.ok(after.expansion, '跃迁读数必须在');
-  assert.equal(after.expansion.sigmaS, after.structLedgerSize, 'sigmaS＝结构账条目数（真身口径）');
+  // 🔴 [2026-11-04 · Pillar 2 (xiaoD 62 P1-1)] ΣS counts directional anchors only; the auditable
+  //   difference: structLedgerSize − ΣS ＝ placeholder (sign:'0') count.
+  const placeholders = (after.structLedger ?? []).filter((e) => e.sign === '0').length;
+  assert.equal(after.expansion.sigmaS, after.structLedgerSize - placeholders,
+    'ΣS＝directional anchors; structLedgerSize − ΣS ＝ placeholder count (auditable difference)');
   assert.equal(after.expansion.r0, null, 'R₀ 由决策方给定 ⇒ 引擎如实报 null，不编数');
   assert.equal(after.expansion.triggered, false, '引擎不自动触发 R_EXPANSION（跳3 归决策方）');
   assert.match(after.expansion.note, /决策方|decider/, 'note 必须写明归属');

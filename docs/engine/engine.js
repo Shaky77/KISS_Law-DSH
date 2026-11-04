@@ -446,6 +446,14 @@ function inferCallSemantics(call, ctx = {}) {
     isCredWrite,
     isSystem: SYSTEM_PATH.test(path) || SYSTEM_PATH.test(sh),
     isExternal,
+    // 🔴 [2026-11-04 · Pillar 1 "explicit attribution" (xiaoD 62 P0-1 · three-way intersection)]
+    //   "who said it" is attribution, not authorization — attribution is parsed & fixed before the
+    //   gate (adapter bridges the field); the deduction layer branches by attribution:
+    //   third-party ⇒ intrusion holds; principal ⇒ never; unattributed ⇒ pending-attribution.
+    //   pre-step calls are shaped {name:'pre-step', args:{messages}} ⇒ take provenance from msg[0].
+    provThirdParty: call?.args?.messages?.[0]?.provenance === 'third-party' || call?.args?.messages?.[0]?.ctx?.provenance === 'third-party',
+    provPrincipal: call?.args?.messages?.[0]?.provenance === 'principal' || call?.args?.messages?.[0]?.ctx?.provenance === 'principal',
+    provAttributed: Boolean(call?.args?.messages?.[0]?.provenance ?? call?.args?.messages?.[0]?.ctx?.provenance),
     hitsInnerH: hitsInnerH(packed),
     // Directional signal (not content signal): whether execution content is auditable before execution.
     // All three segments must hold (opaque source → transform/eval → execution sink), avoiding "writing a doc" misjudged as execution.
@@ -530,7 +538,12 @@ function simulateBranch(s, kind, premise = inferencePremise(s)) {
   }
   // D-1 path (=|S-1|): assume call triggers damage. Erosion amount graded by risk-signal severity (objective structure, not enumerating specific values).
   // Branches ordered high-to-low severity: light signal must not mask heavy signal (e.g. hasOpaqueVar -1 must not block isCred -3).
-  if (s.hitsInnerH) return { path: 'D-1', finalS: -3, note: '侵内 H 黑箱（思想/自由意志）' };
+  // 🔴 [2026-11-04 · Pillar 1 (xiaoD 62 P0-1)] attribution-aware intrusion branch:
+  if (s.hitsInnerH) {
+    if (s.provThirdParty) return { path: 'D-1', finalS: -3, note: '侵内 H 黑箱（思想/自由意志）——来源已显式归属为第三方' };
+    if (s.provPrincipal) return { path: 'allow', finalS: 0, note: '主权者自己的话——归属显式，内 H 不审（自我决定）' };
+    return { path: 'D-1', finalS: 0, note: '来源未标注——待归属（不预设外人、不记罚分）：交还主权者裁决' };
+  }
   // Directional criterion precedes content criterion: when content is masked no content judgment, but "non-auditable execution" direction is already determined bad.
   if (s.isOpaqueExec) return { path: 'D-1', finalS: -3, note: '执行内容不可审计（不透明源→转换/求值→执行落点）：后果不可推演，方向恒为 S 不可保' };
   // Chained fallback (2026-08-25): script written this session gets executed — content source known (registry), grade by registered content
@@ -1881,7 +1894,11 @@ export class WeiwenLawEngine {
       //   presents the distance. r0 has no engine-side value (the decider sets it) ⇒ null,
       //   honestly; distance likewise; only sigmaS (the true body) reads.
       expansion: {
-        sigmaS: this.sStructLedger.size,
+      // 🔴 [2026-11-04 · Pillar 2 "double-entry ledger" (xiaoD 62 P1-1)] ΣS counts directional
+      //   anchors only (sign ∈ {'+','-'}); sign:"0" placeholders stay in the ledger but are
+      //   excluded from thickness — "placeholders must not enter judgment".
+      sigmaS: [...this.sStructLedger.values()].filter((e) => e?.sign === '+' || e?.sign === '-').length,
+      sigmaSNote: 'ΣS＝directional anchors; structLedgerSize − ΣS ＝ placeholder count (auditable difference)',
         r0: null,
         distance: null,
         triggered: false,

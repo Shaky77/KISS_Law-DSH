@@ -287,6 +287,25 @@ function policeGate(call) {
 //   入口未接 ⇒ 锚池留空 ⇒ 不可逆动作交人工（fail-closed）。**这是设计，不是漏读消息。**
 const PRINCIPAL_ROLE_HINT = /^(user|human|principal|operator|owner)$/i;
 
+// 🔴 [2026-11-04 · Pillar 2 / display-vs-action (xiaoD 62 P1-3)] single masking entry:
+export function maskSecrets(v) {
+  const MASK = (s) => String(s)
+    .replace(/((?:github_pat_|ghp_|gho_|ghu_|ghs_|sk-|npm_|xoxb-|AKIA)[A-Za-z0-9_\-]{4})[A-Za-z0-9_\-]+/g, '$1***')
+    .replace(/(Bearer\s+)([A-Za-z0-9_\-=.]{8})[A-Za-z0-9_\-=.]+/gi, '$1$2***')
+    .replace(/((?:token|apikey|api_key|access_token|password|secret)\s*[=:]\s*["']?)([A-Za-z0-9_\-]{4})[A-Za-z0-9_\-]+/gi, '$1$2***');
+  if (typeof v === 'string') return MASK(v);
+  try { return JSON.parse(MASK(JSON.stringify(v))); } catch { return v; }
+}
+
+// 🔴 [2026-11-04 · Pillar 2 (xiaoD 62 P1-2)] payload-direction criterion:
+export function isFetchShaped(cmd) {
+  const sh = String(cmd ?? '');
+  if (!/\b(curl|curl\.exe|wget|Invoke-RestMethod|Invoke-WebRequest|irm|iwr|httpie)\b/i.test(sh)) return false;
+  if (/(^|\s)-X\s*["']?(POST|PUT|PATCH|DELETE)\b/i.test(sh)) return false;
+  if (/(^|\s)(-d|--data(\b|-raw|-binary|-urlencode)|-F|--form|-T|--upload-file|--json)\b/i.test(sh)) return false;
+  return true;
+}
+
 // 结构入口（宿主集成方调用；模型不可达）。返回上一值便于回退，不给"开关式骑墙"留口。
 let _hostPrincipalScope = null;
 // 范围变更留痕（append-only 观测，上限 20 条）：**撤回必须有痕**。
@@ -1161,7 +1180,10 @@ function apply(ctx) {
             : (isCredAsk ? 'This action reads credential material (keys/passwords/tokens).' : 'This layer\'s criteria are exhausted; it cannot decide for you.'));
     // ③ detail line: the criterion text compressed to **one summary line** (the evidence stays in the ledger)
     const rawDetail = String(decision.reason ?? '').split('\n')[0].trim();
-    const detailLine = rawDetail.length > 72 ? `${rawDetail.slice(0, 72)}…` : (rawDetail || '(this layer\'s criteria are exhausted)');
+    // 🔴 [2026-11-04 · P1-3] the summary passes maskSecrets — criterion text may quote the raw
+    //    command (with credential literals); the display surface must never show full credentials.
+    const detailLine0 = rawDetail.length > 72 ? `${rawDetail.slice(0, 72)}…` : (rawDetail || '(this layer\'s criteria are exhausted)');
+    const detailLine = String(maskSecrets(detailLine0));
     // "Always allow" memory hit ⇒ the same kind is not asked again (this is the effect side of the fourth
     // state); the receipt still records where the approval came from.
     if (_reviewAlways.has(rk)) return { always: true, key: rk };
@@ -1366,11 +1388,23 @@ function apply(ctx) {
         const atE = decision?.attrib;
         const cmdCat = commandLayer(String(call?.args?.command ?? call?.args?.cmd ?? call?.args?.script ?? '')) || '';
         if (atE && (cmdCat === 'exfil' || cmdCat === 'exfil-net' || atE.layer === 'network-send' || atE.layer === 'exfil' || atE.layer === 'exfil-net')) {
+          // 🔴 [2026-11-04 · Pillar 2 (xiaoD 62 P1-2)] ledger by payload direction, not credential
+          //   presence: fetch-shaped (GET, no send body) ⇒ data flows in only ⇒ **no consumption**
+          //   (sign:'0' fetch entry, same-class deduped); true egress keeps the negative entry.
+          const _cmd0 = String(call?.args?.command ?? call?.args?.cmd ?? call?.args?.script ?? '');
+          if (isFetchShaped(_cmd0)) {
+            engine.recordStructural?.({
+              cls: 'struct::net::fetch',
+              sign: '0',
+              rule: 'Fetch (GET-shaped, no send body) ⇒ inbound direction, no consumption, no negative entry (severity by direction, not by action)',
+            });
+            logline(`pre-execute ${exec?.name} -> fetch executed (human-approved) | ledger: sign:0 fetch (no consumption, payload-direction criterion)`);
+          } else {
           engine.recordSteady?.({
             executed: true,
             negative: 1,
             attrib: atE,
-            action: String(call?.args?.command ?? call?.args?.body ?? '').slice(0, 200),
+            action: String(maskSecrets(call?.args?.command ?? call?.args?.body ?? '')).slice(0, 200),
             detail: 'Exfiltration executed (human-approved): the data left this machine and cannot be recalled — the steady state was consumed, recorded as a negative entry (the ledger only grows)',
           });
           // 🔴 [2026-10-30 · structural wiring (xiaoD 51, the trustee's own words)] the first
@@ -1381,6 +1415,7 @@ function apply(ctx) {
             sign: '-',
             rule: 'Same-class exfiltration ⇒ ask a human (review); if approved, execute and record the negative entry; irreversible (the data has left the machine)',
           });
+          }
         }
         // 🔴 [2026-10-29 · exfiltration demoted to S · ledger] a human-approved exfiltration leaves a
         //   factual trace: "irreversible" is carried by the ledger (executed ⇒ the ledger derives the
@@ -1485,11 +1520,21 @@ function apply(ctx) {
       // ═══ White-box carry-through: what the interface sees = what the log records (same object, no fork) ═══
       // The log is the append-only audit surface (src/runtime.log, gitignored, not committed). Writing a second "summary" here
       //   means two copies that can drift, at which point white-box degrades into "looks white-box" ⇒ so what is logged is **the very object returned**.
-      logline(`pre-execute ${exec?.name} -> ${decision.kind}${isReview ? '(awaitingHuman, bugKey=' + out.bugKey + ')' : ''} | whitebox ${JSON.stringify(out)}`);
+      // 🔴 [2026-11-04 · P2-2 origin] plugin-originated rejects carry origin:'plugin'.
+      // 🔴 [2026-11-04 · P1-3] logs pass maskSecrets — audit trail kept, credentials masked.
+      if (out.kind === 'reject' || out.kind === 'review') out.origin = 'plugin';
+      logline(`pre-execute ${exec?.name} -> ${decision.kind}${isReview ? '(awaitingHuman, bugKey=' + out.bugKey + ')' : ''} | whitebox ${JSON.stringify(maskSecrets(out))}`);
       return out;
     }
     // allow: leave a white-box record too — otherwise "was not blocked" becomes an **unrecorded event** (isomorphic to the engine rule "every causalChain leaves a mark").
-    logline(`pre-execute ${exec?.name} -> whitebox ${JSON.stringify(decision)}`);
+    // 🔴 [2026-11-04 · Pillar 2 (Acheng P2)] allow leaves a sign:'0' structural entry (same-class
+    //   deduped) — "reviewed and let through" is a presence proof, not a consumption, not a gain.
+    logline(`pre-execute ${exec?.name} -> whitebox ${JSON.stringify(maskSecrets(decision))}`);
+    engine.recordStructural?.({
+      cls: 'struct::observed::allow',
+      sign: '0',
+      rule: 'Allow (allow) ＝ presence proof: reviewed, replayable; no consumption, no gain (double-entry: allows leave traces too)',
+    });
     return next();
   });
 
@@ -1510,31 +1555,52 @@ function apply(ctx) {
     channel.agentBoundary = observeBoundary(payload?.agent);
     channel.lastObservedAt = new Date().toISOString();
     logline(`pre-step observed (shape=${rd.shape}, roles=[${rd.rolesSeen.join(',')}], clue=${rd.principalClue ? 'yes' : 'no'}, authority=${channel.authoritySeen ? 'structural-entry' : 'NONE'}) — 窗口面不授权，锚池不由此填充，不猜`);
-    const decision = engine.decidePreStep(payload?.messages);
+    // 🔴 [2026-11-04 · Pillar 1 (xiaoD 62 P0-1)] field bridge fix: the engine reads `provenance`,
+    //   DSH actually carries `role`/`source.kind` ⇒ the adapter maps a principal-role turn before
+    //   the gate (batch-level, matching the engine's batch semantics; tool results use
+    //   pre-execute/post-execute and never pass this gate).
+    const _psMsgs = payload?.messages;
+    const _isPrincipalTurn = Array.isArray(_psMsgs)
+      && _psMsgs.some((m) => PRINCIPAL_ROLE_HINT.test(m?.role ?? ''));
+    const decision = engine.decidePreStep(
+      _isPrincipalTurn
+        ? _psMsgs.map((m) => ({ ...m, provenance: 'principal' }))
+        : _psMsgs
+    );
     // reject (clear violation) and review (definition unclear / cannot determine) both block, do not spread.
     // review = "suspend & return to user for decision": intercept first, don't release.
-    if (decision.kind === 'reject' || decision.kind === 'review') {
-      if (decision.kind === 'review') {
-        // PreStepDecision 契约仅 {kind:'reject'}、不携带 reason/branches，
-        // 故富信息（定义不明缘由 + 留证身份 + 推演后果）记入 runtime.log 供审计，
-        // 宿主侧以 reject 阻断该步、交还用户裁决。
-        // [2026-09-24 同构回填 · base A → B] 这一格是 base A 的既有能力：契约不给回传通道时，
-        //   **唯一不留白的方式是把留证写进审计日志** —— 否则 pre-step 的 review 事后不可追溯（bugKey 与后果双失）。
+    // 🔴 [2026-11-04 · Pillar 3 "display ≠ action" (xiaoD 62 P0-2 · the trustee's own criterion)]
+    //   The gate sits on the hands, not the mouth: review ⇒ **visible decision point** (the approval
+    //   channel asks a human), never a silent reject that swallows the message. Approved ⇒ next()
+    //   (displayed and acted on, responsibility with the adjudicator); refused ⇒ reject; no approval
+    //   service ⇒ fail-closed reject (rich log).
+    // 🔴 [2026-11-04 · Pillar 2 · P2-2] rejects carry origin:'plugin' — actor says who approved,
+    //   origin says who blocked.
+    if (decision.kind === 'reject') {
+      logline(`pre-step -> reject(${decision.law}) | whitebox ${JSON.stringify(maskSecrets({ ...decision, origin: 'plugin', bugKey: bugKeyOf({ name: 'pre-step', args: { messages: payload?.messages } }), causalChain: engine.causalChain ?? [] }))}`);
+      return { kind: 'reject', origin: 'plugin' };
+    }
+    if (decision.kind === 'review') {
         const call = { name: 'pre-step', args: { messages: payload?.messages } };
         const bug = bugKeyOf(call);
         const branches = deduceBranches(engine, call);
-        logline(`pre-step review (definition unclear) -> suspend & return to user for decision, bugKey=${bug}` + (branches ? ` branches=${JSON.stringify(branches)}` : ''));
-      } else {
-        logline(`pre-step -> reject(${decision.law})`);
-      }
+        logline(`pre-step review (definition unclear) -> visible decision point (approval channel) bugKey=${bug}` + (branches ? ` branches=${JSON.stringify(maskSecrets(branches))}` : ''));
       // ═══ White-box carry-through: isomorphic to tools/pre-execute ═══
       // The host contract (PreStepDecision) only accepts {kind:'reject'} ⇒ rich information **cannot leave via the return value**,
       //   so the log is the only white-box surface at this exit. Before, only a few names were picked for the log
       //   (bugKey / branches) — the same "pick by name" defect: neither the engine decision object itself (law/reason)
       //   nor **this decision's chain landing** (engine.causalChain) reached the audit surface.
       // Now the **engine decision object itself** is recorded verbatim, plus adapter additions (same rule: by position, never by name).
-      logline(`pre-step -> whitebox ${JSON.stringify({ ...decision, bugKey: bugKeyOf({ name: 'pre-step', args: { messages: payload?.messages } }), causalChain: engine.causalChain ?? [] })}`);
-      return { kind: 'reject' }; // PreStepDecision only {kind:'reject'}, no reason field
+      logline(`pre-step -> whitebox ${JSON.stringify(maskSecrets({ ...decision, bugKey: bug, conduction: engine.conduction ?? [], causalChain: engine.causalChain ?? [] }))}`);
+      const verdict = await requestReviewVerdict({ name: 'pre-step' }, decision, call);
+      if (verdict === 'allowed-once') {
+        logline(`pre-step review -> trustee allowed this one -> next | whitebox ${JSON.stringify(maskSecrets({ ...decision, humanVerdict: 'allowed-once' }))}`);
+        return next();
+      }
+      // rejected or null (no approval service, fail-closed): not acted on; the popup summary is the
+      // visible decision point (host display-receipt gap is P2-1 family, escalated).
+      logline(`pre-step review -> ${verdict === 'rejected' ? 'trustee refused' : 'no approval service, fail-closed'} -> reject | whitebox ${JSON.stringify(maskSecrets({ ...decision, humanVerdict: verdict ?? 'no-approval-service' }))}`);
+      return { kind: 'reject', origin: 'plugin' };
     }
     return next();
   });
